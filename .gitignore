@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+npm-debug.log*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Env
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Vite
+apps/web/dist/
+
+# Claude Code local session settings (per-machine, not project source)
+.claude/settings.local.json
+
+# 旧系统参考截图/视频素材：体积大（数百MB），仅本地参考用，不入库
+月子中心管理软件截图与操作视频/
