@@ -115,6 +115,10 @@ async function main() {
     { code: 'crm.opportunity', name: 'CRM-销售机会', type: 'PAGE', parentCode: 'crm' },
     { code: 'crm.follow-up', name: 'CRM-跟进记录', type: 'PAGE', parentCode: 'crm' },
 
+    { code: 'contract', name: '合同管理', type: 'MODULE' },
+    { code: 'contract.template', name: '合同管理-合同模板', type: 'PAGE', parentCode: 'contract' },
+    { code: 'contract.record', name: '合同管理-合同', type: 'PAGE', parentCode: 'contract' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -171,6 +175,13 @@ async function main() {
   }
   for (const action of ['view', 'create']) {
     permSpecs.push({ code: `crm.follow-up.${action}`, name: `CRM-跟进记录-${action}`, type: 'BUTTON', parentCode: 'crm.follow-up' });
+  }
+
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `contract.template.${action}`, name: `合同管理-合同模板-${action}`, type: 'BUTTON', parentCode: 'contract.template' });
+  }
+  for (const action of ['view', 'create', 'update', 'sign', 'submit', 'void', 'renew']) {
+    permSpecs.push({ code: `contract.record.${action}`, name: `合同管理-合同-${action}`, type: 'BUTTON', parentCode: 'contract.record' });
   }
 
   const codeToId = new Map<string, string>();
@@ -260,13 +271,16 @@ async function main() {
   }
 
   // STORE_MANAGER：有意缺 platform.store.delete 与 platform.account.field.phone.view，用于验证 403 与字段掩码；
-  // CRM 的 lose（线索/机会标记流失）同理有意缺失——影响销售统计口径的作废类操作先只给 SUPER_ADMIN。
+  // CRM 的 lose（线索/机会标记流失）、合同的 void（作废）同理有意缺失——影响统计口径/具有终局性的
+  // 操作先只给 SUPER_ADMIN。合同模板（法律文本主数据）也不开放给 STORE_MANAGER，与 Parameter/Tag/Region
+  // 这类主数据现在的处理口径一致。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
     'crm.customer.field.phone.view',
     'crm.lead.lose',
     'crm.opportunity.lose',
+    'contract.record.void',
   ]);
   const storeManagerCodes = permSpecs
     .map((p) => p.code)
@@ -282,7 +296,8 @@ async function main() {
           code === 'audit.log' ||
           code === 'audit.log.view' ||
           code === 'platform' ||
-          code.startsWith('crm')),
+          code.startsWith('crm') ||
+          code.startsWith('contract.record')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -397,6 +412,43 @@ async function main() {
     },
   });
 
+  // ---------- 工作流定义：CONTRACT_SIGNING ----------
+  const contractSigningDefinition = await prisma.workflowDefinition.upsert({
+    where: { tenantId_code_version: { tenantId: tenant.id, code: 'CONTRACT_SIGNING', version: 1 } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'CONTRACT_SIGNING',
+      name: '合同签约审核',
+      version: 1,
+      status: 'PUBLISHED',
+      createdBy: 'SEED',
+    },
+  });
+
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: contractSigningDefinition.id, seq: 1 } },
+    update: {},
+    create: {
+      workflowDefinitionId: contractSigningDefinition.id,
+      seq: 1,
+      name: '店长初审',
+      approverType: 'ROLE',
+      approverRoleId: storeManagerRole.id,
+    },
+  });
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: contractSigningDefinition.id, seq: 2 } },
+    update: {},
+    create: {
+      workflowDefinitionId: contractSigningDefinition.id,
+      seq: 2,
+      name: '平台管理员终审',
+      approverType: 'ROLE',
+      approverRoleId: superAdminRole.id,
+    },
+  });
+
   // ---------- 参数 ----------
   const parameters: { key: string; value: string; description: string }[] = [
     { key: 'platform.password_policy.min_length', value: '8', description: '密码最小长度' },
@@ -477,6 +529,41 @@ async function main() {
         customerId: demoCustomer.id,
         stage: 'FOLLOWING',
         assignedToId: storeManagerAccount.id,
+        createdBy: 'SEED',
+      },
+    });
+  }
+
+  // ---------- 合同示例数据 ----------
+  const contractTemplate = await prisma.contractTemplate.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'STANDARD_V1' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'STANDARD_V1',
+      name: '标准月子套餐合同模板',
+      content: '甲方（客户）与乙方（伴月轩月子中心）就月子套餐服务达成以下约定：服务内容、金额、起止日期以合同正文为准。',
+      createdBy: 'SEED',
+    },
+  });
+
+  const demoContract = await prisma.contract.findFirst({
+    where: { tenantId: tenant.id, customerId: demoCustomer.id },
+  });
+  if (!demoContract) {
+    await prisma.contract.create({
+      data: {
+        tenantId: tenant.id,
+        contractNo: generateBusinessNo('CT'),
+        customerId: demoCustomer.id,
+        templateId: contractTemplate.id,
+        storeId: store.id,
+        title: '示例客户-李女士 月子套餐合同',
+        content: contractTemplate.content,
+        amount: 8800000,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        status: 'DRAFT',
         createdBy: 'SEED',
       },
     });

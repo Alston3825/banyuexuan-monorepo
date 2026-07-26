@@ -79,6 +79,7 @@ model Store {
   accounts    Account[]
   customers   Customer[]
   leads       Lead[]
+  contracts   Contract[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -659,6 +660,7 @@ model Customer {
   assignedTo    Account?           @relation(fields: [assignedToId], references: [id])
   leads         Lead[]
   opportunities SalesOpportunity[]
+  contracts     Contract[]
 
   @@unique([tenantId, customerNo])
   @@index([tenantId, assignedToId])
@@ -719,6 +721,7 @@ model SalesOpportunity {
   customer   Customer @relation(fields: [customerId], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
   assignedTo Account? @relation(fields: [assignedToId], references: [id])
+  contracts  Contract[]
 
   @@unique([tenantId, opportunityNo])
   @@index([tenantId, stage])
@@ -745,4 +748,76 @@ model FollowUpRecord {
   @@index([tenantId, businessType, businessId])
   @@index([tenantId, createdAt])
   @@map("follow_up_records")
+}
+
+// ==================== 合同管理 ====================
+
+enum ContractStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  VOIDED
+}
+
+/// 合同模板：法律文本相关主数据，正常可编辑（不像合同本身那样"签了就锁定"），
+/// 不做占位符替换引擎——content 是纯文本，套用模板时由前端把内容复制进合同表单，
+/// 由人编辑后再提交，符合"AI 只做技术实现、模板文本人工终审"的原则。
+model ContractTemplate {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  content   String       @db.Text
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  contracts Contract[]
+
+  @@unique([tenantId, code])
+  @@map("contract_templates")
+}
+
+/// 合同：租户全局可见，不做门店级数据隔离（同 Customer，一份合同背后是一个全局客户）。
+/// 状态机：DRAFT -(签署)-> 内容锁定 -(提交)-> PENDING_APPROVAL -(通用工作流引擎审批)-> ACTIVE/REJECTED；
+/// ACTIVE/DRAFT 可 VOIDED。PENDING_APPROVAL 阶段的状态推进由 ContractRecordService 在读取时
+/// 懒同步自 WorkflowInstance（见 ContractRecordService.reconcileStatus），不侵入通用工作流引擎本身。
+/// 续签＝新建一条 Contract（renewalOfContractId 指回原合同），原合同不做任何修改。
+model Contract {
+  id                  String         @id @default(cuid())
+  tenantId            String         @map("tenant_id")
+  contractNo          String         @map("contract_no")
+  customerId          String         @map("customer_id")
+  opportunityId       String?        @map("opportunity_id")
+  templateId          String?        @map("template_id")
+  storeId             String         @map("store_id")
+  title               String
+  content             String         @db.Text
+  amount              Int // 合同总金额，最小货币单位（分）
+  startDate           DateTime       @map("start_date")
+  endDate             DateTime       @map("end_date")
+  status              ContractStatus @default(DRAFT)
+  signedByCustomerAt  DateTime?      @map("signed_by_customer_at")
+  signedByCustomerIp  String?        @map("signed_by_customer_ip")
+  renewalOfContractId String?        @map("renewal_of_contract_id")
+  voidReason          String?        @map("void_reason") @db.Text
+  createdBy           String         @map("created_by")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  version             Int            @default(0)
+
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  opportunity SalesOpportunity? @relation(fields: [opportunityId], references: [id])
+  template    ContractTemplate? @relation(fields: [templateId], references: [id])
+  store       Store             @relation(fields: [storeId], references: [id])
+  renewalOf   Contract?         @relation("ContractRenewal", fields: [renewalOfContractId], references: [id])
+  renewals    Contract[]        @relation("ContractRenewal")
+
+  @@unique([tenantId, contractNo])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@map("contracts")
 }
