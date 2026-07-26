@@ -77,6 +77,8 @@ model Store {
   departments Department[]
   teams       Team[]
   accounts    Account[]
+  customers   Customer[]
+  leads       Lead[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -178,6 +180,9 @@ model Account {
   position        Position?               @relation(fields: [positionId], references: [id])
   roleAssignments AccountRoleAssignment[]
   refreshTokens   RefreshToken[]
+  assignedCustomers     Customer[]
+  assignedLeads         Lead[]
+  assignedOpportunities SalesOpportunity[]
 
   @@unique([tenantId, username])
   @@index([tenantId, storeId])
@@ -594,4 +599,150 @@ model DemoApprovalRequest {
   version     Int                    @default(0)
 
   @@map("demo_approval_requests")
+}
+
+// ==================== CRM：客户与线索管理 ====================
+
+enum CustomerSource {
+  WALK_IN // 自然到店
+  REFERRAL // 转介绍
+  ONLINE_AD // 线上广告投放
+  SOCIAL_MEDIA // 社交媒体/私域
+  PARTNER // 渠道合作
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  FOLLOWING
+  CONVERTED
+  LOST
+}
+
+enum OpportunityStage {
+  FOLLOWING
+  QUOTED
+  WON
+  LOST
+}
+
+enum FollowUpType {
+  PHONE_CALL
+  WECHAT
+  SMS
+  ON_SITE_VISIT
+  INVITATION // 邀约到店
+  OTHER
+}
+
+/// 客户主数据：租户全局共享，不做门店级数据隔离（已与业务方确认）。
+/// primaryStoreId 仅用于展示/报表（首次建档门店），不参与任何权限范围过滤。
+/// 字段保持最小化——合同/收款/房态预订等 P1 后续切片会引用 Customer.id，
+/// 但不因为它们而预先在这里加字段，那些模块的专属数据放在各自的表里。
+model Customer {
+  id             String         @id @default(cuid())
+  tenantId       String         @map("tenant_id")
+  customerNo     String         @map("customer_no")
+  name           String
+  phone          String // 敏感字段，见 FieldMaskInterceptor + SENSITIVE_FIELD_REGISTRY.Customer
+  source         CustomerSource @default(WALK_IN)
+  primaryStoreId String?        @map("primary_store_id") // 首次建档门店，仅展示/报表用途
+  assignedToId   String?        @map("assigned_to_id") // 当前归属销售，无保护期/锁定机制
+  remark         String?        @db.Text
+  createdBy      String         @map("created_by")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  version        Int            @default(0)
+
+  primaryStore  Store?             @relation(fields: [primaryStoreId], references: [id])
+  assignedTo    Account?           @relation(fields: [assignedToId], references: [id])
+  leads         Lead[]
+  opportunities SalesOpportunity[]
+
+  @@unique([tenantId, customerNo])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, primaryStoreId])
+  @@index([tenantId, phone])
+  @@map("customers")
+}
+
+/// 线索：NEW -> ASSIGNED -> FOLLOWING -> CONVERTED；LOST 可从 NEW/ASSIGNED/FOLLOWING 到达。
+model Lead {
+  id           String         @id @default(cuid())
+  tenantId     String         @map("tenant_id")
+  leadNo       String         @map("lead_no")
+  name         String
+  phone        String
+  source       CustomerSource @default(WALK_IN)
+  storeId      String?        @map("store_id") // 线索录入门店，仅展示用途，不做范围过滤
+  status       LeadStatus     @default(NEW)
+  assignedToId String?        @map("assigned_to_id")
+  customerId   String?        @map("customer_id") // 转化后回填，转化前为空
+  lostReason   String?        @map("lost_reason") @db.Text
+  remark       String?        @db.Text
+  createdBy    String         @map("created_by")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  version      Int            @default(0)
+
+  store         Store?             @relation(fields: [storeId], references: [id])
+  assignedTo    Account?           @relation(fields: [assignedToId], references: [id])
+  customer      Customer?          @relation(fields: [customerId], references: [id])
+  opportunities SalesOpportunity[]
+
+  @@unique([tenantId, leadNo])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, storeId])
+  @@map("leads")
+}
+
+/// 销售机会：FOLLOWING -> QUOTED -> WON；LOST 可从 FOLLOWING/QUOTED 到达，WON 为终态不可转 LOST。
+/// leadId 可空——允许无原始线索的机会（如老客户加购/转介绍直接开单）。
+model SalesOpportunity {
+  id            String           @id @default(cuid())
+  tenantId      String           @map("tenant_id")
+  opportunityNo String           @map("opportunity_no")
+  customerId    String           @map("customer_id")
+  leadId        String?          @map("lead_id")
+  stage         OpportunityStage @default(FOLLOWING)
+  amount        Int? // 意向金额，最小货币单位（分）
+  assignedToId  String?          @map("assigned_to_id")
+  lostReason    String?          @map("lost_reason") @db.Text
+  remark        String?          @db.Text
+  createdBy     String           @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  version       Int              @default(0)
+
+  customer   Customer @relation(fields: [customerId], references: [id])
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  assignedTo Account? @relation(fields: [assignedToId], references: [id])
+
+  @@unique([tenantId, opportunityNo])
+  @@index([tenantId, stage])
+  @@index([tenantId, customerId])
+  @@index([tenantId, assignedToId])
+  @@map("sales_opportunities")
+}
+
+/// 跟进/邀约记录：多态挂接（businessType/businessId），镜像 WorkflowInstance 的
+/// businessType/businessId 命名与设计——不建三个可空外键，未来新增可跟进的实体
+/// （如合同回访）无需改表结构。这是只增不改的日志类实体（没有 version/updatedAt），
+/// 与 WorkflowActionLog 保持同一建模风格，而非套用"每个业务模型都有 version"的模板。
+model FollowUpRecord {
+  id             String       @id @default(cuid())
+  tenantId       String       @map("tenant_id")
+  businessType   String       @map("business_type") // 'LEAD' | 'OPPORTUNITY' | 'CUSTOMER'
+  businessId     String       @map("business_id")
+  type           FollowUpType
+  content        String       @db.Text
+  nextFollowUpAt DateTime?    @map("next_follow_up_at")
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, businessType, businessId])
+  @@index([tenantId, createdAt])
+  @@map("follow_up_records")
 }

@@ -8,6 +8,7 @@ import { QueueModule } from './queue/queue.module';
 import { AuthModule } from './auth/auth.module';
 import { PlatformModule } from './platform/platform.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { CrmModule } from './crm/crm.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -24,6 +25,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     AuthModule,
     PlatformModule,
     WorkflowModule,
+    CrmModule,
     HealthModule,
   ],
   providers: [

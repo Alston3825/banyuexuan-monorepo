@@ -4,6 +4,7 @@
  */
 import { PrismaClient, PermissionPointType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { generateBusinessNo } from '../src/common/utils/business-no.util';
 
 const prisma = new PrismaClient();
 
@@ -108,7 +109,14 @@ async function main() {
     { code: 'audit', name: '审计日志', type: 'MODULE' },
     { code: 'audit.log', name: '审计日志-查询', type: 'PAGE', parentCode: 'audit' },
 
+    { code: 'crm', name: '客户与线索管理', type: 'MODULE' },
+    { code: 'crm.customer', name: 'CRM-客户', type: 'PAGE', parentCode: 'crm' },
+    { code: 'crm.lead', name: 'CRM-线索', type: 'PAGE', parentCode: 'crm' },
+    { code: 'crm.opportunity', name: 'CRM-销售机会', type: 'PAGE', parentCode: 'crm' },
+    { code: 'crm.follow-up', name: 'CRM-跟进记录', type: 'PAGE', parentCode: 'crm' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
+    { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
 
   for (const sub of [
@@ -151,6 +159,19 @@ async function main() {
     });
   }
   permSpecs.push({ code: 'audit.log.view', name: '审计日志-查询-view', type: 'BUTTON', parentCode: 'audit.log' });
+
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `crm.customer.${action}`, name: `CRM-客户-${action}`, type: 'BUTTON', parentCode: 'crm.customer' });
+  }
+  for (const action of ['view', 'create', 'update', 'assign', 'convert', 'lose']) {
+    permSpecs.push({ code: `crm.lead.${action}`, name: `CRM-线索-${action}`, type: 'BUTTON', parentCode: 'crm.lead' });
+  }
+  for (const action of ['view', 'create', 'update', 'advance-stage', 'lose']) {
+    permSpecs.push({ code: `crm.opportunity.${action}`, name: `CRM-销售机会-${action}`, type: 'BUTTON', parentCode: 'crm.opportunity' });
+  }
+  for (const action of ['view', 'create']) {
+    permSpecs.push({ code: `crm.follow-up.${action}`, name: `CRM-跟进记录-${action}`, type: 'BUTTON', parentCode: 'crm.follow-up' });
+  }
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -238,8 +259,15 @@ async function main() {
       .catch(() => undefined);
   }
 
-  // STORE_MANAGER：有意缺 platform.store.delete 与 platform.account.field.phone.view，用于验证 403 与字段掩码
-  const storeManagerExcluded = new Set(['platform.store.delete', 'platform.account.field.phone.view']);
+  // STORE_MANAGER：有意缺 platform.store.delete 与 platform.account.field.phone.view，用于验证 403 与字段掩码；
+  // CRM 的 lose（线索/机会标记流失）同理有意缺失——影响销售统计口径的作废类操作先只给 SUPER_ADMIN。
+  const storeManagerExcluded = new Set([
+    'platform.store.delete',
+    'platform.account.field.phone.view',
+    'crm.customer.field.phone.view',
+    'crm.lead.lose',
+    'crm.opportunity.lose',
+  ]);
   const storeManagerCodes = permSpecs
     .map((p) => p.code)
     .filter(
@@ -253,7 +281,8 @@ async function main() {
           code === 'audit' ||
           code === 'audit.log' ||
           code === 'audit.log.view' ||
-          code === 'platform'),
+          code === 'platform' ||
+          code.startsWith('crm')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -399,6 +428,59 @@ async function main() {
     update: {},
     create: { tenantId: tenant.id, tagId: tag.id, entityType: 'Store', entityId: store.id, createdBy: 'SEED' },
   });
+
+  // ---------- CRM 示例数据 ----------
+  const demoLead = await prisma.lead.findFirst({
+    where: { tenantId: tenant.id, phone: '13700000001' },
+  });
+  if (!demoLead) {
+    await prisma.lead.create({
+      data: {
+        tenantId: tenant.id,
+        leadNo: generateBusinessNo('L'),
+        name: '示例线索-张女士',
+        phone: '13700000001',
+        source: 'ONLINE_AD',
+        storeId: store.id,
+        status: 'NEW',
+        createdBy: 'SEED',
+      },
+    });
+  }
+
+  let demoCustomer = await prisma.customer.findFirst({
+    where: { tenantId: tenant.id, phone: '13700000002' },
+  });
+  if (!demoCustomer) {
+    demoCustomer = await prisma.customer.create({
+      data: {
+        tenantId: tenant.id,
+        customerNo: generateBusinessNo('C'),
+        name: '示例客户-李女士',
+        phone: '13700000002',
+        source: 'REFERRAL',
+        primaryStoreId: store.id,
+        assignedToId: storeManagerAccount.id,
+        createdBy: 'SEED',
+      },
+    });
+  }
+
+  const demoOpportunity = await prisma.salesOpportunity.findFirst({
+    where: { tenantId: tenant.id, customerId: demoCustomer.id },
+  });
+  if (!demoOpportunity) {
+    await prisma.salesOpportunity.create({
+      data: {
+        tenantId: tenant.id,
+        opportunityNo: generateBusinessNo('O'),
+        customerId: demoCustomer.id,
+        stage: 'FOLLOWING',
+        assignedToId: storeManagerAccount.id,
+        createdBy: 'SEED',
+      },
+    });
+  }
 
   console.log('seed 完成:');
   console.log(`  租户: ${tenant.code} / 门店: ${store.code} / 区域: ${region.code}`);

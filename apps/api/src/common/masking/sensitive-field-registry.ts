@@ -15,4 +15,5 @@ function maskPhone(value: unknown): unknown {
 
 export const SENSITIVE_FIELD_REGISTRY: Record<string, SensitiveFieldRule[]> = {
   Account: [{ field: 'phone', permissionCode: 'platform.account.field.phone.view', mask: maskPhone }],
+  Customer: [{ field: 'phone', permissionCode: 'crm.customer.field.phone.view', mask: maskPhone }],
 };
