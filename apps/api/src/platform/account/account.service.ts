@@ -27,7 +27,11 @@ export class AccountService {
   }
 
   async findOneOrThrow(id: string) {
-    const account = await this.prisma.account.findUnique({ where: { id }, omit: ACCOUNT_OMIT });
+    const account = await this.prisma.account.findUnique({
+      where: { id },
+      omit: ACCOUNT_OMIT,
+      include: { roleAssignments: { where: { revokedAt: null }, include: { role: true } } },
+    });
     if (!account) throw new NotFoundException(`Account ${id} 不存在`);
     return account;
   }
