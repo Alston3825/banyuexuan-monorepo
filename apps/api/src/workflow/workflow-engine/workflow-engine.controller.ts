@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -9,6 +9,7 @@ import { CommentDto } from './dto/comment.dto';
 import { ReassignDto } from './dto/reassign.dto';
 import { AddApproverDto } from './dto/add-approver.dto';
 import { CcDto } from './dto/cc.dto';
+import { QueryWorkflowInstanceDto } from './dto/query-workflow-instance.dto';
 
 @ApiTags('workflow/instance')
 @Controller('workflow/instances')
@@ -18,6 +19,16 @@ export class WorkflowEngineController {
     private readonly prisma: PrismaService,
     private readonly ctx: RequestContextService,
   ) {}
+
+  /** 按业务单据反查最新一条挂在它身上的 WorkflowInstance，供业务模块详情页跳转查看审批进度。 */
+  @Get()
+  @RequirePermission('workflow.instance.view')
+  findByBusiness(@Query() query: QueryWorkflowInstanceDto) {
+    return this.prisma.workflowInstance.findFirst({
+      where: { tenantId: this.ctx.tenantId, businessType: query.businessType, businessId: query.businessId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 
   @Get(':id')
   @RequirePermission('workflow.instance.view')

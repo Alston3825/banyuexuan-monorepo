@@ -3,6 +3,10 @@ import type { WorkflowInstance } from '../types/workflow'
 
 export const workflowInstanceApi = {
   get: (id: string) => http.get<WorkflowInstance>(`/workflow/instances/${id}`).then((r) => r.data),
+  findByBusiness: (businessType: string, businessId: string) =>
+    http
+      .get<WorkflowInstance | null>('/workflow/instances', { params: { businessType, businessId } })
+      .then((r) => r.data),
   approve: (id: string, comment?: string) =>
     http.post<WorkflowInstance>(`/workflow/instances/${id}/approve`, { comment }).then((r) => r.data),
   reject: (id: string, comment?: string) =>

@@ -15,6 +15,10 @@ import {
   DocumentText,
   List,
   Clipboard,
+  PersonAdd,
+  TrendingUp,
+  Reader,
+  Document,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -36,6 +40,25 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('部门管理', '/org/departments'), key: '/org/departments', icon: icon(Business) },
       { label: linkLabel('班组管理', '/org/teams'), key: '/org/teams', icon: icon(People) },
       { label: linkLabel('职位管理', '/org/positions'), key: '/org/positions', icon: icon(Clipboard) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '客户与线索',
+    key: 'group-crm',
+    children: [
+      { label: linkLabel('客户管理', '/crm/customers'), key: '/crm/customers', icon: icon(PersonAdd) },
+      { label: linkLabel('线索管理', '/crm/leads'), key: '/crm/leads', icon: icon(People) },
+      { label: linkLabel('销售机会', '/crm/opportunities'), key: '/crm/opportunities', icon: icon(TrendingUp) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '合同管理',
+    key: 'group-contract',
+    children: [
+      { label: linkLabel('合同模板', '/contract/templates'), key: '/contract/templates', icon: icon(Reader) },
+      { label: linkLabel('合同管理', '/contract/records'), key: '/contract/records', icon: icon(Document) },
     ],
   },
   {

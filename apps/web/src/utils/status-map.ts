@@ -66,6 +66,47 @@ export const WORKFLOW_ACTION_LABEL_MAP: Record<string, string> = {
   ARCHIVE: '归档',
 }
 
+export const LEAD_STATUS_MAP: Record<string, StatusMeta> = {
+  NEW: { label: '新线索', type: 'default' },
+  ASSIGNED: { label: '已分配', type: 'info' },
+  FOLLOWING: { label: '跟进中', type: 'warning' },
+  CONVERTED: { label: '已转化', type: 'success' },
+  LOST: { label: '已流失', type: 'error' },
+}
+
+export const OPPORTUNITY_STAGE_MAP: Record<string, StatusMeta> = {
+  FOLLOWING: { label: '跟进中', type: 'warning' },
+  QUOTED: { label: '报价中', type: 'info' },
+  WON: { label: '已签约', type: 'success' },
+  LOST: { label: '已流失', type: 'error' },
+}
+
+export const CONTRACT_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审核中', type: 'warning' },
+  ACTIVE: { label: '已生效', type: 'success' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  VOIDED: { label: '已作废', type: 'default' },
+}
+
+export const CUSTOMER_SOURCE_LABEL_MAP: Record<string, string> = {
+  WALK_IN: '自然到店',
+  REFERRAL: '转介绍',
+  ONLINE_AD: '线上广告',
+  SOCIAL_MEDIA: '社交媒体/私域',
+  PARTNER: '渠道合作',
+  OTHER: '其他',
+}
+
+export const FOLLOW_UP_TYPE_LABEL_MAP: Record<string, string> = {
+  PHONE_CALL: '电话',
+  WECHAT: '微信',
+  SMS: '短信',
+  ON_SITE_VISIT: '到访',
+  INVITATION: '邀约',
+  OTHER: '其他',
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',
