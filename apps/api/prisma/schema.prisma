@@ -1,0 +1,597 @@
+// 伴月轩月子中心管理系统 — P0 平台底座数据模型
+// 命名约定：Prisma 侧用 camelCase，通过 @map/@@map 落到 snake_case 列名，
+// 遵循《新系统开发文档》"关键原则"：tenant_id/store_id/created_by/created_at/updated_at/version。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 平台域 ====================
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+/// 租户：伴月轩当前只有一个租户，不建管理 CRUD API，仅由 seed 脚本创建。
+model Tenant {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  @@map("tenants")
+}
+
+enum CommonStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Region {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  stores Store[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("regions")
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  CLOSED
+}
+
+model Store {
+  id        String      @id @default(cuid())
+  tenantId  String      @map("tenant_id")
+  regionId  String      @map("region_id")
+  code      String
+  name      String
+  address   String?
+  status    StoreStatus @default(PENDING)
+  createdBy String      @map("created_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  version   Int         @default(0)
+
+  region      Region       @relation(fields: [regionId], references: [id])
+  departments Department[]
+  teams       Team[]
+  accounts    Account[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, regionId])
+  @@map("stores")
+}
+
+model Department {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  storeId   String?      @map("store_id") // null = 总部/跨店部门
+  parentId  String?      @map("parent_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  store    Store?       @relation(fields: [storeId], references: [id])
+  parent   Department?  @relation("DeptTree", fields: [parentId], references: [id])
+  children Department[] @relation("DeptTree")
+  teams    Team[]
+  accounts Account[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, storeId])
+  @@map("departments")
+}
+
+model Team {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  storeId      String?      @map("store_id") // 从部门冗余，便于按店查询
+  departmentId String       @map("department_id")
+  code         String
+  name         String
+  status       CommonStatus @default(ACTIVE)
+  createdBy    String       @map("created_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  version      Int          @default(0)
+
+  store      Store?     @relation(fields: [storeId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  accounts   Account[]
+
+  @@unique([departmentId, code])
+  @@index([tenantId, storeId])
+  @@map("teams")
+}
+
+model Position {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  rank      Int?
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  accounts Account[]
+
+  @@unique([tenantId, code])
+  @@map("positions")
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+  LOCKED
+}
+
+model Account {
+  id           String        @id @default(cuid())
+  tenantId     String        @map("tenant_id")
+  storeId      String?       @map("store_id") // 主门店，总部账号可为空
+  departmentId String?       @map("department_id")
+  teamId       String?       @map("team_id")
+  positionId   String?       @map("position_id")
+  username     String
+  phone        String? // 敏感字段，见 FieldMaskInterceptor
+  email        String?
+  passwordHash String        @map("password_hash")
+  realName     String        @map("real_name")
+  status       AccountStatus @default(ACTIVE)
+  lastLoginAt  DateTime?     @map("last_login_at")
+  createdBy    String        @map("created_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  version      Int           @default(0)
+
+  store           Store?                  @relation(fields: [storeId], references: [id])
+  department      Department?             @relation(fields: [departmentId], references: [id])
+  team            Team?                   @relation(fields: [teamId], references: [id])
+  position        Position?               @relation(fields: [positionId], references: [id])
+  roleAssignments AccountRoleAssignment[]
+  refreshTokens   RefreshToken[]
+
+  @@unique([tenantId, username])
+  @@index([tenantId, storeId])
+  @@map("accounts")
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean      @default(false) @map("is_system") // 内置角色不可删除
+  status      CommonStatus @default(ACTIVE)
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  version     Int          @default(0)
+
+  permissions RoleOnPermission[]
+  assignments AccountRoleAssignment[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+enum PermissionPointType {
+  MODULE
+  PAGE
+  BUTTON
+  FIELD
+}
+
+/// RBAC 四级权限目录：模块/页面/按钮/字段，全局系统目录（非租户隔离），由 seed 脚本维护。
+model PermissionPoint {
+  id            String              @id @default(cuid())
+  applicationId String?             @map("application_id")
+  parentId      String?             @map("parent_id")
+  type          PermissionPointType
+  code          String              @unique
+  name          String
+  isSensitive   Boolean             @default(false) @map("is_sensitive")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  application Application?       @relation(fields: [applicationId], references: [id])
+  parent      PermissionPoint?   @relation("PermTree", fields: [parentId], references: [id])
+  children    PermissionPoint[]  @relation("PermTree")
+  roles       RoleOnPermission[]
+
+  @@map("permission_points")
+}
+
+model RoleOnPermission {
+  id                String   @id @default(cuid())
+  roleId            String   @map("role_id")
+  permissionPointId String   @map("permission_point_id")
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  role            Role            @relation(fields: [roleId], references: [id])
+  permissionPoint PermissionPoint @relation(fields: [permissionPointId], references: [id])
+
+  @@unique([roleId, permissionPointId])
+  @@map("role_permissions")
+}
+
+enum DataScopeType {
+  TENANT
+  REGION
+  STORE
+  DEPARTMENT
+  TEAM
+  SELF
+}
+
+/// 数据范围授权：账号-角色绑定携带 scope，跨店查询/执行需要独立的一条授权记录。
+model AccountRoleAssignment {
+  id        String        @id @default(cuid())
+  tenantId  String        @map("tenant_id")
+  accountId String        @map("account_id")
+  roleId    String        @map("role_id")
+  scopeType DataScopeType @map("scope_type")
+  scopeId   String?       @map("scope_id") // TENANT/SELF 时为空
+  grantedBy String        @map("granted_by")
+  grantedAt DateTime      @default(now()) @map("granted_at")
+  expiresAt DateTime?     @map("expires_at")
+  revokedAt DateTime?     @map("revoked_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  @@index([accountId])
+  @@index([tenantId, scopeType, scopeId])
+  @@map("account_role_assignments")
+}
+
+enum ApplicationType {
+  WEB
+  MOBILE
+  OPENAPI
+}
+
+model Application {
+  id        String          @id @default(cuid())
+  tenantId  String?         @map("tenant_id") // null = 平台级应用
+  code      String          @unique
+  name      String
+  type      ApplicationType
+  status    CommonStatus    @default(ACTIVE)
+  createdBy String          @map("created_by")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  version   Int             @default(0)
+
+  permissionPoints PermissionPoint[]
+
+  @@map("applications")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  color     String?
+  category  String?
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  bindings TagBinding[]
+
+  @@unique([tenantId, name])
+  @@map("tags")
+}
+
+/// 多态挂接：标签可打在任意未来实体上（entityType + entityId）。
+model TagBinding {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  tagId      String   @map("tag_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("tag_bindings")
+}
+
+enum ParameterValueType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+model Parameter {
+  id          String             @id @default(cuid())
+  tenantId    String?            @map("tenant_id") // null = 全局系统默认值
+  storeId     String?            @map("store_id") // 非空覆盖到店级
+  key         String
+  value       String             @db.Text
+  valueType   ParameterValueType @default(STRING) @map("value_type")
+  description String?
+  isSystem    Boolean            @default(false) @map("is_system")
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  // 注意：MySQL 唯一索引中 NULL 不互斥，(tenantId=X, storeId=NULL, key=K) 理论上可重复插入；
+  // ParameterService 在应用层做"先查后插"兜底校验，不完全依赖数据库唯一约束。
+  @@unique([tenantId, storeId, key])
+  @@map("parameters")
+}
+
+// ==================== 审计 ====================
+
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  VOID
+  STATE_TRANSITION
+  APPROVE
+  REJECT
+  WITHDRAW
+  REASSIGN
+  ADD_APPROVER
+  CC
+  ARCHIVE
+  SENSITIVE_QUERY
+  EXPORT
+  PRINT
+}
+
+/// 只增不改：不提供 update/delete 方法，关键记录只允许冲正/作废，符合审计总则。
+model AuditLog {
+  id            String      @id @default(cuid())
+  tenantId      String?     @map("tenant_id") // 登录失败等无租户上下文场景可为空
+  storeId       String?     @map("store_id")
+  accountId     String?     @map("account_id")
+  action        AuditAction
+  entityType    String      @map("entity_type")
+  entityId      String?     @map("entity_id")
+  beforeData    Json?       @map("before_data")
+  afterData     Json?       @map("after_data")
+  changedFields Json?       @map("changed_fields")
+  ip            String?
+  userAgent     String?     @map("user_agent")
+  requestId     String?     @map("request_id")
+  result        String      @default("SUCCESS")
+  remark        String?     @db.Text
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@index([accountId, createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== 工作流引擎骨架 ====================
+
+enum WorkflowDefStatus {
+  DRAFT
+  PUBLISHED
+  DISABLED
+}
+
+model WorkflowDefinition {
+  id        String            @id @default(cuid())
+  tenantId  String            @map("tenant_id")
+  code      String // 业务场景 key，如 "DEMO_APPROVAL"
+  name      String
+  version   Int               @default(1)
+  status    WorkflowDefStatus @default(PUBLISHED)
+  createdBy String            @map("created_by")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  nodes     WorkflowNode[]
+  instances WorkflowInstance[]
+
+  @@unique([tenantId, code, version])
+  @@map("workflow_definitions")
+}
+
+enum WorkflowNodeApproverType {
+  ROLE
+  ACCOUNT
+}
+
+/// 顺序审批节点定义。
+model WorkflowNode {
+  id                   String                   @id @default(cuid())
+  workflowDefinitionId String                   @map("workflow_definition_id")
+  seq                  Int
+  name                 String
+  approverType         WorkflowNodeApproverType @map("approver_type")
+  approverRoleId       String?                  @map("approver_role_id")
+  approverAccountId    String?                  @map("approver_account_id")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  definition WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+
+  @@unique([workflowDefinitionId, seq])
+  @@map("workflow_nodes")
+}
+
+enum WorkflowInstanceStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  ARCHIVED
+}
+
+/// businessType/businessId 泛化挂接任意业务单据，P1+ 真实单据复用同一引擎无需改动。
+model WorkflowInstance {
+  id                   String                 @id @default(cuid())
+  tenantId             String                 @map("tenant_id")
+  storeId              String?                @map("store_id")
+  workflowDefinitionId String                 @map("workflow_definition_id")
+  businessType         String                 @map("business_type")
+  businessId           String                 @map("business_id")
+  title                String
+  status               WorkflowInstanceStatus @default(DRAFT)
+  currentNodeSeq       Int?                   @map("current_node_seq")
+  initiatorId          String                 @map("initiator_id")
+  submittedAt          DateTime?              @map("submitted_at")
+  finishedAt           DateTime?              @map("finished_at")
+  createdBy            String                 @map("created_by")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  version              Int                    @default(0)
+
+  definition WorkflowDefinition         @relation(fields: [workflowDefinitionId], references: [id])
+  approvers  WorkflowInstanceApprover[]
+  actions    WorkflowActionLog[]
+
+  @@index([tenantId, businessType, businessId])
+  @@index([status])
+  @@map("workflow_instances")
+}
+
+enum WorkflowApproverRole {
+  APPROVER
+  ADDED_APPROVER
+  CC
+}
+
+enum WorkflowApproverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REASSIGNED
+  SKIPPED
+  NOTIFIED
+}
+
+/// 单表覆盖：普通审批人 / 加签 / 抄送 / 转交链（reassignedFromId 指向被转交的原记录）。
+model WorkflowInstanceApprover {
+  id                 String                 @id @default(cuid())
+  workflowInstanceId String                 @map("workflow_instance_id")
+  nodeSeq            Int                    @map("node_seq")
+  accountId          String                 @map("account_id")
+  role               WorkflowApproverRole   @default(APPROVER)
+  status             WorkflowApproverStatus @default(PENDING)
+  comment            String?                @db.Text
+  actedAt            DateTime?              @map("acted_at")
+  reassignedFromId   String?                @map("reassigned_from_id")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  instance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+
+  @@index([workflowInstanceId, nodeSeq])
+  @@index([accountId, status])
+  @@map("workflow_instance_approvers")
+}
+
+enum WorkflowAction {
+  SUBMIT
+  APPROVE
+  REJECT
+  WITHDRAW
+  REASSIGN
+  ADD_APPROVER
+  CC
+  ARCHIVE
+}
+
+/// 审批时间线，供后续 UI 展示；每次动作同时写一份摘要进 AuditLog。
+model WorkflowActionLog {
+  id                 String         @id @default(cuid())
+  workflowInstanceId String         @map("workflow_instance_id")
+  nodeSeq            Int?           @map("node_seq")
+  actorId            String         @map("actor_id")
+  action             WorkflowAction
+  comment            String?        @db.Text
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  instance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+
+  @@index([workflowInstanceId, createdAt])
+  @@map("workflow_action_logs")
+}
+
+// ==================== 认证 ====================
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  accountId String    @map("account_id")
+  tokenHash String    @unique @map("token_hash")
+  userAgent String?   @map("user_agent")
+  ip        String?
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("refresh_tokens")
+}
+
+// ==================== 工作流引擎示例业务实体 ====================
+
+/// P0 专用最小审批业务实体，仅用于验证工作流引擎骨架端到端可用；
+/// P1+ 真实单据（合同/收款等）复用同一 WorkflowEngineService，不需要为每种业务再写一套状态机。
+model DemoApprovalRequest {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @map("tenant_id")
+  storeId     String?                @map("store_id")
+  title       String
+  content     String                 @db.Text
+  amount      Int? // 最小货币单位（分）
+  applicantId String                 @map("applicant_id")
+  status      WorkflowInstanceStatus @default(DRAFT)
+  createdBy   String                 @map("created_by")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  version     Int                    @default(0)
+
+  @@map("demo_approval_requests")
+}
