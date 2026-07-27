@@ -73,13 +73,15 @@ model Store {
   updatedAt DateTime    @updatedAt @map("updated_at")
   version   Int         @default(0)
 
-  region      Region       @relation(fields: [regionId], references: [id])
-  departments Department[]
-  teams       Team[]
-  accounts    Account[]
-  customers   Customer[]
-  leads       Lead[]
-  contracts   Contract[]
+  region          Region          @relation(fields: [regionId], references: [id])
+  departments     Department[]
+  teams           Team[]
+  accounts        Account[]
+  customers       Customer[]
+  leads           Lead[]
+  contracts       Contract[]
+  rooms           Room[]
+  roomOccupancies RoomOccupancy[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -656,11 +658,12 @@ model Customer {
   updatedAt      DateTime       @updatedAt @map("updated_at")
   version        Int            @default(0)
 
-  primaryStore  Store?             @relation(fields: [primaryStoreId], references: [id])
-  assignedTo    Account?           @relation(fields: [assignedToId], references: [id])
-  leads         Lead[]
-  opportunities SalesOpportunity[]
-  contracts     Contract[]
+  primaryStore    Store?             @relation(fields: [primaryStoreId], references: [id])
+  assignedTo      Account?           @relation(fields: [assignedToId], references: [id])
+  leads           Lead[]
+  opportunities   SalesOpportunity[]
+  contracts       Contract[]
+  roomOccupancies RoomOccupancy[]
 
   @@unique([tenantId, customerNo])
   @@index([tenantId, assignedToId])
@@ -809,15 +812,103 @@ model Contract {
   updatedAt           DateTime       @updatedAt @map("updated_at")
   version             Int            @default(0)
 
-  customer    Customer          @relation(fields: [customerId], references: [id])
-  opportunity SalesOpportunity? @relation(fields: [opportunityId], references: [id])
-  template    ContractTemplate? @relation(fields: [templateId], references: [id])
-  store       Store             @relation(fields: [storeId], references: [id])
-  renewalOf   Contract?         @relation("ContractRenewal", fields: [renewalOfContractId], references: [id])
-  renewals    Contract[]        @relation("ContractRenewal")
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  opportunity     SalesOpportunity? @relation(fields: [opportunityId], references: [id])
+  template        ContractTemplate? @relation(fields: [templateId], references: [id])
+  store           Store             @relation(fields: [storeId], references: [id])
+  renewalOf       Contract?         @relation("ContractRenewal", fields: [renewalOfContractId], references: [id])
+  renewals        Contract[]        @relation("ContractRenewal")
+  roomOccupancies RoomOccupancy[]
 
   @@unique([tenantId, contractNo])
   @@index([tenantId, customerId])
   @@index([tenantId, status])
   @@map("contracts")
+}
+
+// ==================== 房态预订（住店运营域） ====================
+
+enum RoomOccupancyStatus {
+  RESERVED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+model RoomType {
+  id            String       @id @default(cuid())
+  tenantId      String       @map("tenant_id")
+  code          String
+  name          String
+  description   String?      @db.Text
+  standardPrice Int?         @map("standard_price") // 参考价，最小货币单位（分），可空——非强制定价
+  status        CommonStatus @default(ACTIVE)
+  createdBy     String       @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  version       Int          @default(0)
+
+  rooms Room[]
+
+  @@unique([tenantId, code])
+  @@map("room_types")
+}
+
+/// 房间：不存房态枚举，房态由 RoomOccupancy 实时计算得出（见 RoomService.computeStatus）。
+/// underMaintenance/needsCleaning 是独立于占用记录的标志位（沿用开发文档"维修为独立标志"的设计）。
+model Room {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  storeId          String   @map("store_id")
+  roomTypeId       String   @map("room_type_id")
+  roomNo           String   @map("room_no")
+  floor            String // 允许 "1F"/"B1" 等标签，不做纯数字假设
+  underMaintenance Boolean  @default(false) @map("under_maintenance")
+  maintenanceNote  String?  @map("maintenance_note") @db.Text
+  needsCleaning    Boolean  @default(false) @map("needs_cleaning")
+  createdBy        String   @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  version          Int      @default(0)
+
+  store       Store           @relation(fields: [storeId], references: [id])
+  roomType    RoomType        @relation(fields: [roomTypeId], references: [id])
+  occupancies RoomOccupancy[]
+
+  @@unique([tenantId, storeId, roomNo])
+  @@index([tenantId, storeId])
+  @@map("rooms")
+}
+
+/// 占房记录：预订/入住/离店/取消的状态机主体。合同可选（弱关联，仿照 Contract.opportunityId）。
+model RoomOccupancy {
+  id               String              @id @default(cuid())
+  tenantId         String              @map("tenant_id")
+  occupancyNo      String              @map("occupancy_no")
+  roomId           String              @map("room_id")
+  storeId          String              @map("store_id") // 冗余存储，便于按店过滤，仿照 Contract.storeId
+  customerId       String              @map("customer_id")
+  contractId       String?             @map("contract_id")
+  status           RoomOccupancyStatus @default(RESERVED)
+  plannedCheckIn   DateTime            @map("planned_check_in")
+  plannedCheckOut  DateTime            @map("planned_check_out")
+  actualCheckInAt  DateTime?           @map("actual_check_in_at")
+  actualCheckOutAt DateTime?           @map("actual_check_out_at")
+  cancelReason     String?             @map("cancel_reason") @db.Text
+  remark           String?             @db.Text
+  createdBy        String              @map("created_by")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  version          Int                 @default(0)
+
+  room     Room      @relation(fields: [roomId], references: [id])
+  store    Store     @relation(fields: [storeId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id])
+  contract Contract? @relation(fields: [contractId], references: [id])
+
+  @@unique([tenantId, occupancyNo])
+  @@index([tenantId, roomId])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("room_occupancies")
 }

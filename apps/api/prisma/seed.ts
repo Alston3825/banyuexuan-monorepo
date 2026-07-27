@@ -119,6 +119,11 @@ async function main() {
     { code: 'contract.template', name: '合同管理-合同模板', type: 'PAGE', parentCode: 'contract' },
     { code: 'contract.record', name: '合同管理-合同', type: 'PAGE', parentCode: 'contract' },
 
+    { code: 'room', name: '房态预订', type: 'MODULE' },
+    { code: 'room.type', name: '房态预订-房型', type: 'PAGE', parentCode: 'room' },
+    { code: 'room.room', name: '房态预订-房间', type: 'PAGE', parentCode: 'room' },
+    { code: 'room.occupancy', name: '房态预订-占用记录', type: 'PAGE', parentCode: 'room' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -182,6 +187,16 @@ async function main() {
   }
   for (const action of ['view', 'create', 'update', 'sign', 'submit', 'void', 'renew']) {
     permSpecs.push({ code: `contract.record.${action}`, name: `合同管理-合同-${action}`, type: 'BUTTON', parentCode: 'contract.record' });
+  }
+
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `room.type.${action}`, name: `房态预订-房型-${action}`, type: 'BUTTON', parentCode: 'room.type' });
+  }
+  for (const action of ['view', 'create', 'update', 'maintenance', 'clean']) {
+    permSpecs.push({ code: `room.room.${action}`, name: `房态预订-房间-${action}`, type: 'BUTTON', parentCode: 'room.room' });
+  }
+  for (const action of ['view', 'create', 'checkin', 'checkout', 'cancel']) {
+    permSpecs.push({ code: `room.occupancy.${action}`, name: `房态预订-占用记录-${action}`, type: 'BUTTON', parentCode: 'room.occupancy' });
   }
 
   const codeToId = new Map<string, string>();
@@ -273,7 +288,8 @@ async function main() {
   // STORE_MANAGER：有意缺 platform.store.delete 与 platform.account.field.phone.view，用于验证 403 与字段掩码；
   // CRM 的 lose（线索/机会标记流失）、合同的 void（作废）同理有意缺失——影响统计口径/具有终局性的
   // 操作先只给 SUPER_ADMIN。合同模板（法律文本主数据）也不开放给 STORE_MANAGER，与 Parameter/Tag/Region
-  // 这类主数据现在的处理口径一致。
+  // 这类主数据现在的处理口径一致。房型（room.type）同理是平台级主数据，不开放给 STORE_MANAGER；
+  // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -297,7 +313,9 @@ async function main() {
           code === 'audit.log.view' ||
           code === 'platform' ||
           code.startsWith('crm') ||
-          code.startsWith('contract.record')),
+          code.startsWith('contract.record') ||
+          code.startsWith('room.room') ||
+          code.startsWith('room.occupancy')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -564,6 +582,72 @@ async function main() {
         startDate: new Date(),
         endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         status: 'DRAFT',
+        createdBy: 'SEED',
+      },
+    });
+  }
+
+  // ---------- 房态预订示例数据 ----------
+  const standardRoomType = await prisma.roomType.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'STANDARD' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'STANDARD',
+      name: '标准房',
+      standardPrice: 60000,
+      createdBy: 'SEED',
+    },
+  });
+  const suiteRoomType = await prisma.roomType.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'SUITE' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'SUITE',
+      name: '套房',
+      standardPrice: 98000,
+      createdBy: 'SEED',
+    },
+  });
+
+  const roomSeeds = [
+    { roomNo: '201', floor: '2F', roomTypeId: standardRoomType.id },
+    { roomNo: '202', floor: '2F', roomTypeId: standardRoomType.id },
+    { roomNo: '301', floor: '3F', roomTypeId: suiteRoomType.id },
+  ];
+  const demoRooms: Awaited<ReturnType<typeof prisma.room.upsert>>[] = [];
+  for (const r of roomSeeds) {
+    const room = await prisma.room.upsert({
+      where: { tenantId_storeId_roomNo: { tenantId: tenant.id, storeId: store.id, roomNo: r.roomNo } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        storeId: store.id,
+        roomTypeId: r.roomTypeId,
+        roomNo: r.roomNo,
+        floor: r.floor,
+        createdBy: 'SEED',
+      },
+    });
+    demoRooms.push(room);
+  }
+
+  const demoOccupancy = await prisma.roomOccupancy.findFirst({
+    where: { tenantId: tenant.id, customerId: demoCustomer.id },
+  });
+  if (!demoOccupancy) {
+    await prisma.roomOccupancy.create({
+      data: {
+        tenantId: tenant.id,
+        occupancyNo: generateBusinessNo('RO'),
+        roomId: demoRooms[0].id,
+        storeId: store.id,
+        customerId: demoCustomer.id,
+        // contractId 留空——验证"占用记录不要求先有生效合同"
+        plannedCheckIn: new Date(),
+        plannedCheckOut: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        status: 'RESERVED',
         createdBy: 'SEED',
       },
     });
