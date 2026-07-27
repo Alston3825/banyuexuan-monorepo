@@ -124,6 +124,9 @@ async function main() {
     { code: 'room.room', name: '房态预订-房间', type: 'PAGE', parentCode: 'room' },
     { code: 'room.occupancy', name: '房态预订-占用记录', type: 'PAGE', parentCode: 'room' },
 
+    { code: 'payment', name: '收款管理', type: 'MODULE' },
+    { code: 'payment.record', name: '收款管理-收款', type: 'PAGE', parentCode: 'payment' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -197,6 +200,9 @@ async function main() {
   }
   for (const action of ['view', 'create', 'checkin', 'checkout', 'cancel']) {
     permSpecs.push({ code: `room.occupancy.${action}`, name: `房态预订-占用记录-${action}`, type: 'BUTTON', parentCode: 'room.occupancy' });
+  }
+  for (const action of ['view', 'create', 'refund']) {
+    permSpecs.push({ code: `payment.record.${action}`, name: `收款管理-收款-${action}`, type: 'BUTTON', parentCode: 'payment.record' });
   }
 
   const codeToId = new Map<string, string>();
@@ -290,6 +296,8 @@ async function main() {
   // 操作先只给 SUPER_ADMIN。合同模板（法律文本主数据）也不开放给 STORE_MANAGER，与 Parameter/Tag/Region
   // 这类主数据现在的处理口径一致。房型（room.type）同理是平台级主数据，不开放给 STORE_MANAGER；
   // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除。
+  // 收款（payment.record）同理——退款的"提交申请"是前台日常操作，真正的审批权由通用工作流
+  // 引擎的审批人角色把关，不在这一层额外收紧，全部动作开放。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -315,7 +323,8 @@ async function main() {
           code.startsWith('crm') ||
           code.startsWith('contract.record') ||
           code.startsWith('room.room') ||
-          code.startsWith('room.occupancy')),
+          code.startsWith('room.occupancy') ||
+          code.startsWith('payment.record')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -467,6 +476,31 @@ async function main() {
     },
   });
 
+  // ---------- 工作流定义：PAYMENT_REFUND（只给一个审批节点，不像合同签约那样需要平台管理员终审） ----------
+  const paymentRefundDefinition = await prisma.workflowDefinition.upsert({
+    where: { tenantId_code_version: { tenantId: tenant.id, code: 'PAYMENT_REFUND', version: 1 } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'PAYMENT_REFUND',
+      name: '收款退款审批',
+      version: 1,
+      status: 'PUBLISHED',
+      createdBy: 'SEED',
+    },
+  });
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: paymentRefundDefinition.id, seq: 1 } },
+    update: {},
+    create: {
+      workflowDefinitionId: paymentRefundDefinition.id,
+      seq: 1,
+      name: '店长审批',
+      approverType: 'ROLE',
+      approverRoleId: storeManagerRole.id,
+    },
+  });
+
   // ---------- 参数 ----------
   const parameters: { key: string; value: string; description: string }[] = [
     { key: 'platform.password_policy.min_length', value: '8', description: '密码最小长度' },
@@ -565,11 +599,11 @@ async function main() {
     },
   });
 
-  const demoContract = await prisma.contract.findFirst({
+  let demoContract = await prisma.contract.findFirst({
     where: { tenantId: tenant.id, customerId: demoCustomer.id },
   });
   if (!demoContract) {
-    await prisma.contract.create({
+    demoContract = await prisma.contract.create({
       data: {
         tenantId: tenant.id,
         contractNo: generateBusinessNo('CT'),
@@ -653,10 +687,30 @@ async function main() {
     });
   }
 
+  // ---------- 收款示例数据 ----------
+  const demoPayment = await prisma.payment.findFirst({
+    where: { tenantId: tenant.id, contractId: demoContract.id },
+  });
+  if (!demoPayment) {
+    await prisma.payment.create({
+      data: {
+        tenantId: tenant.id,
+        paymentNo: generateBusinessNo('PY'),
+        contractId: demoContract.id,
+        customerId: demoCustomer.id,
+        storeId: store.id,
+        amount: 3000000,
+        method: 'CASH',
+        status: 'RECORDED',
+        createdBy: 'SEED',
+      },
+    });
+  }
+
   console.log('seed 完成:');
   console.log(`  租户: ${tenant.code} / 门店: ${store.code} / 区域: ${region.code}`);
   console.log(`  账号: admin / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
-  console.log(`  工作流定义: DEMO_APPROVAL（店长初审 -> 平台管理员终审）`);
+  console.log(`  工作流定义: DEMO_APPROVAL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND（店长审批）`);
 }
 
 main()

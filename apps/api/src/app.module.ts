@@ -11,6 +11,7 @@ import { WorkflowModule } from './workflow/workflow.module';
 import { CrmModule } from './crm/crm.module';
 import { ContractModule } from './contract/contract.module';
 import { RoomModule } from './room/room.module';
+import { PaymentModule } from './payment/payment.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -30,6 +31,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     CrmModule,
     ContractModule,
     RoomModule,
+    PaymentModule,
     HealthModule,
   ],
   providers: [
