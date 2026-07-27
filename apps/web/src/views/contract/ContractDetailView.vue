@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NSpace, NButton, NDescriptions, NDescriptionsItem, NModal, NForm, NFormItem, NInput, NInputNumber, NDatePicker } from 'naive-ui'
+import { NCard, NSpace, NButton, NDescriptions, NDescriptionsItem, NModal, NForm, NFormItem, NInput, NInputNumber, NDatePicker, NDataTable, NSelect, type DataTableColumns } from 'naive-ui'
 import { contractApi } from '../../api/modules/contract.api'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
+import { paymentApi } from '../../api/modules/payment.api'
 import type { Contract } from '../../api/types/contract'
-import { renderStatusBadge, CONTRACT_STATUS_MAP } from '../../utils/status-map'
+import type { Payment } from '../../api/types/payment'
+import type { PaymentContractSummary } from '../../api/types/payment'
+import { renderStatusBadge, CONTRACT_STATUS_MAP, PAYMENT_STATUS_MAP, PAYMENT_METHOD_LABEL_MAP } from '../../utils/status-map'
 import { toMajorUnits, toMinorUnits } from '../../utils/money'
 import { message, dialog } from '../../utils/discrete-api'
 
@@ -154,7 +157,110 @@ async function handleVoid() {
   }
 }
 
-onMounted(fetchAll)
+// ---------------- 收款记录 ----------------
+const payments = ref<Payment[]>([])
+const paymentSummary = ref<PaymentContractSummary | null>(null)
+
+async function fetchPayments() {
+  const [list, summary] = await Promise.all([paymentApi.list({ contractId }), paymentApi.getSummary(contractId)])
+  payments.value = list
+  paymentSummary.value = summary
+}
+
+const paymentFormVisible = ref(false)
+const paymentSubmitting = ref(false)
+const paymentModel = ref({ amountYuan: null as number | null, method: 'CASH', remark: '' })
+
+function openCreatePayment() {
+  paymentModel.value = { amountYuan: null, method: 'CASH', remark: '' }
+  paymentFormVisible.value = true
+}
+
+async function handleCreatePayment() {
+  if (!contract.value || !paymentModel.value.amountYuan) {
+    message.error('请填写收款金额')
+    return
+  }
+  paymentSubmitting.value = true
+  try {
+    await paymentApi.create({
+      contractId: contract.value.id,
+      customerId: contract.value.customerId,
+      storeId: contract.value.storeId,
+      amount: toMinorUnits(paymentModel.value.amountYuan)!,
+      method: paymentModel.value.method as Payment['method'],
+      remark: paymentModel.value.remark || undefined,
+    })
+    message.success('收款已登记')
+    paymentFormVisible.value = false
+    await fetchPayments()
+  } finally {
+    paymentSubmitting.value = false
+  }
+}
+
+const refundVisible = ref(false)
+const refundTarget = ref<Payment | null>(null)
+const refundReason = ref('')
+const refundSubmitting = ref(false)
+
+function openRefund(row: Payment) {
+  refundTarget.value = row
+  refundReason.value = ''
+  refundVisible.value = true
+}
+
+async function handleRequestRefund() {
+  if (!refundTarget.value) return
+  if (!refundReason.value.trim()) {
+    message.error('请填写退款原因')
+    return
+  }
+  refundSubmitting.value = true
+  try {
+    await paymentApi.requestRefund(refundTarget.value.id, refundReason.value, refundTarget.value.version)
+    message.success('退款申请已提交')
+    refundVisible.value = false
+    await fetchPayments()
+  } finally {
+    refundSubmitting.value = false
+  }
+}
+
+async function viewPaymentApprovalProgress(row: Payment) {
+  const instance = await workflowInstanceApi.findByBusiness('PAYMENT', row.id)
+  if (!instance) {
+    message.error('未找到关联的审批流程')
+    return
+  }
+  router.push(`/workflow/instances/${instance.id}`)
+}
+
+const paymentColumns: DataTableColumns<Payment> = [
+  { key: 'paymentNo', title: '收款单号' },
+  { key: 'amount', title: '金额（元）', render: (row) => toMajorUnits(row.amount) },
+  { key: 'method', title: '方式', render: (row) => PAYMENT_METHOD_LABEL_MAP[row.method] ?? row.method },
+  { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, PAYMENT_STATUS_MAP) },
+  {
+    key: 'actions',
+    title: '操作',
+    width: 140,
+    render: (row) => {
+      if (row.status === 'RECORDED') {
+        return h(NButton, { size: 'small', onClick: () => openRefund(row) }, { default: () => '退款申请' })
+      }
+      if (row.status === 'PENDING_REFUND') {
+        return h(NButton, { size: 'small', onClick: () => viewPaymentApprovalProgress(row) }, { default: () => '查看审批进度' })
+      }
+      return null
+    },
+  },
+]
+
+onMounted(async () => {
+  await fetchAll()
+  await fetchPayments()
+})
 </script>
 
 <template>
@@ -191,6 +297,19 @@ onMounted(fetchAll)
           <n-button type="error" quaternary @click="voidVisible = true">作废</n-button>
         </template>
       </n-space>
+    </n-card>
+
+    <n-card title="收款记录" style="margin-bottom: 16px">
+      <template #header-extra>
+        <n-button size="small" type="primary" @click="openCreatePayment">登记收款</n-button>
+      </template>
+      <n-descriptions v-if="paymentSummary" :column="4" label-placement="left" style="margin-bottom: 12px">
+        <n-descriptions-item label="合同金额">{{ toMajorUnits(paymentSummary.contractAmount) }} 元</n-descriptions-item>
+        <n-descriptions-item label="已收">{{ toMajorUnits(paymentSummary.totalCollected) }} 元</n-descriptions-item>
+        <n-descriptions-item label="已退">{{ toMajorUnits(paymentSummary.totalRefunded) }} 元</n-descriptions-item>
+        <n-descriptions-item label="余额">{{ toMajorUnits(paymentSummary.balance) }} 元</n-descriptions-item>
+      </n-descriptions>
+      <n-data-table :columns="paymentColumns" :data="payments" :row-key="(r: Payment) => r.id" />
     </n-card>
 
     <n-modal :show="editVisible" @update:show="(v) => (editVisible = v)">
@@ -235,6 +354,48 @@ onMounted(fetchAll)
           <n-space justify="end">
             <n-button @click="voidVisible = false">取消</n-button>
             <n-button type="error" :loading="voidSubmitting" @click="handleVoid">确认作废</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <n-modal :show="paymentFormVisible" @update:show="(v) => (paymentFormVisible = v)">
+      <n-card title="登记收款" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="left" label-width="80">
+          <n-form-item label="金额（元）"><n-input-number v-model:value="paymentModel.amountYuan" style="width: 100%" /></n-form-item>
+          <n-form-item label="收款方式">
+            <n-select
+              v-model:value="paymentModel.method"
+              :options="[
+                { label: '现金', value: 'CASH' },
+                { label: '银行转账', value: 'BANK_TRANSFER' },
+                { label: '微信', value: 'WECHAT' },
+                { label: '支付宝', value: 'ALIPAY' },
+                { label: 'POS 刷卡', value: 'POS_CARD' },
+                { label: '其他', value: 'OTHER' },
+              ]"
+            />
+          </n-form-item>
+          <n-form-item label="备注"><n-input v-model:value="paymentModel.remark" type="textarea" /></n-form-item>
+        </n-form>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="paymentFormVisible = false">取消</n-button>
+            <n-button type="primary" :loading="paymentSubmitting" @click="handleCreatePayment">提交</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <n-modal :show="refundVisible" @update:show="(v) => (refundVisible = v)">
+      <n-card title="申请退款" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="left" label-width="80">
+          <n-form-item label="退款原因"><n-input v-model:value="refundReason" type="textarea" /></n-form-item>
+        </n-form>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="refundVisible = false">取消</n-button>
+            <n-button type="error" :loading="refundSubmitting" @click="handleRequestRefund">提交申请</n-button>
           </n-space>
         </template>
       </n-card>

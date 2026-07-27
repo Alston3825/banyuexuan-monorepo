@@ -107,6 +107,36 @@ export const FOLLOW_UP_TYPE_LABEL_MAP: Record<string, string> = {
   OTHER: '其他',
 }
 
+export const ROOM_STATUS_MAP: Record<string, StatusMeta> = {
+  VACANT: { label: '空闲', type: 'success' },
+  RESERVED: { label: '预订中', type: 'info' },
+  OCCUPIED: { label: '使用中', type: 'warning' },
+  PENDING_CLEANING: { label: '待清扫', type: 'error' },
+  MAINTENANCE: { label: '维修中', type: 'default' },
+}
+
+export const ROOM_OCCUPANCY_STATUS_MAP: Record<string, StatusMeta> = {
+  RESERVED: { label: '预订中', type: 'info' },
+  CHECKED_IN: { label: '已入住', type: 'warning' },
+  CHECKED_OUT: { label: '已离店', type: 'default' },
+  CANCELLED: { label: '已取消', type: 'error' },
+}
+
+export const PAYMENT_STATUS_MAP: Record<string, StatusMeta> = {
+  RECORDED: { label: '已收款', type: 'success' },
+  PENDING_REFUND: { label: '退款审核中', type: 'warning' },
+  REFUNDED: { label: '已退款', type: 'default' },
+}
+
+export const PAYMENT_METHOD_LABEL_MAP: Record<string, string> = {
+  CASH: '现金',
+  BANK_TRANSFER: '银行转账',
+  WECHAT: '微信',
+  ALIPAY: '支付宝',
+  POS_CARD: 'POS 刷卡',
+  OTHER: '其他',
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',

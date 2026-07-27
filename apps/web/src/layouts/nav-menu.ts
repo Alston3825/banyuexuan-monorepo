@@ -19,6 +19,11 @@ import {
   TrendingUp,
   Reader,
   Document,
+  Grid,
+  Bed,
+  Layers,
+  Calendar,
+  Cash,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -60,6 +65,23 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('合同模板', '/contract/templates'), key: '/contract/templates', icon: icon(Reader) },
       { label: linkLabel('合同管理', '/contract/records'), key: '/contract/records', icon: icon(Document) },
     ],
+  },
+  {
+    type: 'group',
+    label: '住店运营',
+    key: 'group-room',
+    children: [
+      { label: linkLabel('房态看板', '/room/board'), key: '/room/board', icon: icon(Grid) },
+      { label: linkLabel('房间管理', '/room/rooms'), key: '/room/rooms', icon: icon(Bed) },
+      { label: linkLabel('房型管理', '/room/types'), key: '/room/types', icon: icon(Layers) },
+      { label: linkLabel('预订记录', '/room/occupancies'), key: '/room/occupancies', icon: icon(Calendar) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '收款管理',
+    key: 'group-payment',
+    children: [{ label: linkLabel('收款记录', '/payment/records'), key: '/payment/records', icon: icon(Cash) }],
   },
   {
     type: 'group',
