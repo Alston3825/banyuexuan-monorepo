@@ -9,6 +9,8 @@ import { LeadService } from '../lead/lead.service';
  * 跟进记录：只增不改的日志类实体（同 WorkflowActionLog 风格），不做门店范围过滤。
  * businessType='LEAD' 时会联动 Lead 的状态机：只有处于 ASSIGNED/FOLLOWING 的线索
  * 才能被跟进（未分配线索不该有人跟进），若原状态是 ASSIGNED 则顺带推进到 FOLLOWING。
+ * businessType='CARE_ABNORMALITY' 时被 CareAbnormalityService 复用（护理异常跟进不
+ * 新建独立表），走通用分支，无联动副作用——由调用方自行决定异常状态是否推进。
  */
 @Injectable()
 export class FollowUpService {
@@ -27,7 +29,7 @@ export class FollowUpService {
   }
 
   async create(data: {
-    businessType: 'LEAD' | 'OPPORTUNITY' | 'CUSTOMER';
+    businessType: 'LEAD' | 'OPPORTUNITY' | 'CUSTOMER' | 'CARE_ABNORMALITY';
     businessId: string;
     type: FollowUpRecord['type'];
     content: string;
