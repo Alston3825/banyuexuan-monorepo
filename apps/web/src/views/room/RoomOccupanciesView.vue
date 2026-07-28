@@ -1,13 +1,31 @@
 <script setup lang="ts">
 import { h, onMounted, ref, type VNode } from 'vue'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NSelect, NDatePicker, type DataTableColumns } from 'naive-ui'
+import {
+  NButton,
+  NSpace,
+  NDataTable,
+  NModal,
+  NCard,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NSelect,
+  NDatePicker,
+  NTabs,
+  NTabPane,
+  NEmpty,
+  type DataTableColumns,
+} from 'naive-ui'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import { roomApi } from '../../api/modules/room.api'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
+import { roomCallApi, roomOutingApi, roomServiceRequisitionApi } from '../../api/modules/room-ops.api'
 import type { RoomOccupancy } from '../../api/types/room-occupancy'
 import type { Room } from '../../api/types/room'
-import { renderStatusBadge, ROOM_OCCUPANCY_STATUS_MAP } from '../../utils/status-map'
+import type { RoomCall, RoomOuting, RoomServiceRequisition } from '../../api/types/room-ops'
+import { renderStatusBadge, ROOM_OCCUPANCY_STATUS_MAP, ROOM_CALL_STATUS_MAP, ROOM_OUTING_STATUS_MAP, ROOM_REQUISITION_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
 
 const rows = ref<RoomOccupancy[]>([])
@@ -138,6 +156,158 @@ async function handleCancel() {
   }
 }
 
+// ---------------- 客房动态：呼叫/外出/客房服务领用 ----------------
+const opsVisible = ref(false)
+const opsOccupancy = ref<RoomOccupancy | null>(null)
+const opsLoading = ref(false)
+const calls = ref<RoomCall[]>([])
+const outings = ref<RoomOuting[]>([])
+const requisitions = ref<RoomServiceRequisition[]>([])
+
+async function openOps(row: RoomOccupancy) {
+  opsOccupancy.value = row
+  opsVisible.value = true
+  await fetchOps()
+}
+
+async function fetchOps() {
+  if (!opsOccupancy.value) return
+  opsLoading.value = true
+  try {
+    const occupancyId = opsOccupancy.value.id
+    const [callList, outingList, requisitionList] = await Promise.all([
+      roomCallApi.list({ occupancyId }),
+      roomOutingApi.list({ occupancyId }),
+      roomServiceRequisitionApi.list({ occupancyId }),
+    ])
+    calls.value = callList
+    outings.value = outingList
+    requisitions.value = requisitionList
+  } finally {
+    opsLoading.value = false
+  }
+}
+
+// 呼叫记录
+const callReason = ref('')
+async function submitCall() {
+  if (!callReason.value.trim() || !opsOccupancy.value) return
+  await roomCallApi.create({ occupancyId: opsOccupancy.value.id, reason: callReason.value })
+  callReason.value = ''
+  message.success('呼叫记录已创建')
+  await fetchOps()
+}
+async function handleCallDone(row: RoomCall) {
+  await roomCallApi.handle(row.id)
+  message.success('已处理')
+  await fetchOps()
+}
+const callColumns: DataTableColumns<RoomCall> = [
+  { key: 'reason', title: '呼叫事由' },
+  { key: 'calledAt', title: '呼叫时间', render: (row) => new Date(row.calledAt).toLocaleString() },
+  { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, ROOM_CALL_STATUS_MAP) },
+  {
+    key: 'actions',
+    title: '操作',
+    width: 90,
+    render: (row) => (row.status === 'PENDING' ? h(NButton, { size: 'small', type: 'primary', onClick: () => handleCallDone(row) }, { default: () => '处理' }) : null),
+  },
+]
+
+// 外出管理
+const outingRange = ref<[number, number] | null>(null)
+const outingRiskNote = ref('')
+async function submitOuting() {
+  if (!outingRange.value || !opsOccupancy.value) {
+    message.error('请选择外出起止时间')
+    return
+  }
+  await roomOutingApi.create({
+    occupancyId: opsOccupancy.value.id,
+    plannedOutAt: new Date(outingRange.value[0]).toISOString(),
+    plannedBackAt: new Date(outingRange.value[1]).toISOString(),
+    riskNote: outingRiskNote.value || undefined,
+  })
+  outingRange.value = null
+  outingRiskNote.value = ''
+  message.success('外出记录已创建')
+  await fetchOps()
+}
+async function checkOutOuting(row: RoomOuting) {
+  await roomOutingApi.checkOut(row.id, row.version)
+  message.success('已签出')
+  await fetchOps()
+}
+async function checkBackOuting(row: RoomOuting) {
+  await roomOutingApi.checkBack(row.id, row.version)
+  message.success('已签回')
+  await fetchOps()
+}
+async function cancelOuting(row: RoomOuting) {
+  const reason = window.prompt('请输入取消原因')
+  if (!reason) return
+  await roomOutingApi.cancel(row.id, reason, row.version)
+  message.success('已取消')
+  await fetchOps()
+}
+const outingColumns: DataTableColumns<RoomOuting> = [
+  { key: 'plannedOutAt', title: '计划外出', render: (row) => new Date(row.plannedOutAt).toLocaleString() },
+  { key: 'plannedBackAt', title: '计划返回', render: (row) => new Date(row.plannedBackAt).toLocaleString() },
+  { key: 'riskNote', title: '风险提示', render: (row) => row.riskNote ?? '-' },
+  { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, ROOM_OUTING_STATUS_MAP) },
+  {
+    key: 'actions',
+    title: '操作',
+    width: 160,
+    render: (row) => {
+      const buttons: VNode[] = []
+      if (row.status === 'PLANNED') {
+        buttons.push(h(NButton, { size: 'small', type: 'primary', onClick: () => checkOutOuting(row) }, { default: () => '签出' }))
+        buttons.push(h(NButton, { size: 'small', onClick: () => cancelOuting(row) }, { default: () => '取消' }))
+      } else if (row.status === 'OUT') {
+        buttons.push(h(NButton, { size: 'small', type: 'primary', onClick: () => checkBackOuting(row) }, { default: () => '签回' }))
+      }
+      return h(NSpace, {}, { default: () => buttons })
+    },
+  },
+]
+
+// 客房服务领用
+const requisitionItemName = ref('')
+const requisitionQuantity = ref(1)
+async function submitRequisition() {
+  if (!requisitionItemName.value.trim() || !opsOccupancy.value) {
+    message.error('请填写领用物品')
+    return
+  }
+  await roomServiceRequisitionApi.create({
+    occupancyId: opsOccupancy.value.id,
+    itemName: requisitionItemName.value,
+    quantity: requisitionQuantity.value,
+  })
+  requisitionItemName.value = ''
+  requisitionQuantity.value = 1
+  message.success('领用记录已创建')
+  await fetchOps()
+}
+async function fulfillRequisition(row: RoomServiceRequisition) {
+  await roomServiceRequisitionApi.fulfill(row.id)
+  message.success('已完成领用')
+  await fetchOps()
+}
+const requisitionColumns: DataTableColumns<RoomServiceRequisition> = [
+  { key: 'itemName', title: '物品' },
+  { key: 'quantity', title: '数量' },
+  { key: 'requestedAt', title: '申请时间', render: (row) => new Date(row.requestedAt).toLocaleString() },
+  { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, ROOM_REQUISITION_STATUS_MAP) },
+  {
+    key: 'actions',
+    title: '操作',
+    width: 90,
+    render: (row) => (row.status === 'REQUESTED' ? h(NButton, { size: 'small', type: 'primary', onClick: () => fulfillRequisition(row) }, { default: () => '完成' }) : null),
+  },
+]
+
 const columns: DataTableColumns<RoomOccupancy> = [
   { key: 'occupancyNo', title: '占用编号' },
   { key: 'roomId', title: '房间号', render: (row) => roomNoById.value[row.roomId] ?? row.roomId },
@@ -148,7 +318,7 @@ const columns: DataTableColumns<RoomOccupancy> = [
   {
     key: 'actions',
     title: '操作',
-    width: 200,
+    width: 280,
     render: (row) => {
       const buttons: VNode[] = []
       if (row.status === 'RESERVED') {
@@ -157,6 +327,7 @@ const columns: DataTableColumns<RoomOccupancy> = [
       } else if (row.status === 'CHECKED_IN') {
         buttons.push(h(NButton, { size: 'small', type: 'primary', onClick: () => handleCheckOut(row) }, { default: () => '离店' }))
       }
+      buttons.push(h(NButton, { size: 'small', onClick: () => openOps(row) }, { default: () => '客房动态' }))
       return h(NSpace, {}, { default: () => buttons })
     },
   },
@@ -201,6 +372,51 @@ onMounted(async () => {
           <n-space justify="end">
             <n-button @click="cancelVisible = false">取消</n-button>
             <n-button type="error" :loading="cancelSubmitting" @click="handleCancel">确认取消</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <n-modal :show="opsVisible" @update:show="(v) => (opsVisible = v)">
+      <n-card
+        v-if="opsOccupancy"
+        :title="`客房动态：${opsOccupancy.occupancyNo}`"
+        style="width: 720px"
+        :bordered="false"
+        role="dialog"
+        aria-modal="true"
+      >
+        <n-tabs type="line" default-value="call">
+          <n-tab-pane name="call" tab="呼叫记录">
+            <n-space style="margin-bottom: 12px">
+              <n-input v-model:value="callReason" placeholder="呼叫事由，如：需要热水" style="width: 320px" />
+              <n-button type="primary" @click="submitCall">发起呼叫</n-button>
+            </n-space>
+            <n-empty v-if="calls.length === 0" description="暂无呼叫记录" />
+            <n-data-table v-else :columns="callColumns" :data="calls" :loading="opsLoading" :row-key="(r: RoomCall) => r.id" />
+          </n-tab-pane>
+          <n-tab-pane name="outing" tab="外出管理">
+            <n-space style="margin-bottom: 12px" :wrap="false">
+              <n-date-picker v-model:value="outingRange" type="datetimerange" style="width: 360px" />
+              <n-input v-model:value="outingRiskNote" placeholder="风险提示（可选）" style="width: 160px" />
+              <n-button type="primary" @click="submitOuting">登记外出计划</n-button>
+            </n-space>
+            <n-empty v-if="outings.length === 0" description="暂无外出记录" />
+            <n-data-table v-else :columns="outingColumns" :data="outings" :loading="opsLoading" :row-key="(r: RoomOuting) => r.id" />
+          </n-tab-pane>
+          <n-tab-pane name="requisition" tab="客房服务领用">
+            <n-space style="margin-bottom: 12px">
+              <n-input v-model:value="requisitionItemName" placeholder="领用物品，如：婴儿纸尿裤" style="width: 220px" />
+              <n-input-number v-model:value="requisitionQuantity" :min="1" style="width: 100px" />
+              <n-button type="primary" @click="submitRequisition">提交领用</n-button>
+            </n-space>
+            <n-empty v-if="requisitions.length === 0" description="暂无领用记录" />
+            <n-data-table v-else :columns="requisitionColumns" :data="requisitions" :loading="opsLoading" :row-key="(r: RoomServiceRequisition) => r.id" />
+          </n-tab-pane>
+        </n-tabs>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="opsVisible = false">关闭</n-button>
           </n-space>
         </template>
       </n-card>

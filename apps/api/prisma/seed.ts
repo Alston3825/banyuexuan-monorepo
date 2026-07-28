@@ -123,9 +123,35 @@ async function main() {
     { code: 'room.type', name: '房态预订-房型', type: 'PAGE', parentCode: 'room' },
     { code: 'room.room', name: '房态预订-房间', type: 'PAGE', parentCode: 'room' },
     { code: 'room.occupancy', name: '房态预订-占用记录', type: 'PAGE', parentCode: 'room' },
+    { code: 'room.call', name: '房态预订-呼叫记录', type: 'PAGE', parentCode: 'room' },
+    { code: 'room.outing', name: '房态预订-外出管理', type: 'PAGE', parentCode: 'room' },
+    { code: 'room.service-requisition', name: '房态预订-客房服务领用', type: 'PAGE', parentCode: 'room' },
 
     { code: 'payment', name: '收款管理', type: 'MODULE' },
     { code: 'payment.record', name: '收款管理-收款', type: 'PAGE', parentCode: 'payment' },
+
+    { code: 'care', name: '护理', type: 'MODULE' },
+    { code: 'care.field', name: '护理-护理字段管理', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.form-template', name: '护理-护理项目管理', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.plan-template', name: '护理-护理方案管理', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.profile', name: '护理-母婴档案', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.plan', name: '护理-护理计划', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.record', name: '护理-护理记录', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.abnormality', name: '护理-护理异常', type: 'PAGE', parentCode: 'care' },
+
+    { code: 'meal', name: '月子餐', type: 'MODULE' },
+    { code: 'meal.item', name: '月子餐-菜品管理', type: 'PAGE', parentCode: 'meal' },
+    { code: 'meal.dietary-restriction', name: '月子餐-禁忌管理', type: 'PAGE', parentCode: 'meal' },
+    { code: 'meal.plan-template', name: '月子餐-膳食计划管理', type: 'PAGE', parentCode: 'meal' },
+    { code: 'meal.diner-profile', name: '月子餐-用膳人', type: 'PAGE', parentCode: 'meal' },
+    { code: 'meal.record', name: '月子餐-排餐记录', type: 'PAGE', parentCode: 'meal' },
+
+    { code: 'service', name: '产康服务', type: 'MODULE' },
+    { code: 'service.product', name: '产康服务-项目', type: 'PAGE', parentCode: 'service' },
+    { code: 'service.package', name: '产康服务-服务包', type: 'PAGE', parentCode: 'service' },
+    { code: 'service.therapist', name: '产康服务-技师', type: 'PAGE', parentCode: 'service' },
+    { code: 'service.customer-package', name: '产康服务-客户已购服务包', type: 'PAGE', parentCode: 'service' },
+    { code: 'service.appointment', name: '产康服务-预约', type: 'PAGE', parentCode: 'service' },
 
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
@@ -201,8 +227,86 @@ async function main() {
   for (const action of ['view', 'create', 'checkin', 'checkout', 'cancel']) {
     permSpecs.push({ code: `room.occupancy.${action}`, name: `房态预订-占用记录-${action}`, type: 'BUTTON', parentCode: 'room.occupancy' });
   }
+  for (const action of ['view', 'create', 'handle']) {
+    permSpecs.push({ code: `room.call.${action}`, name: `房态预订-呼叫记录-${action}`, type: 'BUTTON', parentCode: 'room.call' });
+  }
+  for (const action of ['view', 'create', 'checkout', 'checkback', 'cancel']) {
+    permSpecs.push({ code: `room.outing.${action}`, name: `房态预订-外出管理-${action}`, type: 'BUTTON', parentCode: 'room.outing' });
+  }
+  for (const action of ['view', 'create', 'fulfill']) {
+    permSpecs.push({
+      code: `room.service-requisition.${action}`,
+      name: `房态预订-客房服务领用-${action}`,
+      type: 'BUTTON',
+      parentCode: 'room.service-requisition',
+    });
+  }
   for (const action of ['view', 'create', 'refund']) {
     permSpecs.push({ code: `payment.record.${action}`, name: `收款管理-收款-${action}`, type: 'BUTTON', parentCode: 'payment.record' });
+  }
+
+  for (const action of ['view', 'create', 'update', 'delete']) {
+    permSpecs.push({ code: `care.field.${action}`, name: `护理-护理字段管理-${action}`, type: 'BUTTON', parentCode: 'care.field' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `care.form-template.${action}`, name: `护理-护理项目管理-${action}`, type: 'BUTTON', parentCode: 'care.form-template' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `care.plan-template.${action}`, name: `护理-护理方案管理-${action}`, type: 'BUTTON', parentCode: 'care.plan-template' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `care.profile.${action}`, name: `护理-母婴档案-${action}`, type: 'BUTTON', parentCode: 'care.profile' });
+  }
+  for (const action of ['view', 'create', 'terminate']) {
+    permSpecs.push({ code: `care.plan.${action}`, name: `护理-护理计划-${action}`, type: 'BUTTON', parentCode: 'care.plan' });
+  }
+  for (const action of ['view', 'create']) {
+    permSpecs.push({ code: `care.record.${action}`, name: `护理-护理记录-${action}`, type: 'BUTTON', parentCode: 'care.record' });
+  }
+  for (const action of ['view', 'follow-up', 'resolve', 'ignore']) {
+    permSpecs.push({ code: `care.abnormality.${action}`, name: `护理-护理异常-${action}`, type: 'BUTTON', parentCode: 'care.abnormality' });
+  }
+
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `meal.item.${action}`, name: `月子餐-菜品管理-${action}`, type: 'BUTTON', parentCode: 'meal.item' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({
+      code: `meal.dietary-restriction.${action}`,
+      name: `月子餐-禁忌管理-${action}`,
+      type: 'BUTTON',
+      parentCode: 'meal.dietary-restriction',
+    });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `meal.plan-template.${action}`, name: `月子餐-膳食计划管理-${action}`, type: 'BUTTON', parentCode: 'meal.plan-template' });
+  }
+  for (const action of ['view', 'create', 'end']) {
+    permSpecs.push({ code: `meal.diner-profile.${action}`, name: `月子餐-用膳人-${action}`, type: 'BUTTON', parentCode: 'meal.diner-profile' });
+  }
+  for (const action of ['view', 'select', 'serve', 'feedback']) {
+    permSpecs.push({ code: `meal.record.${action}`, name: `月子餐-排餐记录-${action}`, type: 'BUTTON', parentCode: 'meal.record' });
+  }
+
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `service.product.${action}`, name: `产康服务-项目-${action}`, type: 'BUTTON', parentCode: 'service.product' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `service.package.${action}`, name: `产康服务-服务包-${action}`, type: 'BUTTON', parentCode: 'service.package' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `service.therapist.${action}`, name: `产康服务-技师-${action}`, type: 'BUTTON', parentCode: 'service.therapist' });
+  }
+  for (const action of ['view', 'create']) {
+    permSpecs.push({
+      code: `service.customer-package.${action}`,
+      name: `产康服务-客户已购服务包-${action}`,
+      type: 'BUTTON',
+      parentCode: 'service.customer-package',
+    });
+  }
+  for (const action of ['view', 'create', 'complete', 'cancel', 'feedback']) {
+    permSpecs.push({ code: `service.appointment.${action}`, name: `产康服务-预约-${action}`, type: 'BUTTON', parentCode: 'service.appointment' });
   }
 
   const codeToId = new Map<string, string>();
@@ -298,6 +402,14 @@ async function main() {
   // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除。
   // 收款（payment.record）同理——退款的"提交申请"是前台日常操作，真正的审批权由通用工作流
   // 引擎的审批人角色把关，不在这一层额外收紧，全部动作开放。
+  // 护理表单引擎配置（care.field / care.form-template / care.plan-template）是总部制定的
+  // 临床协议主数据，同 room.type/contract.template 口径不开放给 STORE_MANAGER；母婴档案
+  // （care.profile）是护理人员/前台的日常操作，全部动作开放。
+  // 月子餐同理：菜品/禁忌/膳食计划模板（meal.item/dietary-restriction/plan-template）是总部制定的
+  // 营养配餐主数据，不开放；用膳人与排餐记录（meal.diner-profile/record）是护理/膳食人员的日常
+  // 操作，全部动作开放。产康服务：项目/服务包/技师（service.product/package/therapist）是总部
+  // 定价与人力主数据，不开放；客户已购服务包与预约（service.customer-package/appointment）是
+  // 前台/技师的日常操作，全部动作开放。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -324,7 +436,19 @@ async function main() {
           code.startsWith('contract.record') ||
           code.startsWith('room.room') ||
           code.startsWith('room.occupancy') ||
-          code.startsWith('payment.record')),
+          code.startsWith('room.call') ||
+          code.startsWith('room.outing') ||
+          code.startsWith('room.service-requisition') ||
+          code.startsWith('payment.record') ||
+          code.startsWith('care.profile') ||
+          code === 'care.plan' ||
+          code.startsWith('care.plan.') ||
+          code.startsWith('care.record') ||
+          code.startsWith('care.abnormality') ||
+          code.startsWith('meal.diner-profile') ||
+          code.startsWith('meal.record') ||
+          code.startsWith('service.customer-package') ||
+          code.startsWith('service.appointment')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);

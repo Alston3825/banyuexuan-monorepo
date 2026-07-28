@@ -137,6 +137,120 @@ export const PAYMENT_METHOD_LABEL_MAP: Record<string, string> = {
   OTHER: '其他',
 }
 
+export const CARE_TARGET_TYPE_LABEL_MAP: Record<string, string> = {
+  MOTHER: '妈妈',
+  BABY: '宝宝',
+}
+
+export const CARE_FORM_DEPARTMENT_LABEL_MAP: Record<string, string> = {
+  NURSING: '护理部',
+  POSTPARTUM_RECOVERY: '产康部',
+  MEAL: '膳食部',
+  CUSTOMER_SERVICE: '客服部',
+  MEDICAL: '医务部',
+}
+
+export const CARE_FORM_SCENE_LABEL_MAP: Record<string, string> = {
+  GENERAL: '通用',
+  IN_HOUSE: '所内',
+  HOME_VISIT: '上户',
+  HOSPITAL: '医院',
+}
+
+export const DELIVERY_METHOD_LABEL_MAP: Record<string, string> = {
+  VAGINAL: '顺产',
+  CESAREAN: '剖宫产',
+  UNKNOWN: '未知',
+}
+
+export const BABY_GENDER_LABEL_MAP: Record<string, string> = {
+  MALE: '男',
+  FEMALE: '女',
+  UNKNOWN: '未知',
+}
+
+export const CARE_PLAN_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  ACTIVE: { label: '进行中', type: 'success' },
+  COMPLETED: { label: '已完成', type: 'default' },
+  TERMINATED: { label: '已终止', type: 'error' },
+}
+
+export const CARE_PLAN_TASK_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING: { label: '待执行', type: 'warning' },
+  COMPLETED: { label: '已完成', type: 'success' },
+  MISSED: { label: '已错过', type: 'default' },
+}
+
+export const CARE_ABNORMALITY_STATUS_MAP: Record<string, StatusMeta> = {
+  OPEN: { label: '待处理', type: 'error' },
+  FOLLOWING: { label: '跟进中', type: 'warning' },
+  RESOLVED: { label: '已解决', type: 'success' },
+  IGNORED: { label: '已忽略', type: 'default' },
+}
+
+export const ROOM_CALL_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING: { label: '待处理', type: 'warning' },
+  HANDLED: { label: '已处理', type: 'success' },
+}
+
+export const ROOM_OUTING_STATUS_MAP: Record<string, StatusMeta> = {
+  PLANNED: { label: '计划中', type: 'default' },
+  OUT: { label: '已外出', type: 'warning' },
+  RETURNED: { label: '已返回', type: 'success' },
+  CANCELLED: { label: '已取消', type: 'error' },
+}
+
+export const ROOM_REQUISITION_STATUS_MAP: Record<string, StatusMeta> = {
+  REQUESTED: { label: '待领用', type: 'warning' },
+  FULFILLED: { label: '已完成', type: 'success' },
+}
+
+export const MEAL_SLOT_LABEL_MAP: Record<string, string> = {
+  BREAKFAST: '早餐',
+  MORNING_SNACK: '早点',
+  LUNCH: '午餐',
+  AFTERNOON_SNACK: '午点',
+  DINNER: '晚餐',
+  NIGHT_SNACK: '晚点',
+}
+
+export const MEAL_PLAN_TYPE_LABEL_MAP: Record<string, string> = {
+  MONTH_MEAL: '月子餐',
+  MINI_MONTH: '小月子',
+  TRIAL: '试吃',
+  DELIVERY: '外送餐',
+  VIP: 'VIP',
+}
+
+export const DIETARY_RESTRICTION_CATEGORY_LABEL_MAP: Record<string, string> = {
+  INGREDIENT: '食材类',
+  MEDICAL: '病理性',
+}
+
+export const DINER_PROFILE_STATUS_MAP: Record<string, StatusMeta> = {
+  ACTIVE: { label: '用膳中', type: 'success' },
+  ENDED: { label: '已结束', type: 'default' },
+}
+
+export const MEAL_RECORD_STATUS_MAP: Record<string, StatusMeta> = {
+  PLANNED: { label: '待供餐', type: 'warning' },
+  SERVED: { label: '已供餐', type: 'success' },
+  CANCELLED: { label: '已取消', type: 'error' },
+}
+
+export const CUSTOMER_SERVICE_PACKAGE_STATUS_MAP: Record<string, StatusMeta> = {
+  ACTIVE: { label: '可用', type: 'success' },
+  EXHAUSTED: { label: '已耗尽', type: 'default' },
+}
+
+export const SERVICE_APPOINTMENT_STATUS_MAP: Record<string, StatusMeta> = {
+  BOOKED: { label: '已预约', type: 'warning' },
+  COMPLETED: { label: '已完成', type: 'success' },
+  CANCELLED: { label: '已取消', type: 'error' },
+  NO_SHOW: { label: '爽约', type: 'error' },
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',

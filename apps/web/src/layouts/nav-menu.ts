@@ -24,6 +24,17 @@ import {
   Layers,
   Calendar,
   Cash,
+  Woman,
+  ListOutline,
+  ClipboardOutline,
+  JournalOutline,
+  Restaurant,
+  NutritionOutline,
+  FastFood,
+  PersonOutline,
+  Fitness,
+  Body,
+  CalendarOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -69,6 +80,40 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('房间管理', '/room/rooms'), key: '/room/rooms', icon: icon(Bed) },
       { label: linkLabel('房型管理', '/room/types'), key: '/room/types', icon: icon(Layers) },
       { label: linkLabel('预订记录', '/room/occupancies'), key: '/room/occupancies', icon: icon(Calendar) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '母婴护理',
+    key: 'group-care',
+    children: [
+      { label: linkLabel('母婴档案', '/care/profiles'), key: '/care/profiles', icon: icon(Woman) },
+      { label: linkLabel('护理字段管理', '/care/fields'), key: '/care/fields', icon: icon(ListOutline) },
+      { label: linkLabel('护理项目管理', '/care/form-templates'), key: '/care/form-templates', icon: icon(ClipboardOutline) },
+      { label: linkLabel('护理方案管理', '/care/plan-templates'), key: '/care/plan-templates', icon: icon(JournalOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '月子餐',
+    key: 'group-meal',
+    children: [
+      { label: linkLabel('用膳人', '/meal/diner-profiles'), key: '/meal/diner-profiles', icon: icon(PersonOutline) },
+      { label: linkLabel('菜品管理', '/meal/items'), key: '/meal/items', icon: icon(FastFood) },
+      { label: linkLabel('禁忌管理', '/meal/dietary-restrictions'), key: '/meal/dietary-restrictions', icon: icon(NutritionOutline) },
+      { label: linkLabel('膳食计划管理', '/meal/plan-templates'), key: '/meal/plan-templates', icon: icon(Restaurant) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '产康服务',
+    key: 'group-service',
+    children: [
+      { label: linkLabel('预约管理', '/service/appointments'), key: '/service/appointments', icon: icon(CalendarOutline) },
+      { label: linkLabel('客户已购服务包', '/service/customer-packages'), key: '/service/customer-packages', icon: icon(Body) },
+      { label: linkLabel('产康项目', '/service/products'), key: '/service/products', icon: icon(Fitness) },
+      { label: linkLabel('服务包', '/service/packages'), key: '/service/packages', icon: icon(Layers) },
+      { label: linkLabel('技师管理', '/service/therapists'), key: '/service/therapists', icon: icon(People) },
     ],
   },
   {
