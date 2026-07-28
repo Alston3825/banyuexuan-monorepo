@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, ref } from 'vue'
+import { h, onMounted, ref, type VNode } from 'vue'
 import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NSelect, NDatePicker, type DataTableColumns } from 'naive-ui'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import { roomApi } from '../../api/modules/room.api'
@@ -150,7 +150,7 @@ const columns: DataTableColumns<RoomOccupancy> = [
     title: '操作',
     width: 200,
     render: (row) => {
-      const buttons = []
+      const buttons: VNode[] = []
       if (row.status === 'RESERVED') {
         buttons.push(h(NButton, { size: 'small', type: 'primary', onClick: () => handleCheckIn(row) }, { default: () => '入住' }))
         buttons.push(h(NButton, { size: 'small', onClick: () => openCancelModal(row) }, { default: () => '取消' }))

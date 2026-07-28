@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { NCard, NSpace, NButton, NDescriptions, NDescriptionsItem, NModal, NForm, NFormItem, NInput } from 'naive-ui'
 import { opportunityApi } from '../../api/modules/opportunity.api'
 import { customerApi } from '../../api/modules/customer.api'
@@ -11,7 +11,6 @@ import { message } from '../../utils/discrete-api'
 import FollowUpTimeline from '../../components/crm/FollowUpTimeline.vue'
 
 const route = useRoute()
-const router = useRouter()
 const opportunityId = route.params.id as string
 
 const opportunity = ref<SalesOpportunity | null>(null)

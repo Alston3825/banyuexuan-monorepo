@@ -53,4 +53,6 @@ export interface QueryContractParams {
   customerId?: string
   storeId?: string
   status?: ContractStatus
+  isRenewal?: boolean
+  renewalOfContractId?: string
 }

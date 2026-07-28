@@ -23,7 +23,7 @@ async function handleSubmit() {
   loading.value = true
   try {
     await auth.login(model.value.username, model.value.password)
-    const redirect = (route.query.redirect as string) || '/org/regions'
+    const redirect = (route.query.redirect as string) || '/crm/customers'
     router.push(redirect)
   } catch {
     message.error('登录失败，请检查用户名和密码')

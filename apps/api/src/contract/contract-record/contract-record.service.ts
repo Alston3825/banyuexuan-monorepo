@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Contract, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
@@ -37,8 +42,14 @@ export class ContractRecordService {
       customerId: query.customerId,
       storeId: query.storeId,
       status: query.status,
+      renewalOfContractId:
+        query.renewalOfContractId ??
+        (query.isRenewal ? { not: null } : undefined),
     };
-    const contracts = await this.prisma.contract.findMany({ where, orderBy: { createdAt: 'desc' } });
+    const contracts = await this.prisma.contract.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
     return Promise.all(contracts.map((c) => this.reconcileStatus(c)));
   }
 
@@ -83,13 +94,21 @@ export class ContractRecordService {
 
   async update(
     id: string,
-    data: { title?: string; content?: string; amount?: number; startDate?: string; endDate?: string },
+    data: {
+      title?: string;
+      content?: string;
+      amount?: number;
+      startDate?: string;
+      endDate?: string;
+    },
     expectedVersion: number,
   ): Promise<Contract> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
     if (before.status !== 'DRAFT' || before.signedByCustomerAt) {
-      throw new BadRequestException('合同已签署或不处于草稿状态，不能再编辑内容');
+      throw new BadRequestException(
+        '合同已签署或不处于草稿状态，不能再编辑内容',
+      );
     }
     const updated = await this.prisma.contract.update({
       where: { id },
@@ -121,7 +140,11 @@ export class ContractRecordService {
     }
     const updated = await this.prisma.contract.update({
       where: { id },
-      data: { signedByCustomerAt: new Date(), signedByCustomerIp: this.ctx.ip, version: { increment: 1 } },
+      data: {
+        signedByCustomerAt: new Date(),
+        signedByCustomerIp: this.ctx.ip,
+        version: { increment: 1 },
+      },
     });
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
@@ -168,11 +191,17 @@ export class ContractRecordService {
     return updated;
   }
 
-  async void(id: string, voidReason: string, expectedVersion: number): Promise<Contract> {
+  async void(
+    id: string,
+    voidReason: string,
+    expectedVersion: number,
+  ): Promise<Contract> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
     if (!['DRAFT', 'ACTIVE'].includes(before.status)) {
-      throw new BadRequestException(`合同当前状态「${before.status}」不允许作废`);
+      throw new BadRequestException(
+        `合同当前状态「${before.status}」不允许作废`,
+      );
     }
     const updated = await this.prisma.contract.update({
       where: { id },
@@ -236,7 +265,8 @@ export class ContractRecordService {
     if (!instance) return contract;
 
     let nextStatus: 'ACTIVE' | 'REJECTED' | 'DRAFT' | null = null;
-    if (instance.status === 'APPROVED' || instance.status === 'ARCHIVED') nextStatus = 'ACTIVE';
+    if (instance.status === 'APPROVED' || instance.status === 'ARCHIVED')
+      nextStatus = 'ACTIVE';
     else if (instance.status === 'REJECTED') nextStatus = 'REJECTED';
     else if (instance.status === 'WITHDRAWN') nextStatus = 'DRAFT';
     if (!nextStatus) return contract;

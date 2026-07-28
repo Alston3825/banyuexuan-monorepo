@@ -34,19 +34,12 @@ function linkLabel(label: string, to: string) {
   return () => h(RouterLink, { to }, { default: () => label })
 }
 
+// 导航分组原则：业务模块（客户签约履约相关，对应一线岗位日常操作）排在前面，
+// 平台管理/系统配置类（组织架构、账号权限、基础资料、审批流程配置、审计日志）统一收在最后。
+// 后续 P2/P3 新增护理、服务、月子餐、库存、财务、人事、办公等业务模块时，
+// 一律插入"业务模块"分区（收款管理分组之前），不要插进平台管理分区。
 export const navMenuOptions: MenuOption[] = [
-  {
-    type: 'group',
-    label: '组织架构',
-    key: 'group-org',
-    children: [
-      { label: linkLabel('区域管理', '/org/regions'), key: '/org/regions', icon: icon(Folder) },
-      { label: linkLabel('门店管理', '/org/stores'), key: '/org/stores', icon: icon(Storefront) },
-      { label: linkLabel('部门管理', '/org/departments'), key: '/org/departments', icon: icon(Business) },
-      { label: linkLabel('班组管理', '/org/teams'), key: '/org/teams', icon: icon(People) },
-      { label: linkLabel('职位管理', '/org/positions'), key: '/org/positions', icon: icon(Clipboard) },
-    ],
-  },
+  // ==================== 业务模块 ====================
   {
     type: 'group',
     label: '客户与线索',
@@ -64,6 +57,7 @@ export const navMenuOptions: MenuOption[] = [
     children: [
       { label: linkLabel('合同模板', '/contract/templates'), key: '/contract/templates', icon: icon(Reader) },
       { label: linkLabel('合同管理', '/contract/records'), key: '/contract/records', icon: icon(Document) },
+      { label: linkLabel('续签查询', '/contract/renewals'), key: '/contract/renewals', icon: icon(Reader) },
     ],
   },
   {
@@ -82,6 +76,20 @@ export const navMenuOptions: MenuOption[] = [
     label: '收款管理',
     key: 'group-payment',
     children: [{ label: linkLabel('收款记录', '/payment/records'), key: '/payment/records', icon: icon(Cash) }],
+  },
+
+  // ==================== 平台管理 ====================
+  {
+    type: 'group',
+    label: '组织架构',
+    key: 'group-org',
+    children: [
+      { label: linkLabel('区域管理', '/org/regions'), key: '/org/regions', icon: icon(Folder) },
+      { label: linkLabel('门店管理', '/org/stores'), key: '/org/stores', icon: icon(Storefront) },
+      { label: linkLabel('部门管理', '/org/departments'), key: '/org/departments', icon: icon(Business) },
+      { label: linkLabel('班组管理', '/org/teams'), key: '/org/teams', icon: icon(People) },
+      { label: linkLabel('职位管理', '/org/positions'), key: '/org/positions', icon: icon(Clipboard) },
+    ],
   },
   {
     type: 'group',

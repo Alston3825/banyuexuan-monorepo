@@ -17,7 +17,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('../layouts/AdminLayout.vue'),
-    redirect: '/org/regions',
+    redirect: '/crm/customers',
     children: [
       { path: 'org/regions', name: 'regions', component: () => import('../views/org/RegionsView.vue'), meta: { title: '区域管理' } },
       { path: 'org/stores', name: 'stores', component: () => import('../views/org/StoresView.vue'), meta: { title: '门店管理' } },
@@ -33,6 +33,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'contract/templates', name: 'contract-templates', component: () => import('../views/contract/ContractTemplatesView.vue'), meta: { title: '合同模板' } },
       { path: 'contract/records', name: 'contract-records', component: () => import('../views/contract/ContractsView.vue'), meta: { title: '合同管理' } },
       { path: 'contract/records/:id', name: 'contract-record-detail', component: () => import('../views/contract/ContractDetailView.vue'), meta: { title: '合同详情' } },
+      { path: 'contract/renewals', name: 'contract-renewals', component: () => import('../views/contract/ContractRenewalsView.vue'), meta: { title: '续签查询' } },
       { path: 'room/types', name: 'room-types', component: () => import('../views/room/RoomTypesView.vue'), meta: { title: '房型管理' } },
       { path: 'room/rooms', name: 'room-rooms', component: () => import('../views/room/RoomsView.vue'), meta: { title: '房间管理' } },
       { path: 'room/board', name: 'room-board', component: () => import('../views/room/RoomBoardView.vue'), meta: { title: '房态看板' } },
@@ -60,7 +61,7 @@ export const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.path === '/login') {
-    if (auth.isAuthenticated) return '/org/regions'
+    if (auth.isAuthenticated) return '/crm/customers'
     return true
   }
   if (!auth.isAuthenticated) {

@@ -9,7 +9,7 @@ export default defineConfig({
       // 后端目前没有开 CORS，开发环境用 Vite 代理让浏览器视角是同源请求，
       // 绕开 CORS；生产部署如果前后端分属不同源，需要后端加 app.enableCors(...)。
       '/api/v1': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://localhost:3000',
         changeOrigin: true,
       },
     },
