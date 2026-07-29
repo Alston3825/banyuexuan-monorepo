@@ -17,6 +17,9 @@ import { MealModule } from './meal/meal.module';
 import { ServiceModule } from './service/service.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { HrModule } from './hr/hr.module';
+import { FinanceModule } from './finance/finance.module';
+import { OfficeModule } from './office/office.module';
+import { LogisticsModule } from './logistics/logistics.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -42,6 +45,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ServiceModule,
     InventoryModule,
     HrModule,
+    FinanceModule,
+    OfficeModule,
+    LogisticsModule,
     HealthModule,
   ],
   providers: [

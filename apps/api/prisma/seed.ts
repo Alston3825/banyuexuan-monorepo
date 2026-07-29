@@ -172,6 +172,19 @@ async function main() {
     { code: 'hr.commission-record', name: '人事-业绩提成', type: 'PAGE', parentCode: 'hr' },
     { code: 'hr.payroll-record', name: '人事-薪资单', type: 'PAGE', parentCode: 'hr' },
 
+    { code: 'finance', name: '财务结算', type: 'MODULE' },
+    { code: 'finance.customer-account', name: '财务结算-会员账户', type: 'PAGE', parentCode: 'finance' },
+
+    { code: 'office', name: '办公审批', type: 'MODULE' },
+    { code: 'office.leave-request', name: '办公审批-请假申请', type: 'PAGE', parentCode: 'office' },
+    { code: 'office.expense-claim', name: '办公审批-报销申请', type: 'PAGE', parentCode: 'office' },
+    { code: 'office.general-memo', name: '办公审批-日常签呈', type: 'PAGE', parentCode: 'office' },
+
+    { code: 'logistics', name: '后勤管理', type: 'MODULE' },
+    { code: 'logistics.vehicle', name: '后勤管理-车辆管理', type: 'PAGE', parentCode: 'logistics' },
+    { code: 'logistics.vehicle-booking', name: '后勤管理-用车申请', type: 'PAGE', parentCode: 'logistics' },
+    { code: 'logistics.utility-expense', name: '后勤管理-水电费登记', type: 'PAGE', parentCode: 'logistics' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -370,6 +383,27 @@ async function main() {
   for (const action of ['view', 'create', 'submit', 'mark-paid', 'cancel']) {
     permSpecs.push({ code: `hr.payroll-record.${action}`, name: `人事-薪资单-${action}`, type: 'BUTTON', parentCode: 'hr.payroll-record' });
   }
+  for (const action of ['view', 'recharge', 'consume', 'refund', 'adjust']) {
+    permSpecs.push({ code: `finance.customer-account.${action}`, name: `财务结算-会员账户-${action}`, type: 'BUTTON', parentCode: 'finance.customer-account' });
+  }
+  for (const action of ['view', 'create', 'submit', 'cancel']) {
+    permSpecs.push({ code: `office.leave-request.${action}`, name: `办公审批-请假申请-${action}`, type: 'BUTTON', parentCode: 'office.leave-request' });
+  }
+  for (const action of ['view', 'create', 'submit', 'cancel']) {
+    permSpecs.push({ code: `office.expense-claim.${action}`, name: `办公审批-报销申请-${action}`, type: 'BUTTON', parentCode: 'office.expense-claim' });
+  }
+  for (const action of ['view', 'create', 'submit', 'cancel']) {
+    permSpecs.push({ code: `office.general-memo.${action}`, name: `办公审批-日常签呈-${action}`, type: 'BUTTON', parentCode: 'office.general-memo' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `logistics.vehicle.${action}`, name: `后勤管理-车辆管理-${action}`, type: 'BUTTON', parentCode: 'logistics.vehicle' });
+  }
+  for (const action of ['view', 'create', 'cancel']) {
+    permSpecs.push({ code: `logistics.vehicle-booking.${action}`, name: `后勤管理-用车申请-${action}`, type: 'BUTTON', parentCode: 'logistics.vehicle-booking' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `logistics.utility-expense.${action}`, name: `后勤管理-水电费登记-${action}`, type: 'BUTTON', parentCode: 'logistics.utility-expense' });
+  }
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -478,6 +512,16 @@ async function main() {
   // 全部动作开放——真正的审批权由通用工作流引擎的审批人角色把关，同 payment.record 口径。
   // 人事域：员工档案/班次定义/排班/业绩提成/薪资单都是店长日常管理自己门店员工的操作
   // （店长本身就是提成/薪资审批人），全部动作开放，不额外收紧。
+  // 财务结算-会员账户：充值/消费/退款是有实际业务凭证支撑的前台日常操作，开放给店长；
+  // "人工调整"(finance.customer-account.adjust)是脱离正常业务凭证、可任意改动余额的纠错
+  // 操作，风险等级同"作废/标记流失"，只留给 SUPER_ADMIN。
+  // 办公审批：请假/报销/签呈都是店长日常审批自己门店事务的操作（店长本身就是审批人），
+  // 全部动作开放，不额外收紧，同 hr.commission-record/payroll-record 口径。
+  // 后勤管理：车辆主数据(logistics.vehicle)新增/停用车辆属于总部决策，不开放
+  // create/update 给 STORE_MANAGER；但 view 需要开放——店长发起用车申请时要能看到
+  // 车辆列表去选择，与"总部主数据不可编辑但日常业务要能引用"这个诉求一致。用车申请
+  // (logistics.vehicle-booking)与水电费登记(logistics.utility-expense)是店长日常操作，
+  // 全部动作开放。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -485,6 +529,9 @@ async function main() {
     'crm.lead.lose',
     'crm.opportunity.lose',
     'contract.record.void',
+    'finance.customer-account.adjust',
+    'logistics.vehicle.create',
+    'logistics.vehicle.update',
   ]);
   const storeManagerCodes = permSpecs
     .map((p) => p.code)
@@ -528,7 +575,13 @@ async function main() {
           code.startsWith('hr.shift-definition') ||
           code.startsWith('hr.schedule-entry') ||
           code.startsWith('hr.commission-record') ||
-          code.startsWith('hr.payroll-record')),
+          code.startsWith('hr.payroll-record') ||
+          code.startsWith('finance.customer-account') ||
+          code.startsWith('office.leave-request') ||
+          code.startsWith('office.expense-claim') ||
+          code.startsWith('office.general-memo') ||
+          code.startsWith('logistics.vehicle') ||
+          code.startsWith('logistics.utility-expense')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -756,6 +809,25 @@ async function main() {
     update: {},
     create: { workflowDefinitionId: payrollDefinition.id, seq: 2, name: '平台管理员终审', approverType: 'ROLE', approverRoleId: superAdminRole.id },
   });
+
+  // ---------- 工作流定义：办公审批三种固定单据（均为单节点店长审批，见业务规则确认记录#13） ----------
+  const officeDefinitions: { code: string; name: string }[] = [
+    { code: 'OFFICE_LEAVE', name: '请假申请审批' },
+    { code: 'OFFICE_EXPENSE', name: '报销申请审批' },
+    { code: 'OFFICE_MEMO', name: '日常签呈审批' },
+  ];
+  for (const { code, name } of officeDefinitions) {
+    const definition = await prisma.workflowDefinition.upsert({
+      where: { tenantId_code_version: { tenantId: tenant.id, code, version: 1 } },
+      update: {},
+      create: { tenantId: tenant.id, code, name, version: 1, status: 'PUBLISHED', createdBy: 'SEED' },
+    });
+    await prisma.workflowNode.upsert({
+      where: { workflowDefinitionId_seq: { workflowDefinitionId: definition.id, seq: 1 } },
+      update: {},
+      create: { workflowDefinitionId: definition.id, seq: 1, name: '店长审批', approverType: 'ROLE', approverRoleId: storeManagerRole.id },
+    });
+  }
 
   // ---------- 参数 ----------
   const parameters: { key: string; value: string; description: string }[] = [

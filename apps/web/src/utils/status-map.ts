@@ -304,6 +304,47 @@ export const PAYROLL_RECORD_STATUS_MAP: Record<string, StatusMeta> = {
   PAID: { label: '已发放', type: 'success' },
 }
 
+export const CUSTOMER_ACCOUNT_TRANSACTION_TYPE_MAP: Record<string, StatusMeta> = {
+  RECHARGE: { label: '充值', type: 'success' },
+  CONSUME: { label: '消费', type: 'warning' },
+  REFUND: { label: '退款', type: 'info' },
+  ADJUST: { label: '人工调整', type: 'error' },
+}
+
+export const OFFICE_APPROVAL_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '已批准', type: 'success' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+}
+
+export const LEAVE_TYPE_LABEL_MAP: Record<string, string> = {
+  SICK: '病假',
+  PERSONAL: '事假',
+  ANNUAL: '年假',
+  OTHER: '其他',
+}
+
+export const VEHICLE_STATUS_MAP: Record<string, StatusMeta> = {
+  AVAILABLE: { label: '可用', type: 'success' },
+  MAINTENANCE: { label: '维修中', type: 'warning' },
+  RETIRED: { label: '已报废', type: 'default' },
+}
+
+export const VEHICLE_BOOKING_STATUS_MAP: Record<string, StatusMeta> = {
+  BOOKED: { label: '已预约', type: 'success' },
+  CANCELLED: { label: '已取消', type: 'default' },
+}
+
+export const UTILITY_EXPENSE_TYPE_LABEL_MAP: Record<string, string> = {
+  ELECTRICITY: '电费',
+  WATER: '水费',
+  GAS: '燃气费',
+  PROPERTY_MANAGEMENT: '物业费',
+  OTHER: '其他',
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',

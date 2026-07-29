@@ -73,38 +73,43 @@ model Store {
   updatedAt DateTime    @updatedAt @map("updated_at")
   version   Int         @default(0)
 
-  region          Region          @relation(fields: [regionId], references: [id])
-  departments     Department[]
-  teams           Team[]
-  accounts        Account[]
-  customers       Customer[]
-  leads           Lead[]
-  contracts       Contract[]
-  rooms           Room[]
-  roomOccupancies RoomOccupancy[]
-  payments        Payment[]
-  motherProfiles  MotherProfile[]
-  babyProfiles    BabyProfile[]
-  carePlans       CarePlan[]
-  careRecords     CareRecord[]
-  careAbnormalities CareAbnormality[]
-  roomCalls                RoomCall[]
-  roomOutings              RoomOuting[]
-  roomServiceRequisitions  RoomServiceRequisition[]
-  dinerProfiles            DinerProfile[]
-  mealRecords              MealRecord[]
-  customerServicePackages  CustomerServicePackage[]
-  therapists               Therapist[]
-  serviceAppointments      ServiceAppointment[]
-  warehouses               Warehouse[]
-  purchaseOrders           PurchaseOrder[]
-  goodsReceipts            GoodsReceipt[]
-  stockIssues              StockIssue[]
-  stockCounts              StockCount[]
-  shiftDefinitions         ShiftDefinition[]
-  scheduleEntries          ScheduleEntry[]
-  commissionRecords        CommissionRecord[]
-  payrollRecords           PayrollRecord[]
+  region                  Region                   @relation(fields: [regionId], references: [id])
+  departments             Department[]
+  teams                   Team[]
+  accounts                Account[]
+  customers               Customer[]
+  leads                   Lead[]
+  contracts               Contract[]
+  rooms                   Room[]
+  roomOccupancies         RoomOccupancy[]
+  payments                Payment[]
+  motherProfiles          MotherProfile[]
+  babyProfiles            BabyProfile[]
+  carePlans               CarePlan[]
+  careRecords             CareRecord[]
+  careAbnormalities       CareAbnormality[]
+  roomCalls               RoomCall[]
+  roomOutings             RoomOuting[]
+  roomServiceRequisitions RoomServiceRequisition[]
+  dinerProfiles           DinerProfile[]
+  mealRecords             MealRecord[]
+  customerServicePackages CustomerServicePackage[]
+  therapists              Therapist[]
+  serviceAppointments     ServiceAppointment[]
+  warehouses              Warehouse[]
+  purchaseOrders          PurchaseOrder[]
+  goodsReceipts           GoodsReceipt[]
+  stockIssues             StockIssue[]
+  stockCounts             StockCount[]
+  shiftDefinitions        ShiftDefinition[]
+  scheduleEntries         ScheduleEntry[]
+  commissionRecords       CommissionRecord[]
+  payrollRecords          PayrollRecord[]
+  leaveRequests           LeaveRequest[]
+  expenseClaims           ExpenseClaim[]
+  generalMemos            GeneralMemo[]
+  vehicleBookings         VehicleBooking[]
+  utilityExpenses         UtilityExpense[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -200,16 +205,19 @@ model Account {
   updatedAt    DateTime      @updatedAt @map("updated_at")
   version      Int           @default(0)
 
-  store           Store?                  @relation(fields: [storeId], references: [id])
-  department      Department?             @relation(fields: [departmentId], references: [id])
-  team            Team?                   @relation(fields: [teamId], references: [id])
-  position        Position?               @relation(fields: [positionId], references: [id])
-  roleAssignments AccountRoleAssignment[]
-  refreshTokens   RefreshToken[]
+  store                 Store?                  @relation(fields: [storeId], references: [id])
+  department            Department?             @relation(fields: [departmentId], references: [id])
+  team                  Team?                   @relation(fields: [teamId], references: [id])
+  position              Position?               @relation(fields: [positionId], references: [id])
+  roleAssignments       AccountRoleAssignment[]
+  refreshTokens         RefreshToken[]
   assignedCustomers     Customer[]
   assignedLeads         Lead[]
   assignedOpportunities SalesOpportunity[]
   employeeProfile       EmployeeProfile?
+  expenseClaims         ExpenseClaim[]
+  generalMemos          GeneralMemo[]
+  vehicleBookings       VehicleBooking[]
 
   @@unique([tenantId, username])
   @@index([tenantId, storeId])
@@ -682,18 +690,19 @@ model Customer {
   updatedAt      DateTime       @updatedAt @map("updated_at")
   version        Int            @default(0)
 
-  primaryStore    Store?             @relation(fields: [primaryStoreId], references: [id])
-  assignedTo      Account?           @relation(fields: [assignedToId], references: [id])
-  leads           Lead[]
-  opportunities   SalesOpportunity[]
-  contracts       Contract[]
-  roomOccupancies RoomOccupancy[]
-  payments        Payment[]
-  motherProfiles  MotherProfile[]
-  babyProfiles    BabyProfile[]
-  dinerProfiles   DinerProfile[]
+  primaryStore            Store?                   @relation(fields: [primaryStoreId], references: [id])
+  assignedTo              Account?                 @relation(fields: [assignedToId], references: [id])
+  leads                   Lead[]
+  opportunities           SalesOpportunity[]
+  contracts               Contract[]
+  roomOccupancies         RoomOccupancy[]
+  payments                Payment[]
+  motherProfiles          MotherProfile[]
+  babyProfiles            BabyProfile[]
+  dinerProfiles           DinerProfile[]
   customerServicePackages CustomerServicePackage[]
   serviceAppointments     ServiceAppointment[]
+  account                 CustomerAccount?
 
   @@unique([tenantId, customerNo])
   @@index([tenantId, assignedToId])
@@ -751,9 +760,9 @@ model SalesOpportunity {
   updatedAt     DateTime         @updatedAt @map("updated_at")
   version       Int              @default(0)
 
-  customer   Customer @relation(fields: [customerId], references: [id])
-  lead       Lead?    @relation(fields: [leadId], references: [id])
-  assignedTo Account? @relation(fields: [assignedToId], references: [id])
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  lead       Lead?      @relation(fields: [leadId], references: [id])
+  assignedTo Account?   @relation(fields: [assignedToId], references: [id])
   contracts  Contract[]
 
   @@unique([tenantId, opportunityNo])
@@ -932,15 +941,15 @@ model RoomOccupancy {
   updatedAt        DateTime            @updatedAt @map("updated_at")
   version          Int                 @default(0)
 
-  room                     Room                     @relation(fields: [roomId], references: [id])
-  store                    Store                    @relation(fields: [storeId], references: [id])
-  customer                 Customer                 @relation(fields: [customerId], references: [id])
-  contract                 Contract?                @relation(fields: [contractId], references: [id])
-  motherProfiles           MotherProfile[]
-  roomCalls                RoomCall[]
-  roomOutings              RoomOuting[]
+  room                    Room                     @relation(fields: [roomId], references: [id])
+  store                   Store                    @relation(fields: [storeId], references: [id])
+  customer                Customer                 @relation(fields: [customerId], references: [id])
+  contract                Contract?                @relation(fields: [contractId], references: [id])
+  motherProfiles          MotherProfile[]
+  roomCalls               RoomCall[]
+  roomOutings             RoomOuting[]
   roomServiceRequisitions RoomServiceRequisition[]
-  dinerProfiles            DinerProfile[]
+  dinerProfiles           DinerProfile[]
 
   @@unique([tenantId, occupancyNo])
   @@index([tenantId, roomId])
@@ -994,6 +1003,58 @@ model Payment {
   @@index([tenantId, contractId])
   @@index([tenantId, status])
   @@map("payments")
+}
+
+// ==================== 财务结算深化（会员账户：赠送优先扣减，见业务规则确认记录#5） ====================
+// 与 Payment（强绑定 Contract 的合同收款）是两类不同性质的资金记录，不合并、不互相依赖，
+// 呼应竞品"多资金池独立核算"的精神，但V1只用一个账户的"本金/赠送"两个子池覆盖核心区分。
+// 余额变更（充值/消费/退款/调整）均用数据库原子 increment 保证并发安全，不要求前端传
+// expectedVersion——这是高频小额记账场景，与"整单编辑"的乐观锁语义不同（详见业务规则确认记录）。
+
+enum CustomerAccountTransactionType {
+  RECHARGE
+  CONSUME
+  REFUND
+  ADJUST
+}
+
+model CustomerAccount {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  customerId       String   @unique @map("customer_id")
+  principalBalance Int      @default(0) @map("principal_balance") // 客户实付本金余额，最小货币单位（分）
+  giftBalance      Int      @default(0) @map("gift_balance") // 赠送/权益余额，最小货币单位（分）
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  version          Int      @default(0)
+
+  customer     Customer                     @relation(fields: [customerId], references: [id])
+  transactions CustomerAccountTransaction[]
+
+  @@map("customer_accounts")
+}
+
+/// 消费(CONSUME)按"赠送优先，再扣本金"顺序自动拆分 principalDelta/giftDelta（均为负数）；
+/// 退款(REFUND)由操作员显式指定退回本金/赠送各多少，系统不做反查原消费记录的自动比例拆分。
+model CustomerAccountTransaction {
+  id             String                         @id @default(cuid())
+  tenantId       String                         @map("tenant_id")
+  accountId      String                         @map("account_id")
+  type           CustomerAccountTransactionType
+  principalDelta Int                            @default(0) @map("principal_delta") // 可正可负
+  giftDelta      Int                            @default(0) @map("gift_delta") // 可正可负
+  principalAfter Int                            @map("principal_after")
+  giftAfter      Int                            @map("gift_after")
+  sourceType     String?                        @map("source_type") // 如 MANUAL/SERVICE_APPOINTMENT/CONTRACT
+  sourceId       String?                        @map("source_id")
+  remark         String?                        @db.Text
+  createdBy      String                         @map("created_by")
+  createdAt      DateTime                       @default(now()) @map("created_at")
+
+  account CustomerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, accountId])
+  @@map("customer_account_transactions")
 }
 
 // ==================== 护理域（母婴履约深化 P2 第一切片：表单引擎 + 档案） ====================
@@ -1798,28 +1859,28 @@ model Supplier {
 /// 仓库：requiresApproval=false 时该仓库的入库/出库/领用/盘点单跳过工作流审批，直接
 /// DRAFT->APPROVED（"仓库级免审批"配置，竞品分析3.7）。
 model Warehouse {
-  id                String           @id @default(cuid())
-  tenantId          String           @map("tenant_id")
-  storeId           String           @map("store_id")
-  code              String
-  name              String
-  purpose           WarehousePurpose @default(OPERATING)
-  requiresApproval  Boolean          @default(true) @map("requires_approval")
-  status            CommonStatus     @default(ACTIVE)
-  createdBy         String           @map("created_by")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-  version           Int              @default(0)
+  id               String           @id @default(cuid())
+  tenantId         String           @map("tenant_id")
+  storeId          String           @map("store_id")
+  code             String
+  name             String
+  purpose          WarehousePurpose @default(OPERATING)
+  requiresApproval Boolean          @default(true) @map("requires_approval")
+  status           CommonStatus     @default(ACTIVE)
+  createdBy        String           @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  version          Int              @default(0)
 
-  store               Store                @relation(fields: [storeId], references: [id])
-  stocks              WarehouseStock[]
-  batches             StockBatch[]
-  goodsReceipts       GoodsReceipt[]
-  stockIssues         StockIssue[]
-  transfersOut        StockTransfer[]      @relation("TransferFrom")
-  transfersIn         StockTransfer[]      @relation("TransferTo")
-  stockCounts         StockCount[]
-  purchaseOrders      PurchaseOrder[]
+  store          Store            @relation(fields: [storeId], references: [id])
+  stocks         WarehouseStock[]
+  batches        StockBatch[]
+  goodsReceipts  GoodsReceipt[]
+  stockIssues    StockIssue[]
+  transfersOut   StockTransfer[]  @relation("TransferFrom")
+  transfersIn    StockTransfer[]  @relation("TransferTo")
+  stockCounts    StockCount[]
+  purchaseOrders PurchaseOrder[]
 
   @@unique([tenantId, code])
   @@map("warehouses")
@@ -1905,20 +1966,20 @@ enum InventoryDocStatus {
 /// 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED；
 /// APPROVED 后可据此创建入库单（收货数量与采购数量的对比只做展示，不做强校验，见 schema 顶部范围收窄说明）。
 model PurchaseOrder {
-  id          String             @id @default(cuid())
-  tenantId    String             @map("tenant_id")
-  storeId     String             @map("store_id")
-  warehouseId String             @map("warehouse_id")
-  supplierId  String             @map("supplier_id")
-  orderNo     String             @map("order_no")
-  status      InventoryDocStatus @default(DRAFT)
-  totalAmount Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
-  remark      String?            @db.Text
-  cancelReason String?           @map("cancel_reason") @db.Text
-  createdBy   String             @map("created_by")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
-  version     Int                @default(0)
+  id           String             @id @default(cuid())
+  tenantId     String             @map("tenant_id")
+  storeId      String             @map("store_id")
+  warehouseId  String             @map("warehouse_id")
+  supplierId   String             @map("supplier_id")
+  orderNo      String             @map("order_no")
+  status       InventoryDocStatus @default(DRAFT)
+  totalAmount  Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
+  remark       String?            @db.Text
+  cancelReason String?            @map("cancel_reason") @db.Text
+  createdBy    String             @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  version      Int                @default(0)
 
   store         Store               @relation(fields: [storeId], references: [id])
   warehouse     Warehouse           @relation(fields: [warehouseId], references: [id])
@@ -1948,20 +2009,20 @@ model PurchaseOrderItem {
 /// 入库单(RK)：执行(execute)时更新 WarehouseStock（移动加权平均法重算成本）并生成 StockBatch。
 /// 完成后不可变，需要冲正时创建一张新的入库单/出库单反向操作，不修改已完成单据本身。
 model GoodsReceipt {
-  id                String             @id @default(cuid())
-  tenantId          String             @map("tenant_id")
-  storeId           String             @map("store_id")
-  warehouseId       String             @map("warehouse_id")
-  purchaseOrderId   String?            @map("purchase_order_id") // 挂在已审批采购单下则跳过自身审批
-  receiptNo         String             @map("receipt_no")
-  status            InventoryDocStatus @default(DRAFT)
-  remark            String?            @db.Text
-  cancelReason       String?           @map("cancel_reason") @db.Text
-  completedAt       DateTime?          @map("completed_at")
-  createdBy         String             @map("created_by")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  version           Int                @default(0)
+  id              String             @id @default(cuid())
+  tenantId        String             @map("tenant_id")
+  storeId         String             @map("store_id")
+  warehouseId     String             @map("warehouse_id")
+  purchaseOrderId String?            @map("purchase_order_id") // 挂在已审批采购单下则跳过自身审批
+  receiptNo       String             @map("receipt_no")
+  status          InventoryDocStatus @default(DRAFT)
+  remark          String?            @db.Text
+  cancelReason    String?            @map("cancel_reason") @db.Text
+  completedAt     DateTime?          @map("completed_at")
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  version         Int                @default(0)
 
   store         Store              @relation(fields: [storeId], references: [id])
   warehouse     Warehouse          @relation(fields: [warehouseId], references: [id])
@@ -2099,12 +2160,12 @@ model StockCount {
 }
 
 model StockCountItem {
-  id             String @id @default(cuid())
-  stockCountId   String @map("stock_count_id")
-  itemId         String @map("item_id")
-  systemQuantity Int    @map("system_quantity") // 创建盘点单时快照的系统账面数量
-  countedQuantity Int   @map("counted_quantity") // 实际盘点数量
-  diffQuantity   Int    @map("diff_quantity") // countedQuantity - systemQuantity，创建时算好落库
+  id              String @id @default(cuid())
+  stockCountId    String @map("stock_count_id")
+  itemId          String @map("item_id")
+  systemQuantity  Int    @map("system_quantity") // 创建盘点单时快照的系统账面数量
+  countedQuantity Int    @map("counted_quantity") // 实际盘点数量
+  diffQuantity    Int    @map("diff_quantity") // countedQuantity - systemQuantity，创建时算好落库
 
   stockCount StockCount    @relation(fields: [stockCountId], references: [id])
   item       InventoryItem @relation(fields: [itemId], references: [id])
@@ -2155,10 +2216,11 @@ model EmployeeProfile {
   updatedAt           DateTime              @updatedAt @map("updated_at")
   version             Int                   @default(0)
 
-  account          Account            @relation(fields: [accountId], references: [id])
-  scheduleEntries  ScheduleEntry[]
+  account               Account                @relation(fields: [accountId], references: [id])
+  scheduleEntries       ScheduleEntry[]
   commissionAllocations CommissionAllocation[]
-  payrollRecords   PayrollRecord[]
+  payrollRecords        PayrollRecord[]
+  leaveRequests         LeaveRequest[]
 
   @@unique([tenantId, employeeNo])
   @@map("employee_profiles")
@@ -2179,7 +2241,7 @@ model ShiftDefinition {
   updatedAt DateTime     @updatedAt @map("updated_at")
   version   Int          @default(0)
 
-  store          Store           @relation(fields: [storeId], references: [id])
+  store           Store           @relation(fields: [storeId], references: [id])
   scheduleEntries ScheduleEntry[]
 
   @@unique([tenantId, storeId, code])
@@ -2226,20 +2288,20 @@ enum CommissionRecordStatus {
 /// sourceType/sourceId 追溯触发单据（如 PAYMENT/SERVICE_APPOINTMENT/CUSTOMER_SERVICE_PACKAGE），
 /// 不做外键约束（跨模块泛化引用，同 WorkflowInstance.businessType/businessId 的设计）。
 model CommissionRecord {
-  id           String                  @id @default(cuid())
-  tenantId     String                  @map("tenant_id")
-  storeId      String                  @map("store_id")
+  id           String                 @id @default(cuid())
+  tenantId     String                 @map("tenant_id")
+  storeId      String                 @map("store_id")
   type         CommissionType
-  sourceType   String                  @map("source_type")
-  sourceId     String                  @map("source_id")
-  totalAmount  Int                     @map("total_amount") // 最小货币单位，等于各分配明细之和
-  status       CommissionRecordStatus  @default(DRAFT)
-  remark       String?                 @db.Text
-  cancelReason String?                 @map("cancel_reason") @db.Text
-  createdBy    String                  @map("created_by")
-  createdAt    DateTime                @default(now()) @map("created_at")
-  updatedAt    DateTime                @updatedAt @map("updated_at")
-  version      Int                     @default(0)
+  sourceType   String                 @map("source_type")
+  sourceId     String                 @map("source_id")
+  totalAmount  Int                    @map("total_amount") // 最小货币单位，等于各分配明细之和
+  status       CommissionRecordStatus @default(DRAFT)
+  remark       String?                @db.Text
+  cancelReason String?                @map("cancel_reason") @db.Text
+  createdBy    String                 @map("created_by")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  version      Int                    @default(0)
 
   store       Store                  @relation(fields: [storeId], references: [id])
   allocations CommissionAllocation[]
@@ -2279,23 +2341,23 @@ enum PayrollRecordStatus {
 /// -(标记发放)-> PAID。commissionTotal 是创建时对该员工当期已批准 CommissionAllocation 的
 /// 快照汇总，之后提成再变化不会回溯影响已生成的薪资单。
 model PayrollRecord {
-  id              String              @id @default(cuid())
-  tenantId        String              @map("tenant_id")
-  storeId         String              @map("store_id")
-  employeeProfileId String            @map("employee_profile_id")
-  period          String // "YYYY-MM"
-  baseSalary      Int                 @map("base_salary")
-  commissionTotal Int                 @default(0) @map("commission_total")
-  deductions      Int                 @default(0)
-  netAmount       Int                 @map("net_amount") // baseSalary + commissionTotal - deductions，创建时算好落库
-  status          PayrollRecordStatus @default(DRAFT)
-  paidAt          DateTime?           @map("paid_at")
-  remark          String?             @db.Text
-  cancelReason    String?             @map("cancel_reason") @db.Text
-  createdBy       String              @map("created_by")
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
-  version         Int                 @default(0)
+  id                String              @id @default(cuid())
+  tenantId          String              @map("tenant_id")
+  storeId           String              @map("store_id")
+  employeeProfileId String              @map("employee_profile_id")
+  period            String // "YYYY-MM"
+  baseSalary        Int                 @map("base_salary")
+  commissionTotal   Int                 @default(0) @map("commission_total")
+  deductions        Int                 @default(0)
+  netAmount         Int                 @map("net_amount") // baseSalary + commissionTotal - deductions，创建时算好落库
+  status            PayrollRecordStatus @default(DRAFT)
+  paidAt            DateTime?           @map("paid_at")
+  remark            String?             @db.Text
+  cancelReason      String?             @map("cancel_reason") @db.Text
+  createdBy         String              @map("created_by")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  version           Int                 @default(0)
 
   store           Store           @relation(fields: [storeId], references: [id])
   employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
@@ -2303,4 +2365,182 @@ model PayrollRecord {
   @@unique([tenantId, employeeProfileId, period])
   @@index([tenantId, storeId, status])
   @@map("payroll_records")
+}
+
+// ==================== 办公审批（固定几种常用单据类型，不做自定义表单引擎，见业务规则确认记录#13） ====================
+// 三种单据共用同一状态机 OfficeApprovalStatus，均为单级店长审批，完全复用通用工作流引擎，
+// reconcileStatus() 懒同步模式与 CommissionRecord/PayrollRecord 完全同构。
+// 范围收窄：物品申领已由库存域 StockIssue(issueType=REQUISITION) 覆盖、退款已由
+// Payment.requestRefund 覆盖，均不在此重复建模；请假是HR域明确延后的"请假管理"在此补上；
+// 日常签呈(GeneralMemo)是标题+正文自由文本的兜底通用审批入口。
+
+enum OfficeApprovalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  SICK
+  PERSONAL
+  ANNUAL
+  OTHER
+}
+
+model LeaveRequest {
+  id                String               @id @default(cuid())
+  tenantId          String               @map("tenant_id")
+  storeId           String               @map("store_id")
+  employeeProfileId String               @map("employee_profile_id")
+  leaveType         LeaveType            @map("leave_type")
+  startDate         DateTime             @map("start_date")
+  endDate           DateTime             @map("end_date")
+  reason            String               @db.Text
+  status            OfficeApprovalStatus @default(DRAFT)
+  cancelReason      String?              @map("cancel_reason") @db.Text
+  createdBy         String               @map("created_by")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  version           Int                  @default(0)
+
+  store           Store           @relation(fields: [storeId], references: [id])
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("leave_requests")
+}
+
+model ExpenseClaim {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  amount       Int // 最小货币单位（分）
+  category     String // 自由文本，如 差旅/办公用品/招待
+  reason       String               @db.Text
+  status       OfficeApprovalStatus @default(DRAFT)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("expense_claims")
+}
+
+/// 兜底的通用审批入口：标题+正文自由文本，覆盖"以上都不是"的长尾审批需求。
+model GeneralMemo {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  title        String
+  content      String               @db.Text
+  status       OfficeApprovalStatus @default(DRAFT)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("general_memos")
+}
+
+// ==================== 后勤管理（见业务规则确认记录#14/15/16） ====================
+// 后勤仓库/物料复用 P3 库存域已有的 Warehouse/InventoryItem（purpose=LOGISTICS 区分），
+// 不在此重复建模。本节只新增两块全新领域：车辆调度（集团层统一调度池+占用冲突检测）、
+// 水电费登记（门店级运营费用，不做分摊）。
+
+enum VehicleStatus {
+  AVAILABLE
+  MAINTENANCE
+  RETIRED
+}
+
+/// 车辆不归属单一门店，任意门店可申请使用（集团层统一调度池，见#15）。
+model Vehicle {
+  id          String        @id @default(cuid())
+  tenantId    String        @map("tenant_id")
+  plateNumber String        @map("plate_number")
+  model       String
+  status      VehicleStatus @default(AVAILABLE)
+  remark      String?       @db.Text
+  createdBy   String        @map("created_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  version     Int           @default(0)
+
+  bookings VehicleBooking[]
+
+  @@unique([tenantId, plateNumber])
+  @@map("vehicles")
+}
+
+enum VehicleBookingStatus {
+  BOOKED
+  CANCELLED
+}
+
+/// 使用申请：仅做占用冲突检测（同一车辆的 [startTime, endTime) 不可与其他 BOOKED 记录重叠），
+/// 不接入通用审批工作流——冲突检测本身就是唯一的准入门槛，呼应"集团层统一调度池"的定位。
+model VehicleBooking {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  vehicleId    String               @map("vehicle_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  purpose      String               @db.Text
+  startTime    DateTime             @map("start_time")
+  endTime      DateTime             @map("end_time")
+  status       VehicleBookingStatus @default(BOOKED)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, vehicleId, status])
+  @@map("vehicle_bookings")
+}
+
+enum UtilityExpenseType {
+  ELECTRICITY
+  WATER
+  GAS
+  PROPERTY_MANAGEMENT
+  OTHER
+}
+
+/// 门店级运营费用登记，不做分摊到客户房费成本核算（见#16）。
+model UtilityExpense {
+  id          String             @id @default(cuid())
+  tenantId    String             @map("tenant_id")
+  storeId     String             @map("store_id")
+  period      String // "YYYY-MM"
+  expenseType UtilityExpenseType @map("expense_type")
+  amount      Int // 最小货币单位（分）
+  remark      String?            @db.Text
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([tenantId, storeId, period, expenseType])
+  @@map("utility_expenses")
 }
