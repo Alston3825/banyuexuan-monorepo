@@ -153,6 +153,18 @@ async function main() {
     { code: 'service.customer-package', name: '产康服务-客户已购服务包', type: 'PAGE', parentCode: 'service' },
     { code: 'service.appointment', name: '产康服务-预约', type: 'PAGE', parentCode: 'service' },
 
+    { code: 'inventory', name: '库存', type: 'MODULE' },
+    { code: 'inventory.supplier', name: '库存-供应商', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.warehouse', name: '库存-仓库', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.item', name: '库存-物品', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.warehouse-stock', name: '库存-库存查询', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.stock-batch', name: '库存-批次与效期', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.purchase-order', name: '库存-采购单', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.goods-receipt', name: '库存-入库单', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.stock-issue', name: '库存-出库/领用单', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.stock-transfer', name: '库存-调拨单', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.stock-count', name: '库存-盘点单', type: 'PAGE', parentCode: 'inventory' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -309,6 +321,33 @@ async function main() {
     permSpecs.push({ code: `service.appointment.${action}`, name: `产康服务-预约-${action}`, type: 'BUTTON', parentCode: 'service.appointment' });
   }
 
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `inventory.supplier.${action}`, name: `库存-供应商-${action}`, type: 'BUTTON', parentCode: 'inventory.supplier' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `inventory.warehouse.${action}`, name: `库存-仓库-${action}`, type: 'BUTTON', parentCode: 'inventory.warehouse' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `inventory.item.${action}`, name: `库存-物品-${action}`, type: 'BUTTON', parentCode: 'inventory.item' });
+  }
+  permSpecs.push({ code: 'inventory.warehouse-stock.view', name: '库存-库存查询-view', type: 'BUTTON', parentCode: 'inventory.warehouse-stock' });
+  permSpecs.push({ code: 'inventory.stock-batch.view', name: '库存-批次与效期-view', type: 'BUTTON', parentCode: 'inventory.stock-batch' });
+  for (const action of ['view', 'create', 'submit', 'cancel']) {
+    permSpecs.push({ code: `inventory.purchase-order.${action}`, name: `库存-采购单-${action}`, type: 'BUTTON', parentCode: 'inventory.purchase-order' });
+  }
+  for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
+    permSpecs.push({ code: `inventory.goods-receipt.${action}`, name: `库存-入库单-${action}`, type: 'BUTTON', parentCode: 'inventory.goods-receipt' });
+  }
+  for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
+    permSpecs.push({ code: `inventory.stock-issue.${action}`, name: `库存-出库/领用单-${action}`, type: 'BUTTON', parentCode: 'inventory.stock-issue' });
+  }
+  for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
+    permSpecs.push({ code: `inventory.stock-transfer.${action}`, name: `库存-调拨单-${action}`, type: 'BUTTON', parentCode: 'inventory.stock-transfer' });
+  }
+  for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
+    permSpecs.push({ code: `inventory.stock-count.${action}`, name: `库存-盘点单-${action}`, type: 'BUTTON', parentCode: 'inventory.stock-count' });
+  }
+
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
   for (const spec of permSpecs.filter((p) => p.type === 'MODULE')) {
@@ -409,7 +448,11 @@ async function main() {
   // 营养配餐主数据，不开放；用膳人与排餐记录（meal.diner-profile/record）是护理/膳食人员的日常
   // 操作，全部动作开放。产康服务：项目/服务包/技师（service.product/package/therapist）是总部
   // 定价与人力主数据，不开放；客户已购服务包与预约（service.customer-package/appointment）是
-  // 前台/技师的日常操作，全部动作开放。
+  // 前台/技师的日常操作，全部动作开放。库存域：物品/供应商（inventory.item/supplier）是总部
+  // 制定的采购目录与供应商关系，同 room.type/meal.item 口径不开放；仓库（inventory.warehouse）
+  // 是各门店自行管理的经营容器，同 room.room 口径开放；库存查询与批次效期（只读）开放给店长
+  // 做日常盘点/预警巡查；五种单据（采购/入库/出库领用/调拨/盘点）是店长/仓管的日常操作，
+  // 全部动作开放——真正的审批权由通用工作流引擎的审批人角色把关，同 payment.record 口径。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -448,7 +491,14 @@ async function main() {
           code.startsWith('meal.diner-profile') ||
           code.startsWith('meal.record') ||
           code.startsWith('service.customer-package') ||
-          code.startsWith('service.appointment')),
+          code.startsWith('service.appointment') ||
+          code.startsWith('inventory.warehouse') ||
+          code.startsWith('inventory.stock-batch') ||
+          code.startsWith('inventory.purchase-order') ||
+          code.startsWith('inventory.goods-receipt') ||
+          code.startsWith('inventory.stock-issue') ||
+          code.startsWith('inventory.stock-transfer') ||
+          code.startsWith('inventory.stock-count')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -624,6 +674,27 @@ async function main() {
       approverRoleId: storeManagerRole.id,
     },
   });
+
+  // ---------- 工作流定义：库存域五种单据审批，均只给一个店长审批节点 ----------
+  const inventoryWorkflowDefs: { code: string; name: string }[] = [
+    { code: 'INVENTORY_PURCHASE', name: '采购单审批' },
+    { code: 'INVENTORY_GOODS_RECEIPT', name: '入库单审批' },
+    { code: 'INVENTORY_STOCK_ISSUE', name: '出库/领用单审批' },
+    { code: 'INVENTORY_STOCK_TRANSFER', name: '调拨单审批' },
+    { code: 'INVENTORY_STOCK_COUNT', name: '盘点单盈亏审批' },
+  ];
+  for (const def of inventoryWorkflowDefs) {
+    const definition = await prisma.workflowDefinition.upsert({
+      where: { tenantId_code_version: { tenantId: tenant.id, code: def.code, version: 1 } },
+      update: {},
+      create: { tenantId: tenant.id, code: def.code, name: def.name, version: 1, status: 'PUBLISHED', createdBy: 'SEED' },
+    });
+    await prisma.workflowNode.upsert({
+      where: { workflowDefinitionId_seq: { workflowDefinitionId: definition.id, seq: 1 } },
+      update: {},
+      create: { workflowDefinitionId: definition.id, seq: 1, name: '店长审批', approverType: 'ROLE', approverRoleId: storeManagerRole.id },
+    });
+  }
 
   // ---------- 参数 ----------
   const parameters: { key: string; value: string; description: string }[] = [
@@ -834,7 +905,7 @@ async function main() {
   console.log('seed 完成:');
   console.log(`  租户: ${tenant.code} / 门店: ${store.code} / 区域: ${region.code}`);
   console.log(`  账号: admin / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
-  console.log(`  工作流定义: DEMO_APPROVAL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND（店长审批）`);
+  console.log(`  工作流定义: DEMO_APPROVAL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND + 库存五单据（均为店长审批）`);
 }
 
 main()

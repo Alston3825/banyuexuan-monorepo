@@ -96,6 +96,11 @@ model Store {
   customerServicePackages  CustomerServicePackage[]
   therapists               Therapist[]
   serviceAppointments      ServiceAppointment[]
+  warehouses               Warehouse[]
+  purchaseOrders           PurchaseOrder[]
+  goodsReceipts            GoodsReceipt[]
+  stockIssues              StockIssue[]
+  stockCounts              StockCount[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -1742,4 +1747,362 @@ model ServiceAppointment {
   @@index([tenantId, customerId])
   @@index([tenantId, therapistId, scheduledAt])
   @@map("service_appointments")
+}
+
+// ==================== 库存（进销存全链路，交易与供应域） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.7 节
+// + docs/伴月轩月子中心管理系统_新系统开发文档_V1.0.docx 第9章"后勤管理"（复用同一套模型）。
+// 单据状态机审批复用通用工作流引擎，采用与 Contract/Payment 完全相同的
+// "reconcileStatus() 懒同步"模式（见各 Service 注释），不侵入 WorkflowEngineModule。
+// 范围收窄（记录供后续参考）：
+//   - 采购单(PurchaseOrder)始终走审批，不受仓库"免审批"配置影响（花钱承诺，风险等级不同于仓内操作）；
+//     入库单若挂在已审批的采购单下则跳过自身审批（视为已获授权），未挂采购单的临时入库仍按
+//     仓库 requiresApproval 配置决定是否需要审批；出库/领用/调拨/盘点同样按仓库配置决定。
+//   - 调拨单以"源仓库"的 requiresApproval 配置为准（源头承担风险方）。
+//   - 不做采购单"收货进度/超收校验"，入库数量与采购数量的对比只做展示，不做强校验。
+//   - 服务物料桥梁（护理/产康服务核销后自动生成待出库列表）、备料包（套餐→物料清单自动关联）
+//     本期不做，待后续切片把 P2 的护理/产康/月子餐模块反向接入库存域时再设计。
+//   - 移动加权平均法核算成本；批次(StockBatch)只追踪数量与效期，用于"先到期先出"(FEFO)扣减与
+//     过期预警，不做批次级FIFO成本核算（成本核算只在 WarehouseStock 汇总层做加权平均）。
+
+enum WarehousePurpose {
+  OPERATING // 经营性库存（食材、服务耗材等）
+  LOGISTICS // 后勤库房（P3后勤管理模块复用同一套模型，仅用本字段隔离）
+}
+
+model Supplier {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  code        String
+  name        String
+  contactName String?      @map("contact_name")
+  phone       String?
+  remark      String?      @db.Text
+  status      CommonStatus @default(ACTIVE)
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  version     Int          @default(0)
+
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@map("suppliers")
+}
+
+/// 仓库：requiresApproval=false 时该仓库的入库/出库/领用/盘点单跳过工作流审批，直接
+/// DRAFT->APPROVED（"仓库级免审批"配置，竞品分析3.7）。
+model Warehouse {
+  id                String           @id @default(cuid())
+  tenantId          String           @map("tenant_id")
+  storeId           String           @map("store_id")
+  code              String
+  name              String
+  purpose           WarehousePurpose @default(OPERATING)
+  requiresApproval  Boolean          @default(true) @map("requires_approval")
+  status            CommonStatus     @default(ACTIVE)
+  createdBy         String           @map("created_by")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  version           Int              @default(0)
+
+  store               Store                @relation(fields: [storeId], references: [id])
+  stocks              WarehouseStock[]
+  batches             StockBatch[]
+  goodsReceipts       GoodsReceipt[]
+  stockIssues         StockIssue[]
+  transfersOut        StockTransfer[]      @relation("TransferFrom")
+  transfersIn         StockTransfer[]      @relation("TransferTo")
+  stockCounts         StockCount[]
+  purchaseOrders      PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@map("warehouses")
+}
+
+model InventoryItem {
+  id                   String           @id @default(cuid())
+  tenantId             String           @map("tenant_id")
+  code                 String
+  name                 String
+  unit                 String // 计量单位，如"件"/"kg"/"箱"
+  category             String?
+  purpose              WarehousePurpose @default(OPERATING)
+  safetyStockThreshold Int?             @map("safety_stock_threshold") // 低于此数量触发低库存预警，空=不预警
+  shelfLifeDays        Int?             @map("shelf_life_days") // 保质期天数，空=不追踪效期
+  status               CommonStatus     @default(ACTIVE)
+  createdBy            String           @map("created_by")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  version              Int              @default(0)
+
+  stocks             WarehouseStock[]
+  batches            StockBatch[]
+  purchaseOrderItems PurchaseOrderItem[]
+  goodsReceiptItems  GoodsReceiptItem[]
+  stockIssueItems    StockIssueItem[]
+  stockTransferItems StockTransferItem[]
+  stockCountItems    StockCountItem[]
+
+  @@unique([tenantId, code])
+  @@map("inventory_items")
+}
+
+/// 库存汇总层：每个仓库+物品的当前数量与移动加权平均成本，只能被各单据的 execute() 更新，
+/// 不提供直接编辑接口（保证所有变动都有单据留痕）。
+model WarehouseStock {
+  id          String   @id @default(cuid())
+  warehouseId String   @map("warehouse_id")
+  itemId      String   @map("item_id")
+  quantity    Int      @default(0)
+  avgCost     Int      @default(0) @map("avg_cost") // 移动加权平均单位成本，最小货币单位
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@unique([warehouseId, itemId])
+  @@map("warehouse_stocks")
+}
+
+/// 批次层：追踪效期用于 FEFO（先到期先出）扣减与过期预警，不做批次级成本核算。
+/// sourceType/sourceId 追溯批次的产生来源（入库单/调拨单/盘点盈余）。
+model StockBatch {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  warehouseId String    @map("warehouse_id")
+  itemId      String    @map("item_id")
+  batchNo     String    @map("batch_no")
+  quantity    Int // 该批次剩余数量
+  unitCost    Int       @map("unit_cost") // 该批次入库时的单位成本，仅供追溯展示
+  receivedAt  DateTime  @map("received_at")
+  expiresAt   DateTime? @map("expires_at") // 空=不追踪效期（item.shelfLifeDays 未配置）
+  sourceType  String    @map("source_type") // GOODS_RECEIPT / STOCK_TRANSFER / STOCK_COUNT
+  sourceId    String    @map("source_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([warehouseId, itemId, expiresAt])
+  @@map("stock_batches")
+}
+
+enum InventoryDocStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+/// 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED；
+/// APPROVED 后可据此创建入库单（收货数量与采购数量的对比只做展示，不做强校验，见 schema 顶部范围收窄说明）。
+model PurchaseOrder {
+  id          String             @id @default(cuid())
+  tenantId    String             @map("tenant_id")
+  storeId     String             @map("store_id")
+  warehouseId String             @map("warehouse_id")
+  supplierId  String             @map("supplier_id")
+  orderNo     String             @map("order_no")
+  status      InventoryDocStatus @default(DRAFT)
+  totalAmount Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
+  remark      String?            @db.Text
+  cancelReason String?           @map("cancel_reason") @db.Text
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  store         Store               @relation(fields: [storeId], references: [id])
+  warehouse     Warehouse           @relation(fields: [warehouseId], references: [id])
+  supplier      Supplier            @relation(fields: [supplierId], references: [id])
+  items         PurchaseOrderItem[]
+  goodsReceipts GoodsReceipt[]
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String @map("purchase_order_id")
+  itemId          String @map("item_id")
+  quantity        Int
+  unitPrice       Int    @map("unit_price") // 最小货币单位
+  subtotal        Int // quantity * unitPrice，创建时算好落库，避免每次读取重复计算
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+/// 入库单(RK)：执行(execute)时更新 WarehouseStock（移动加权平均法重算成本）并生成 StockBatch。
+/// 完成后不可变，需要冲正时创建一张新的入库单/出库单反向操作，不修改已完成单据本身。
+model GoodsReceipt {
+  id                String             @id @default(cuid())
+  tenantId          String             @map("tenant_id")
+  storeId           String             @map("store_id")
+  warehouseId       String             @map("warehouse_id")
+  purchaseOrderId   String?            @map("purchase_order_id") // 挂在已审批采购单下则跳过自身审批
+  receiptNo         String             @map("receipt_no")
+  status            InventoryDocStatus @default(DRAFT)
+  remark            String?            @db.Text
+  cancelReason       String?           @map("cancel_reason") @db.Text
+  completedAt       DateTime?          @map("completed_at")
+  createdBy         String             @map("created_by")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  version           Int                @default(0)
+
+  store         Store              @relation(fields: [storeId], references: [id])
+  warehouse     Warehouse          @relation(fields: [warehouseId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  items         GoodsReceiptItem[]
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, status])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id             String @id @default(cuid())
+  goodsReceiptId String @map("goods_receipt_id")
+  itemId         String @map("item_id")
+  quantity       Int
+  unitCost       Int    @map("unit_cost") // 最小货币单位，用于移动加权平均法与批次成本
+
+  goodsReceipt GoodsReceipt  @relation(fields: [goodsReceiptId], references: [id])
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("goods_receipt_items")
+}
+
+enum StockIssueType {
+  ISSUE // 一般出库
+  REQUISITION // 部门领用（对应竞品分析的"领用单(LY)"，用途/部门在 remark 里登记）
+  LOSS // 报损
+}
+
+/// 出库/领用单(CK/LY 合一，用 issueType 区分)：执行时按 FEFO 扣减 StockBatch，
+/// WarehouseStock.avgCost 不变（出库不改变剩余库存的加权平均成本）。
+model StockIssue {
+  id           String             @id @default(cuid())
+  tenantId     String             @map("tenant_id")
+  storeId      String             @map("store_id")
+  warehouseId  String             @map("warehouse_id")
+  issueNo      String             @map("issue_no")
+  issueType    StockIssueType     @default(ISSUE) @map("issue_type")
+  status       InventoryDocStatus @default(DRAFT)
+  remark       String?            @db.Text
+  cancelReason String?            @map("cancel_reason") @db.Text
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  version      Int                @default(0)
+
+  store     Store            @relation(fields: [storeId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  items     StockIssueItem[]
+
+  @@unique([tenantId, issueNo])
+  @@index([tenantId, status])
+  @@map("stock_issues")
+}
+
+model StockIssueItem {
+  id           String @id @default(cuid())
+  stockIssueId String @map("stock_issue_id")
+  itemId       String @map("item_id")
+  quantity     Int
+  unitCost     Int?   @map("unit_cost") // 执行时按当前 avgCost 快照写入，用于成本报表，创建时为空
+
+  stockIssue StockIssue    @relation(fields: [stockIssueId], references: [id])
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_issue_items")
+}
+
+/// 调拨单(DB，含跨店)：以源仓库(fromWarehouse)的 requiresApproval 配置决定是否需要审批。
+/// 执行时源仓库按 FEFO 扣减、批次"搬家"到目标仓库（沿用原 receivedAt/expiresAt），
+/// 目标仓库按移动加权平均法用源仓库当前 avgCost 重算成本。
+model StockTransfer {
+  id              String             @id @default(cuid())
+  tenantId        String             @map("tenant_id")
+  fromWarehouseId String             @map("from_warehouse_id")
+  toWarehouseId   String             @map("to_warehouse_id")
+  transferNo      String             @map("transfer_no")
+  status          InventoryDocStatus @default(DRAFT)
+  remark          String?            @db.Text
+  cancelReason    String?            @map("cancel_reason") @db.Text
+  completedAt     DateTime?          @map("completed_at")
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  version         Int                @default(0)
+
+  fromWarehouse Warehouse           @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse           @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  items         StockTransferItem[]
+
+  @@unique([tenantId, transferNo])
+  @@index([tenantId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id              String @id @default(cuid())
+  stockTransferId String @map("stock_transfer_id")
+  itemId          String @map("item_id")
+  quantity        Int
+
+  stockTransfer StockTransfer @relation(fields: [stockTransferId], references: [id])
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_transfer_items")
+}
+
+/// 盘点单(PD)：创建时快照系统当前数量(systemQuantity)，执行时把 WarehouseStock.quantity
+/// 直接修正为盘点数(countedQuantity)，盈亏差额(diffQuantity)通过批次调整留痕
+/// （盘盈生成新批次、盘亏按FEFO消耗批次），avgCost 不变。
+model StockCount {
+  id           String             @id @default(cuid())
+  tenantId     String             @map("tenant_id")
+  storeId      String             @map("store_id")
+  warehouseId  String             @map("warehouse_id")
+  countNo      String             @map("count_no")
+  status       InventoryDocStatus @default(DRAFT)
+  remark       String?            @db.Text
+  cancelReason String?            @map("cancel_reason") @db.Text
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  version      Int                @default(0)
+
+  store     Store            @relation(fields: [storeId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  items     StockCountItem[]
+
+  @@unique([tenantId, countNo])
+  @@index([tenantId, status])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id             String @id @default(cuid())
+  stockCountId   String @map("stock_count_id")
+  itemId         String @map("item_id")
+  systemQuantity Int    @map("system_quantity") // 创建盘点单时快照的系统账面数量
+  countedQuantity Int   @map("counted_quantity") // 实际盘点数量
+  diffQuantity   Int    @map("diff_quantity") // countedQuantity - systemQuantity，创建时算好落库
+
+  stockCount StockCount    @relation(fields: [stockCountId], references: [id])
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_count_items")
 }
