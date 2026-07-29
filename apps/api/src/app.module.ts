@@ -20,6 +20,7 @@ import { HrModule } from './hr/hr.module';
 import { FinanceModule } from './finance/finance.module';
 import { OfficeModule } from './office/office.module';
 import { LogisticsModule } from './logistics/logistics.module';
+import { AiModule } from './ai/ai.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -48,6 +49,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     FinanceModule,
     OfficeModule,
     LogisticsModule,
+    AiModule,
     HealthModule,
   ],
   providers: [

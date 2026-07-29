@@ -185,6 +185,11 @@ async function main() {
     { code: 'logistics.vehicle-booking', name: '后勤管理-用车申请', type: 'PAGE', parentCode: 'logistics' },
     { code: 'logistics.utility-expense', name: '后勤管理-水电费登记', type: 'PAGE', parentCode: 'logistics' },
 
+    { code: 'ai', name: 'AI助手', type: 'MODULE' },
+    { code: 'ai.customer-service-agent', name: 'AI助手-智能客服', type: 'PAGE', parentCode: 'ai' },
+    { code: 'ai.care-abnormality-agent', name: 'AI助手-护理异常建议', type: 'PAGE', parentCode: 'ai' },
+    { code: 'ai.suggestion', name: 'AI助手-建议记录', type: 'PAGE', parentCode: 'ai' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -404,6 +409,11 @@ async function main() {
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `logistics.utility-expense.${action}`, name: `后勤管理-水电费登记-${action}`, type: 'BUTTON', parentCode: 'logistics.utility-expense' });
   }
+  permSpecs.push({ code: 'ai.customer-service-agent.ask', name: 'AI助手-智能客服-ask', type: 'BUTTON', parentCode: 'ai.customer-service-agent' });
+  permSpecs.push({ code: 'ai.care-abnormality-agent.suggest', name: 'AI助手-护理异常建议-suggest', type: 'BUTTON', parentCode: 'ai.care-abnormality-agent' });
+  for (const action of ['view', 'accept', 'dismiss']) {
+    permSpecs.push({ code: `ai.suggestion.${action}`, name: `AI助手-建议记录-${action}`, type: 'BUTTON', parentCode: 'ai.suggestion' });
+  }
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -522,6 +532,8 @@ async function main() {
   // 车辆列表去选择，与"总部主数据不可编辑但日常业务要能引用"这个诉求一致。用车申请
   // (logistics.vehicle-booking)与水电费登记(logistics.utility-expense)是店长日常操作，
   // 全部动作开放。
+  // AI助手：智能客服/护理异常建议都是帮员工日常工作的辅助工具（AI只生成建议、不代替
+  // 人工决策），全部动作开放给STORE_MANAGER，不额外收紧。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -581,7 +593,8 @@ async function main() {
           code.startsWith('office.expense-claim') ||
           code.startsWith('office.general-memo') ||
           code.startsWith('logistics.vehicle') ||
-          code.startsWith('logistics.utility-expense')),
+          code.startsWith('logistics.utility-expense') ||
+          code.startsWith('ai.')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);

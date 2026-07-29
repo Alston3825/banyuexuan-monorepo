@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { NCard, NSpace, NButton, NDescriptions, NDescriptionsItem, NModal, NForm, NFormItem, NInput, NSelect } from 'naive-ui'
 import { leadApi } from '../../api/modules/lead.api'
 import { accountApi } from '../../api/modules/account.api'
+import { storeApi } from '../../api/modules/store.api'
 import type { Lead } from '../../api/types/lead'
 import { renderStatusBadge, LEAD_STATUS_MAP, CUSTOMER_SOURCE_LABEL_MAP } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
 import FollowUpTimeline from '../../components/crm/FollowUpTimeline.vue'
+import AiCustomerServicePanel from '../../components/ai/AiCustomerServicePanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,9 +17,15 @@ const leadId = route.params.id as string
 
 const lead = ref<Lead | null>(null)
 const accountOptions = ref<{ label: string; value: string }[]>([])
+const fallbackStoreId = ref<string>('')
 
 async function fetchLead() {
   lead.value = await leadApi.get(leadId)
+}
+
+async function fetchFallbackStore() {
+  const stores = await storeApi.list()
+  fallbackStoreId.value = stores[0]?.id ?? ''
 }
 
 async function fetchAccountOptions() {
@@ -86,7 +94,7 @@ async function handleConvert() {
 }
 
 onMounted(async () => {
-  await Promise.all([fetchLead(), fetchAccountOptions()])
+  await Promise.all([fetchLead(), fetchAccountOptions(), fetchFallbackStore()])
 })
 </script>
 
@@ -122,6 +130,8 @@ onMounted(async () => {
         </n-button>
       </n-space>
     </n-card>
+
+    <AiCustomerServicePanel business-type="LEAD" :business-id="leadId" :store-id="lead.storeId ?? fallbackStoreId" />
 
     <FollowUpTimeline business-type="LEAD" :business-id="leadId" />
 

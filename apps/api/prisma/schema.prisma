@@ -110,6 +110,7 @@ model Store {
   generalMemos            GeneralMemo[]
   vehicleBookings         VehicleBooking[]
   utilityExpenses         UtilityExpense[]
+  aiSuggestions           AiSuggestion[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -218,6 +219,7 @@ model Account {
   expenseClaims         ExpenseClaim[]
   generalMemos          GeneralMemo[]
   vehicleBookings       VehicleBooking[]
+  acceptedAiSuggestions AiSuggestion[]
 
   @@unique([tenantId, username])
   @@index([tenantId, storeId])
@@ -2543,4 +2545,51 @@ model UtilityExpense {
 
   @@unique([tenantId, storeId, period, expenseType])
   @@map("utility_expenses")
+}
+
+// ==================== AI / Agent 接入（P4，见《新系统开发文档》3.3节 + 业务规则确认记录#9/#10） ====================
+// 首批2个Agent场景：智能客服/线索首触、护理异常预警建议。均由 NestJS 侧预先组装业务上下文后
+// 调用 apps/ai-service 的模型网关做文本生成，不做自主多步工具调用（范围收窄见业务规则确认记录）。
+// AI 只生成建议，不直接写业务库；护理场景强制人工确认后才写入正式护理记录，不支持一键采纳。
+
+enum AiSuggestionScenario {
+  CUSTOMER_SERVICE
+  CARE_ABNORMALITY
+}
+
+enum AiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+/// 每次 Agent 调用的留痕审计记录：输入、输出、所用模型、耗时、是否被人工采纳，满足合规留痕要求。
+model AiSuggestion {
+  id            String               @id @default(cuid())
+  tenantId      String               @map("tenant_id")
+  storeId       String               @map("store_id")
+  scenario      AiSuggestionScenario
+  businessType  String               @map("business_type") // 如 LEAD/CUSTOMER/CARE_ABNORMALITY
+  businessId    String               @map("business_id")
+  inputText     String               @map("input_text") @db.Text // 发送给模型的完整上下文（脱敏后）
+  outputText    String               @map("output_text") @db.Text
+  modelProvider String               @map("model_provider") // volcengine/minimax
+  modelName     String               @map("model_name")
+  usedFallback  Boolean              @default(false) @map("used_fallback")
+  latencyMs     Int                  @map("latency_ms")
+  escalate      Boolean              @default(false) // 智能客服场景：是否建议转人工
+  status        AiSuggestionStatus   @default(PENDING)
+  acceptedById  String?              @map("accepted_by_id")
+  acceptedAt    DateTime?            @map("accepted_at")
+  createdBy     String               @map("created_by")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+  version       Int                  @default(0)
+
+  store      Store    @relation(fields: [storeId], references: [id])
+  acceptedBy Account? @relation(fields: [acceptedById], references: [id])
+
+  @@index([tenantId, storeId, scenario])
+  @@index([tenantId, businessType, businessId])
+  @@map("ai_suggestions")
 }
