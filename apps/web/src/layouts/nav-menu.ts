@@ -48,6 +48,7 @@ import {
   Card,
   CarOutline,
   FlashOutline,
+  LibraryOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -187,6 +188,14 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('用车申请', '/logistics/vehicle-bookings'), key: '/logistics/vehicle-bookings', icon: icon(CarOutline) },
       { label: linkLabel('车辆管理', '/logistics/vehicles'), key: '/logistics/vehicles', icon: icon(CarOutline) },
       { label: linkLabel('水电费登记', '/logistics/utility-expenses'), key: '/logistics/utility-expenses', icon: icon(FlashOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'AI助手',
+    key: 'group-ai',
+    children: [
+      { label: linkLabel('知识库文档', '/ai/knowledge-documents'), key: '/ai/knowledge-documents', icon: icon(LibraryOutline) },
     ],
   },
 

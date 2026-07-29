@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CareAbnormalityService } from '../../care/care-abnormality/care-abnormality.service';
 import { AiGatewayClient } from '../ai-gateway/ai-gateway.client';
 import { AiSuggestionService } from '../ai-suggestion/ai-suggestion.service';
+import { KnowledgeRetrievalService } from '../knowledge-retrieval/knowledge-retrieval.service';
 
 const SYSTEM_PROMPT = `你是伴月轩月子中心的护理助手，服务对象是护理师，不是产妇/家属。
 你的任务是基于系统提供的护理异常信息，给出可能的原因分析与建议的跟进方向，帮助护理师判断。
@@ -25,16 +26,20 @@ export class CareAbnormalityAgentService {
     private readonly careAbnormalityService: CareAbnormalityService,
     private readonly aiGatewayClient: AiGatewayClient,
     private readonly aiSuggestionService: AiSuggestionService,
+    private readonly knowledgeRetrievalService: KnowledgeRetrievalService,
   ) {}
 
   async suggest(abnormalityId: string): Promise<{ suggestion: AiSuggestion; answer: string }> {
     const abnormality = await this.careAbnormalityService.findOneOrThrow(abnormalityId);
     const contextText = await this.buildContext(abnormality);
+    const knowledgeChunks = await this.knowledgeRetrievalService.search(contextText);
+    const knowledgeText =
+      knowledgeChunks.length > 0 ? `\n\n【护理知识库参考资料】\n${knowledgeChunks.map((c) => `[来源:${c.documentTitle}] ${c.content}`).join('\n\n')}` : '';
 
     const startedAt = Date.now();
     const result = await this.aiGatewayClient.complete([
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: contextText },
+      { role: 'user', content: contextText + knowledgeText },
     ]);
     const latencyMs = result.latencyMs || Date.now() - startedAt;
 
@@ -43,7 +48,7 @@ export class CareAbnormalityAgentService {
       scenario: 'CARE_ABNORMALITY',
       businessType: 'CARE_ABNORMALITY',
       businessId: abnormalityId,
-      inputText: contextText,
+      inputText: contextText + knowledgeText,
       outputText: result.content,
       modelProvider: result.provider,
       modelName: result.model,

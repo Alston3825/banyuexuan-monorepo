@@ -3,7 +3,7 @@ from typing import List
 import pytest
 
 from app.gateway import ModelGateway, NoProviderConfiguredError
-from app.providers.base import ChatMessage, ChatResult, ModelProvider, ModelProviderError
+from app.providers.base import ChatMessage, ChatResult, EmbeddingResult, ModelProvider, ModelProviderError
 
 
 class FakeProvider(ModelProvider):
@@ -18,6 +18,12 @@ class FakeProvider(ModelProvider):
         if self._should_fail:
             raise ModelProviderError(f"{self.name} 挂了")
         return ChatResult(content=self._content, provider=self.name, model="fake-model")
+
+    async def embed(self, texts: List[str]) -> EmbeddingResult:
+        self.call_count += 1
+        if self._should_fail:
+            raise ModelProviderError(f"{self.name} 挂了")
+        return EmbeddingResult(embeddings=[[0.1, 0.2, 0.3] for _ in texts], provider=self.name, model="fake-embedding-model")
 
 
 @pytest.mark.asyncio
@@ -74,3 +80,16 @@ async def test_gateway_respects_preferred_provider_override():
     result = await gateway.complete([ChatMessage(role="user", content="你好")], preferred_provider="minimax")
 
     assert result.provider == "minimax"
+
+
+@pytest.mark.asyncio
+async def test_gateway_embed_uses_primary_and_falls_back():
+    primary = FakeProvider("volcengine", should_fail=True)
+    fallback = FakeProvider("minimax")
+    gateway = ModelGateway({"volcengine": primary, "minimax": fallback}, primary="volcengine", fallback="minimax")
+
+    result = await gateway.embed(["文本一", "文本二"])
+
+    assert result.provider == "minimax"
+    assert result.used_fallback is True
+    assert len(result.embeddings) == 2

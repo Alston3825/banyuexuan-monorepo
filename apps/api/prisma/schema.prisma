@@ -2593,3 +2593,43 @@ model AiSuggestion {
   @@index([tenantId, businessType, businessId])
   @@map("ai_suggestions")
 }
+
+// ==================== RAG 知识库（P4第二切片，见业务规则确认记录"P4 RAG知识库接入中"） ====================
+// 只做"手动创建知识库文档"通用入口，不自动从ContractTemplate/CareFormTemplate等业务表同步。
+// 不引入独立向量数据库：KnowledgeChunk.embedding 存为 JSON 数组，检索时应用层(NestJS)对该
+// 租户全部chunk做暴力余弦相似度计算取top-K，量级小(V1几十到上百篇文档)下性能足够。
+// 两个Agent场景（智能客服、护理异常预警建议）都会在生成前检索并把命中片段加入prompt。
+
+/// 知识库文档：标题+正文，创建/更新时按固定长度分段并调用模型网关生成embedding写入KnowledgeChunk。
+model KnowledgeDocument {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  title     String
+  content   String       @db.Text
+  category  String? // 自由文本分类，如 合同模板说明/护理规范/常见问题
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  chunks KnowledgeChunk[]
+
+  @@index([tenantId, status])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  documentId String   @map("document_id")
+  chunkIndex Int      @map("chunk_index")
+  content    String   @db.Text
+  embedding  Json // float[]，由模型网关的 /embeddings/create 生成
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("knowledge_chunks")
+}
