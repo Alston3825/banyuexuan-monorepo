@@ -165,6 +165,13 @@ async function main() {
     { code: 'inventory.stock-transfer', name: '库存-调拨单', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.stock-count', name: '库存-盘点单', type: 'PAGE', parentCode: 'inventory' },
 
+    { code: 'hr', name: '人事', type: 'MODULE' },
+    { code: 'hr.employee-profile', name: '人事-员工档案', type: 'PAGE', parentCode: 'hr' },
+    { code: 'hr.shift-definition', name: '人事-班次定义', type: 'PAGE', parentCode: 'hr' },
+    { code: 'hr.schedule-entry', name: '人事-排班', type: 'PAGE', parentCode: 'hr' },
+    { code: 'hr.commission-record', name: '人事-业绩提成', type: 'PAGE', parentCode: 'hr' },
+    { code: 'hr.payroll-record', name: '人事-薪资单', type: 'PAGE', parentCode: 'hr' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -348,6 +355,22 @@ async function main() {
     permSpecs.push({ code: `inventory.stock-count.${action}`, name: `库存-盘点单-${action}`, type: 'BUTTON', parentCode: 'inventory.stock-count' });
   }
 
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `hr.employee-profile.${action}`, name: `人事-员工档案-${action}`, type: 'BUTTON', parentCode: 'hr.employee-profile' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `hr.shift-definition.${action}`, name: `人事-班次定义-${action}`, type: 'BUTTON', parentCode: 'hr.shift-definition' });
+  }
+  for (const action of ['view', 'create', 'update', 'delete']) {
+    permSpecs.push({ code: `hr.schedule-entry.${action}`, name: `人事-排班-${action}`, type: 'BUTTON', parentCode: 'hr.schedule-entry' });
+  }
+  for (const action of ['view', 'create', 'submit', 'cancel']) {
+    permSpecs.push({ code: `hr.commission-record.${action}`, name: `人事-业绩提成-${action}`, type: 'BUTTON', parentCode: 'hr.commission-record' });
+  }
+  for (const action of ['view', 'create', 'submit', 'mark-paid', 'cancel']) {
+    permSpecs.push({ code: `hr.payroll-record.${action}`, name: `人事-薪资单-${action}`, type: 'BUTTON', parentCode: 'hr.payroll-record' });
+  }
+
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
   for (const spec of permSpecs.filter((p) => p.type === 'MODULE')) {
@@ -453,6 +476,8 @@ async function main() {
   // 是各门店自行管理的经营容器，同 room.room 口径开放；库存查询与批次效期（只读）开放给店长
   // 做日常盘点/预警巡查；五种单据（采购/入库/出库领用/调拨/盘点）是店长/仓管的日常操作，
   // 全部动作开放——真正的审批权由通用工作流引擎的审批人角色把关，同 payment.record 口径。
+  // 人事域：员工档案/班次定义/排班/业绩提成/薪资单都是店长日常管理自己门店员工的操作
+  // （店长本身就是提成/薪资审批人），全部动作开放，不额外收紧。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -498,7 +523,12 @@ async function main() {
           code.startsWith('inventory.goods-receipt') ||
           code.startsWith('inventory.stock-issue') ||
           code.startsWith('inventory.stock-transfer') ||
-          code.startsWith('inventory.stock-count')),
+          code.startsWith('inventory.stock-count') ||
+          code.startsWith('hr.employee-profile') ||
+          code.startsWith('hr.shift-definition') ||
+          code.startsWith('hr.schedule-entry') ||
+          code.startsWith('hr.commission-record') ||
+          code.startsWith('hr.payroll-record')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
@@ -695,6 +725,37 @@ async function main() {
       create: { workflowDefinitionId: definition.id, seq: 1, name: '店长审批', approverType: 'ROLE', approverRoleId: storeManagerRole.id },
     });
   }
+
+  // ---------- 工作流定义：HR_COMMISSION（业绩提成，单节点店长审批） ----------
+  const commissionDefinition = await prisma.workflowDefinition.upsert({
+    where: { tenantId_code_version: { tenantId: tenant.id, code: 'HR_COMMISSION', version: 1 } },
+    update: {},
+    create: { tenantId: tenant.id, code: 'HR_COMMISSION', name: '业绩提成审批', version: 1, status: 'PUBLISHED', createdBy: 'SEED' },
+  });
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: commissionDefinition.id, seq: 1 } },
+    update: {},
+    create: { workflowDefinitionId: commissionDefinition.id, seq: 1, name: '店长审批', approverType: 'ROLE', approverRoleId: storeManagerRole.id },
+  });
+
+  // ---------- 工作流定义：HR_PAYROLL（薪资单，店长初审->平台管理员终审，与CONTRACT_SIGNING同构） ----------
+  // 竞品是"最多3级"，但当前角色体系只有 SUPER_ADMIN/STORE_MANAGER 两个角色，凑3级会让
+  // 同一角色重复审批两次；2级已能验证多级审批机制，见业务规则确认记录「P3人事排班薪酬启动」。
+  const payrollDefinition = await prisma.workflowDefinition.upsert({
+    where: { tenantId_code_version: { tenantId: tenant.id, code: 'HR_PAYROLL', version: 1 } },
+    update: {},
+    create: { tenantId: tenant.id, code: 'HR_PAYROLL', name: '薪资单审批', version: 1, status: 'PUBLISHED', createdBy: 'SEED' },
+  });
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: payrollDefinition.id, seq: 1 } },
+    update: {},
+    create: { workflowDefinitionId: payrollDefinition.id, seq: 1, name: '店长初审', approverType: 'ROLE', approverRoleId: storeManagerRole.id },
+  });
+  await prisma.workflowNode.upsert({
+    where: { workflowDefinitionId_seq: { workflowDefinitionId: payrollDefinition.id, seq: 2 } },
+    update: {},
+    create: { workflowDefinitionId: payrollDefinition.id, seq: 2, name: '平台管理员终审', approverType: 'ROLE', approverRoleId: superAdminRole.id },
+  });
 
   // ---------- 参数 ----------
   const parameters: { key: string; value: string; description: string }[] = [
@@ -905,7 +966,9 @@ async function main() {
   console.log('seed 完成:');
   console.log(`  租户: ${tenant.code} / 门店: ${store.code} / 区域: ${region.code}`);
   console.log(`  账号: admin / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
-  console.log(`  工作流定义: DEMO_APPROVAL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND + 库存五单据（均为店长审批）`);
+  console.log(
+    `  工作流定义: DEMO_APPROVAL/HR_PAYROLL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND + 库存五单据 + HR_COMMISSION（均为店长审批）`,
+  );
 }
 
 main()
