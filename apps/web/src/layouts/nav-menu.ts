@@ -36,6 +36,13 @@ import {
   Body,
   CalendarOutline,
   StatsChartOutline,
+  CubeOutline,
+  FileTrayFullOutline,
+  ArrowRedoOutline,
+  SwapHorizontalOutline,
+  BusinessOutline,
+  WarningOutline,
+  TimeOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -117,6 +124,23 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('服务包', '/service/packages'), key: '/service/packages', icon: icon(Layers) },
       { label: linkLabel('技师管理', '/service/therapists'), key: '/service/therapists', icon: icon(People) },
       { label: linkLabel('结算报表', '/service/report'), key: '/service/report', icon: icon(StatsChartOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '库存',
+    key: 'group-inventory',
+    children: [
+      { label: linkLabel('采购单', '/inventory/purchase-orders'), key: '/inventory/purchase-orders', icon: icon(FileTrayFullOutline) },
+      { label: linkLabel('入库单', '/inventory/goods-receipts'), key: '/inventory/goods-receipts', icon: icon(ArrowRedoOutline) },
+      { label: linkLabel('出库/领用单', '/inventory/stock-issues'), key: '/inventory/stock-issues', icon: icon(ArrowRedoOutline) },
+      { label: linkLabel('调拨单', '/inventory/stock-transfers'), key: '/inventory/stock-transfers', icon: icon(SwapHorizontalOutline) },
+      { label: linkLabel('盘点单', '/inventory/stock-counts'), key: '/inventory/stock-counts', icon: icon(ClipboardOutline) },
+      { label: linkLabel('库存查询', '/inventory/warehouse-stocks'), key: '/inventory/warehouse-stocks', icon: icon(WarningOutline) },
+      { label: linkLabel('批次与效期', '/inventory/stock-batches'), key: '/inventory/stock-batches', icon: icon(TimeOutline) },
+      { label: linkLabel('物品管理', '/inventory/items'), key: '/inventory/items', icon: icon(CubeOutline) },
+      { label: linkLabel('仓库管理', '/inventory/warehouses'), key: '/inventory/warehouses', icon: icon(Layers) },
+      { label: linkLabel('供应商管理', '/inventory/suppliers'), key: '/inventory/suppliers', icon: icon(BusinessOutline) },
     ],
   },
   {

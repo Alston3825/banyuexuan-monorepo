@@ -15,6 +15,7 @@ import { PaymentModule } from './payment/payment.module';
 import { CareModule } from './care/care.module';
 import { MealModule } from './meal/meal.module';
 import { ServiceModule } from './service/service.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -38,6 +39,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     CareModule,
     MealModule,
     ServiceModule,
+    InventoryModule,
     HealthModule,
   ],
   providers: [

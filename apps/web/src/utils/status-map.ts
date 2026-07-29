@@ -251,6 +251,26 @@ export const SERVICE_APPOINTMENT_STATUS_MAP: Record<string, StatusMeta> = {
   NO_SHOW: { label: '爽约', type: 'error' },
 }
 
+export const INVENTORY_DOC_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '已审批(待执行)', type: 'info' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+  COMPLETED: { label: '已完成', type: 'success' },
+}
+
+export const STOCK_ISSUE_TYPE_LABEL_MAP: Record<string, string> = {
+  ISSUE: '一般出库',
+  REQUISITION: '部门领用',
+  LOSS: '报损',
+}
+
+export const WAREHOUSE_PURPOSE_LABEL_MAP: Record<string, string> = {
+  OPERATING: '经营性',
+  LOGISTICS: '后勤',
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',
