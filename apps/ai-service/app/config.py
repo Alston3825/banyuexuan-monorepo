@@ -22,12 +22,14 @@ class Settings(BaseSettings):
     volcengine_api_key: Optional[str] = None
     volcengine_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
     volcengine_endpoint_id: Optional[str] = None  # 控制台创建的推理接入点 ID，如 ep-xxxxxxxx-xxxxx
+    volcengine_embedding_endpoint_id: Optional[str] = None  # embedding 模型的推理接入点 ID
 
     # MiniMax
     minimax_api_key: Optional[str] = None
     minimax_group_id: Optional[str] = None
     minimax_base_url: str = "https://api.minimax.chat/v1"
     minimax_model: str = "abab6.5s-chat"
+    minimax_embedding_model: str = "embo-01"
 
     request_timeout_seconds: float = 30.0
 

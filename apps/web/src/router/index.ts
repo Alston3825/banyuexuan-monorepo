@@ -77,6 +77,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'logistics/vehicles', name: 'logistics-vehicles', component: () => import('../views/logistics/VehiclesView.vue'), meta: { title: '车辆管理' } },
       { path: 'logistics/vehicle-bookings', name: 'logistics-vehicle-bookings', component: () => import('../views/logistics/VehicleBookingsView.vue'), meta: { title: '用车申请' } },
       { path: 'logistics/utility-expenses', name: 'logistics-utility-expenses', component: () => import('../views/logistics/UtilityExpensesView.vue'), meta: { title: '水电费登记' } },
+      { path: 'ai/knowledge-documents', name: 'ai-knowledge-documents', component: () => import('../views/ai/KnowledgeDocumentsView.vue'), meta: { title: '知识库文档' } },
       { path: 'payment/records', name: 'payment-records', component: () => import('../views/payment/PaymentsView.vue'), meta: { title: '收款记录' } },
       { path: 'iam/accounts', name: 'accounts', component: () => import('../views/iam/AccountsView.vue'), meta: { title: '账号管理' } },
       { path: 'iam/roles', name: 'roles', component: () => import('../views/iam/RolesView.vue'), meta: { title: '角色管理' } },

@@ -33,13 +33,24 @@ describe('P4 AI域：智能客服Agent+护理异常建议Agent (e2e)', () => {
     accessToken: string;
   }
 
+  /**
+   * mock 需要按 URL 区分 /chat/complete 与 /embeddings/create 两个端点——数据库是共享的本地
+   * 开发库、不做测试隔离，RAG知识库测试(p4-rag-flow)留下的 KnowledgeChunk 会让本文件的
+   * Agent调用也触发一次 embed() 检索调用，两个端点的响应体形状不同，必须分别处理。
+   */
   function mockGatewaySuccess(content: string) {
-    global.fetch = jest.fn(async () =>
-      new Response(
+    global.fetch = jest.fn(async (url: unknown) => {
+      if (String(url).includes('/embeddings/create')) {
+        return new Response(
+          JSON.stringify({ embeddings: [[0, 0, 0]], provider: 'volcengine', model: 'ep-embed-fake', latency_ms: 5, used_fallback: false }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
         JSON.stringify({ content, provider: 'volcengine', model: 'ep-fake', latency_ms: 123, used_fallback: false }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    ) as unknown as typeof fetch;
+      );
+    }) as unknown as typeof fetch;
   }
 
   function mockGatewayUnavailable() {

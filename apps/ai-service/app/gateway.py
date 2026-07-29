@@ -1,11 +1,13 @@
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, TypeVar
 
 from .config import Settings
-from .providers.base import ChatMessage, ChatResult, ModelProvider, ModelProviderError
+from .providers.base import ChatMessage, ChatResult, EmbeddingResult, ModelProvider, ModelProviderError
 from .providers.minimax import MiniMaxProvider
 from .providers.volcengine import VolcengineProvider
+
+T = TypeVar("T")
 
 
 class NoProviderConfiguredError(Exception):
@@ -21,6 +23,15 @@ class GatewayResult:
     used_fallback: bool
 
 
+@dataclass
+class GatewayEmbeddingResult:
+    embeddings: List[List[float]]
+    provider: str
+    model: str
+    latency_ms: int
+    used_fallback: bool
+
+
 def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
     """按配置构建供应商实例；未配置密钥的供应商不会出现在字典里。"""
     providers: Dict[str, ModelProvider] = {}
@@ -30,6 +41,7 @@ def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
             base_url=settings.volcengine_base_url,
             endpoint_id=settings.volcengine_endpoint_id,
             timeout=settings.request_timeout_seconds,
+            embedding_endpoint_id=settings.volcengine_embedding_endpoint_id,
         )
     if settings.minimax_api_key:
         providers["minimax"] = MiniMaxProvider(
@@ -38,6 +50,7 @@ def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
             base_url=settings.minimax_base_url,
             model=settings.minimax_model,
             timeout=settings.request_timeout_seconds,
+            embedding_model=settings.minimax_embedding_model,
         )
     return providers
 
@@ -45,7 +58,7 @@ def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
 class ModelGateway:
     """
     统一模型网关：主供应商不可用时自动降级到备用供应商（见 3.3.1 节"多供应商热切换与降级"），
-    并记录调用耗时供成本/性能审计使用。
+    并记录调用耗时供成本/性能审计使用。complete()/embed() 共用同一套主备遍历逻辑。
     """
 
     def __init__(self, providers: Dict[str, ModelProvider], primary: str, fallback: Optional[str]):
@@ -54,6 +67,20 @@ class ModelGateway:
         self._fallback = fallback
 
     async def complete(self, messages: List[ChatMessage], preferred_provider: Optional[str] = None) -> GatewayResult:
+        result, latency_ms, used_fallback = await self._call_with_fallback(
+            preferred_provider, lambda provider: provider.complete(messages)
+        )
+        return GatewayResult(content=result.content, provider=result.provider, model=result.model, latency_ms=latency_ms, used_fallback=used_fallback)
+
+    async def embed(self, texts: List[str], preferred_provider: Optional[str] = None) -> GatewayEmbeddingResult:
+        result, latency_ms, used_fallback = await self._call_with_fallback(
+            preferred_provider, lambda provider: provider.embed(texts)
+        )
+        return GatewayEmbeddingResult(
+            embeddings=result.embeddings, provider=result.provider, model=result.model, latency_ms=latency_ms, used_fallback=used_fallback
+        )
+
+    async def _call_with_fallback(self, preferred_provider: Optional[str], call: Callable[[ModelProvider], Awaitable[T]]) -> tuple:
         order = self._resolve_order(preferred_provider)
         if not order:
             raise NoProviderConfiguredError("没有任何已配置密钥的模型供应商")
@@ -65,15 +92,9 @@ class ModelGateway:
                 continue
             started_at = time.monotonic()
             try:
-                result: ChatResult = await provider.complete(messages)
+                result = await call(provider)
                 latency_ms = int((time.monotonic() - started_at) * 1000)
-                return GatewayResult(
-                    content=result.content,
-                    provider=result.provider,
-                    model=result.model,
-                    latency_ms=latency_ms,
-                    used_fallback=index > 0,
-                )
+                return result, latency_ms, index > 0
             except ModelProviderError as exc:
                 last_error = exc
                 continue

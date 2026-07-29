@@ -5,6 +5,7 @@ import { CustomerService } from '../../crm/customer/customer.service';
 import { FollowUpService } from '../../crm/follow-up/follow-up.service';
 import { AiGatewayClient } from '../ai-gateway/ai-gateway.client';
 import { AiSuggestionService } from '../ai-suggestion/ai-suggestion.service';
+import { KnowledgeRetrievalService } from '../knowledge-retrieval/knowledge-retrieval.service';
 import { AskCustomerServiceDto } from './dto/ask-customer-service.dto';
 
 const ESCALATE_MARKER = '[[ESCALATE]]';
@@ -35,12 +36,22 @@ export class CustomerServiceAgentService {
     private readonly followUpService: FollowUpService,
     private readonly aiGatewayClient: AiGatewayClient,
     private readonly aiSuggestionService: AiSuggestionService,
+    private readonly knowledgeRetrievalService: KnowledgeRetrievalService,
   ) {}
 
   async ask(dto: AskCustomerServiceDto): Promise<CustomerServiceAnswer> {
-    const contextText = await this.buildContext(dto.businessType, dto.businessId);
+    const [contextText, knowledgeText] = await Promise.all([
+      this.buildContext(dto.businessType, dto.businessId),
+      this.buildKnowledgeContext(dto.question),
+    ]);
 
-    const userMessage = `【客户/线索背景资料】\n${contextText}\n\n【员工提问】\n${dto.question}`;
+    const userMessage = [
+      `【客户/线索背景资料】\n${contextText}`,
+      knowledgeText ? `【知识库参考资料】\n${knowledgeText}` : null,
+      `【员工提问】\n${dto.question}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     const startedAt = Date.now();
     const result = await this.aiGatewayClient.complete([
       { role: 'system', content: SYSTEM_PROMPT },
@@ -66,6 +77,12 @@ export class CustomerServiceAgentService {
     });
 
     return { suggestion, answer, escalate };
+  }
+
+  private async buildKnowledgeContext(question: string): Promise<string | null> {
+    const chunks = await this.knowledgeRetrievalService.search(question);
+    if (chunks.length === 0) return null;
+    return chunks.map((c) => `[来源:${c.documentTitle}] ${c.content}`).join('\n\n');
   }
 
   private async buildContext(businessType: 'LEAD' | 'CUSTOMER', businessId: string): Promise<string> {

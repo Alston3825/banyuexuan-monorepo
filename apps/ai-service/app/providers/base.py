@@ -16,6 +16,13 @@ class ChatResult:
     model: str
 
 
+@dataclass
+class EmbeddingResult:
+    embeddings: List[List[float]]
+    provider: str
+    model: str
+
+
 class ModelProviderError(Exception):
     """某个供应商调用失败（网络错误、超时、非2xx响应等），网关据此触发降级到备用供应商。"""
 
@@ -28,4 +35,9 @@ class ModelProvider(ABC):
     @abstractmethod
     async def complete(self, messages: List[ChatMessage]) -> ChatResult:
         """调用供应商的 Chat Completions API，失败时抛出 ModelProviderError。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def embed(self, texts: List[str]) -> EmbeddingResult:
+        """调用供应商的 Embeddings API，失败时抛出 ModelProviderError。"""
         raise NotImplementedError
