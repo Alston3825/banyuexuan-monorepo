@@ -6,7 +6,9 @@ import type {
   CreateServiceProductDto,
   CreateTherapistDto,
   CustomerServicePackage,
+  CustomerServicePackageReport,
   ServiceAppointment,
+  ServiceAppointmentReport,
   ServicePackage,
   ServiceProduct,
   Therapist,
@@ -38,11 +40,15 @@ export const customerServicePackageApi = {
     http.get<CustomerServicePackage[]>('/service/customer-packages', { params }).then((r) => r.data),
   get: (id: string) => http.get<CustomerServicePackage>(`/service/customer-packages/${id}`).then((r) => r.data),
   create: (body: CreateCustomerServicePackageDto) => http.post<CustomerServicePackage>('/service/customer-packages', body).then((r) => r.data),
+  report: (params?: { storeId?: string; startDate?: string; endDate?: string }) =>
+    http.get<CustomerServicePackageReport>('/service/customer-packages/report', { params }).then((r) => r.data),
 }
 
 export const serviceAppointmentApi = {
   list: (params?: { customerId?: string; therapistId?: string; storeId?: string; status?: string }) =>
     http.get<ServiceAppointment[]>('/service/appointments', { params }).then((r) => r.data),
+  report: (params?: { storeId?: string; startDate?: string; endDate?: string }) =>
+    http.get<ServiceAppointmentReport>('/service/appointments/report', { params }).then((r) => r.data),
   create: (body: CreateServiceAppointmentDto) => http.post<ServiceAppointment>('/service/appointments', body).then((r) => r.data),
   complete: (id: string, version: number) => http.post<ServiceAppointment>(`/service/appointments/${id}/complete`, { version }).then((r) => r.data),
   cancel: (id: string, cancelReason: string, noShow: boolean, version: number) =>

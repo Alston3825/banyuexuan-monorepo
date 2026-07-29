@@ -6,6 +6,18 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { QueryMealRecordDto } from './dto/query-meal-record.dto';
 import { SelectMealRecordDto } from './dto/select-meal-record.dto';
 import { FeedbackMealRecordDto } from './dto/feedback-meal-record.dto';
+import { QueryMealReportDto } from './dto/query-meal-report.dto';
+
+export interface MealReport {
+  totalRecords: number;
+  plannedCount: number;
+  servedCount: number;
+  cancelledCount: number;
+  customSelectedCount: number;
+  avgRating: number | null;
+  bySlot: Record<string, number>;
+  byMealItem: { mealItemId: string; name: string; servedCount: number }[];
+}
 
 const SELF_SELECT_CUTOFF_HOUR = 9;
 /** 早餐/早点当日无法自选，须提前一天选定（竞品分析3.6"自选餐机制"）。 */
@@ -36,6 +48,67 @@ export class MealRecordService {
       include: includeRecord,
       orderBy: [{ scheduledDate: 'asc' }, { slot: 'asc' }],
     });
+  }
+
+  /**
+   * 月子餐基础报表（P2交付物"膳食预算与产康结算的基础报表"）：按门店/日期区间统计
+   * 排餐执行情况与各菜品实际供餐份数——后者是P3库存域"菜品预算→食材用量"换算的前置
+   * 输入，本期只做份数统计，不做食材折算/采购单联动。
+   */
+  async report(query: QueryMealReportDto = {}): Promise<MealReport> {
+    const records = await this.prisma.mealRecord.findMany({
+      where: {
+        tenantId: this.ctx.tenantId,
+        storeId: query.storeId,
+        scheduledDate: {
+          gte: query.startDate ? new Date(query.startDate) : undefined,
+          lte: query.endDate ? new Date(query.endDate) : undefined,
+        },
+      },
+      include: includeRecord,
+    });
+
+    const bySlot: Record<string, number> = {};
+    const servedByItem = new Map<string, { name: string; count: number }>();
+    let servedCount = 0;
+    let plannedCount = 0;
+    let cancelledCount = 0;
+    let customSelectedCount = 0;
+    let ratingSum = 0;
+    let ratingCount = 0;
+
+    for (const record of records) {
+      bySlot[record.slot] = (bySlot[record.slot] ?? 0) + 1;
+      if (record.isCustomSelected) customSelectedCount += 1;
+      if (record.rating !== null) {
+        ratingSum += record.rating;
+        ratingCount += 1;
+      }
+      if (record.status === 'SERVED') {
+        servedCount += 1;
+        const item = record.isCustomSelected && record.selectedMealItem ? record.selectedMealItem : record.defaultMealItem;
+        const existing = servedByItem.get(item.id);
+        if (existing) existing.count += 1;
+        else servedByItem.set(item.id, { name: item.name, count: 1 });
+      } else if (record.status === 'PLANNED') {
+        plannedCount += 1;
+      } else {
+        cancelledCount += 1;
+      }
+    }
+
+    return {
+      totalRecords: records.length,
+      plannedCount,
+      servedCount,
+      cancelledCount,
+      customSelectedCount,
+      avgRating: ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 100) / 100 : null,
+      bySlot,
+      byMealItem: [...servedByItem.entries()]
+        .map(([mealItemId, v]) => ({ mealItemId, name: v.name, servedCount: v.count }))
+        .sort((a, b) => b.servedCount - a.servedCount),
+    };
   }
 
   async findOneOrThrow(id: string) {

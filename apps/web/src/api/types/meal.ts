@@ -109,6 +109,17 @@ export interface CreateDinerProfileDto {
   restrictionIds?: string[]
 }
 
+export interface MealReport {
+  totalRecords: number
+  plannedCount: number
+  servedCount: number
+  cancelledCount: number
+  customSelectedCount: number
+  avgRating: number | null
+  bySlot: Record<string, number>
+  byMealItem: { mealItemId: string; name: string; servedCount: number }[]
+}
+
 export interface MealRecord {
   id: string
   tenantId: string

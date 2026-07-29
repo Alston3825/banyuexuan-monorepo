@@ -9,6 +9,7 @@ import type {
   MealItem,
   MealPlanTemplate,
   MealRecord,
+  MealReport,
   UpdateDietaryRestrictionDto,
   UpdateMealItemDto,
   UpdateMealPlanTemplateDto,
@@ -45,6 +46,8 @@ export const dinerProfileApi = {
 export const mealRecordApi = {
   list: (params?: { dinerProfileId?: string; scheduledDate?: string; status?: string }) =>
     http.get<MealRecord[]>('/meal/records', { params }).then((r) => r.data),
+  report: (params?: { storeId?: string; startDate?: string; endDate?: string }) =>
+    http.get<MealReport>('/meal/records/report', { params }).then((r) => r.data),
   select: (id: string, mealItemId: string) => http.post<MealRecord>(`/meal/records/${id}/select`, { mealItemId }).then((r) => r.data),
   serve: (id: string) => http.post<MealRecord>(`/meal/records/${id}/serve`, {}).then((r) => r.data),
   feedback: (id: string, rating: number, comment?: string) =>

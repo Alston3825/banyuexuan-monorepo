@@ -106,6 +106,26 @@ export interface ServiceAppointment extends ScopedEntityBase {
   sourcePackage: (CustomerServicePackage & { package: ServicePackage }) | null
 }
 
+export interface ServiceAppointmentReport {
+  totalAppointments: number
+  bookedCount: number
+  completedCount: number
+  cancelledCount: number
+  noShowCount: number
+  avgRating: number | null
+  byProduct: { productId: string; name: string; completedCount: number }[]
+  byTherapist: { therapistId: string; name: string; completedCount: number }[]
+}
+
+export interface CustomerServicePackageReport {
+  totalSold: number
+  totalAmount: number
+  activeCount: number
+  exhaustedCount: number
+  remainingSessionsTotal: number
+  byPackage: { packageId: string; name: string; soldCount: number; amount: number }[]
+}
+
 export interface CreateServiceAppointmentDto {
   storeId: string
   customerId: string

@@ -35,6 +35,7 @@ import {
   Fitness,
   Body,
   CalendarOutline,
+  StatsChartOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -102,6 +103,7 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('菜品管理', '/meal/items'), key: '/meal/items', icon: icon(FastFood) },
       { label: linkLabel('禁忌管理', '/meal/dietary-restrictions'), key: '/meal/dietary-restrictions', icon: icon(NutritionOutline) },
       { label: linkLabel('膳食计划管理', '/meal/plan-templates'), key: '/meal/plan-templates', icon: icon(Restaurant) },
+      { label: linkLabel('统计报表', '/meal/report'), key: '/meal/report', icon: icon(StatsChartOutline) },
     ],
   },
   {
@@ -114,6 +116,7 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('产康项目', '/service/products'), key: '/service/products', icon: icon(Fitness) },
       { label: linkLabel('服务包', '/service/packages'), key: '/service/packages', icon: icon(Layers) },
       { label: linkLabel('技师管理', '/service/therapists'), key: '/service/therapists', icon: icon(People) },
+      { label: linkLabel('结算报表', '/service/report'), key: '/service/report', icon: icon(StatsChartOutline) },
     ],
   },
   {
