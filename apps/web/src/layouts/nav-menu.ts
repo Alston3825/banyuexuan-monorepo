@@ -44,6 +44,10 @@ import {
   WarningOutline,
   TimeOutline,
   PersonCircleOutline,
+  WalletOutline,
+  Card,
+  CarOutline,
+  FlashOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -158,9 +162,32 @@ export const navMenuOptions: MenuOption[] = [
   },
   {
     type: 'group',
-    label: '收款管理',
+    label: '财务结算',
     key: 'group-payment',
-    children: [{ label: linkLabel('收款记录', '/payment/records'), key: '/payment/records', icon: icon(Cash) }],
+    children: [
+      { label: linkLabel('收款记录', '/payment/records'), key: '/payment/records', icon: icon(Cash) },
+      { label: linkLabel('会员账户', '/finance/customer-accounts'), key: '/finance/customer-accounts', icon: icon(WalletOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '办公审批',
+    key: 'group-office',
+    children: [
+      { label: linkLabel('请假申请', '/office/leave-requests'), key: '/office/leave-requests', icon: icon(Calendar) },
+      { label: linkLabel('报销申请', '/office/expense-claims'), key: '/office/expense-claims', icon: icon(Card) },
+      { label: linkLabel('日常签呈', '/office/general-memos'), key: '/office/general-memos', icon: icon(DocumentText) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '后勤管理',
+    key: 'group-logistics',
+    children: [
+      { label: linkLabel('用车申请', '/logistics/vehicle-bookings'), key: '/logistics/vehicle-bookings', icon: icon(CarOutline) },
+      { label: linkLabel('车辆管理', '/logistics/vehicles'), key: '/logistics/vehicles', icon: icon(CarOutline) },
+      { label: linkLabel('水电费登记', '/logistics/utility-expenses'), key: '/logistics/utility-expenses', icon: icon(FlashOutline) },
+    ],
   },
 
   // ==================== 平台管理 ====================

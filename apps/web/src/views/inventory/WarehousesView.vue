@@ -5,7 +5,7 @@ import { warehouseApi } from '../../api/modules/inventory.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { Warehouse } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
-import { renderStatusBadge, COMMON_STATUS_MAP } from '../../utils/status-map'
+import { renderStatusBadge, COMMON_STATUS_MAP, WAREHOUSE_PURPOSE_LABEL_MAP } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
 
 const rows = ref<Warehouse[]>([])
@@ -24,6 +24,7 @@ const model = ref({
   storeId: null as string | null,
   code: '',
   name: '',
+  purpose: 'OPERATING' as Warehouse['purpose'],
   requiresApproval: true,
   status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
 })
@@ -41,13 +42,13 @@ async function fetchAll() {
 
 function openCreateModal() {
   editingRow.value = null
-  model.value = { storeId: stores.value[0]?.id ?? null, code: '', name: '', requiresApproval: true, status: 'ACTIVE' }
+  model.value = { storeId: stores.value[0]?.id ?? null, code: '', name: '', purpose: 'OPERATING', requiresApproval: true, status: 'ACTIVE' }
   formVisible.value = true
 }
 
 function openEditModal(row: Warehouse) {
   editingRow.value = row
-  model.value = { storeId: row.storeId, code: row.code, name: row.name, requiresApproval: row.requiresApproval, status: row.status }
+  model.value = { storeId: row.storeId, code: row.code, name: row.name, purpose: row.purpose, requiresApproval: row.requiresApproval, status: row.status }
   formVisible.value = true
 }
 
@@ -68,7 +69,13 @@ async function handleSubmit() {
       })
       message.success('仓库已更新')
     } else {
-      await warehouseApi.create({ storeId: model.value.storeId, code: model.value.code, name: model.value.name, requiresApproval: model.value.requiresApproval })
+      await warehouseApi.create({
+        storeId: model.value.storeId,
+        code: model.value.code,
+        name: model.value.name,
+        purpose: model.value.purpose,
+        requiresApproval: model.value.requiresApproval,
+      })
       message.success('仓库已创建')
     }
     formVisible.value = false
@@ -82,6 +89,7 @@ const columns: DataTableColumns<Warehouse> = [
   { key: 'name', title: '仓库名称' },
   { key: 'code', title: '编码' },
   { key: 'store', title: '所属门店', render: (row) => storeNameById.value.get(row.storeId) ?? row.storeId },
+  { key: 'purpose', title: '用途', render: (row) => WAREHOUSE_PURPOSE_LABEL_MAP[row.purpose] },
   {
     key: 'requiresApproval',
     title: '审批要求',
@@ -117,6 +125,15 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />
+          </n-form-item>
+          <n-form-item v-if="!editingRow" label="用途">
+            <n-select
+              v-model:value="model.purpose"
+              :options="[
+                { label: '经营性', value: 'OPERATING' },
+                { label: '后勤/办公用品', value: 'LOGISTICS' },
+              ]"
+            />
           </n-form-item>
           <n-form-item label="需要审批">
             <n-switch v-model:value="model.requiresApproval" />

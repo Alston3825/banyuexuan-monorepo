@@ -3,7 +3,7 @@ import { h, onMounted, ref } from 'vue'
 import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, type DataTableColumns, type FormInst } from 'naive-ui'
 import { inventoryItemApi } from '../../api/modules/inventory.api'
 import type { InventoryItem } from '../../api/types/inventory'
-import { renderStatusBadge, COMMON_STATUS_MAP } from '../../utils/status-map'
+import { renderStatusBadge, COMMON_STATUS_MAP, WAREHOUSE_PURPOSE_LABEL_MAP } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
 
 const rows = ref<InventoryItem[]>([])
@@ -19,6 +19,7 @@ const model = ref({
   name: '',
   unit: '',
   category: '',
+  purpose: 'OPERATING' as InventoryItem['purpose'],
   safetyStockThreshold: null as number | null,
   shelfLifeDays: null as number | null,
   status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
@@ -35,7 +36,7 @@ async function fetchList() {
 
 function openCreateModal() {
   editingRow.value = null
-  model.value = { code: '', name: '', unit: '', category: '', safetyStockThreshold: null, shelfLifeDays: null, status: 'ACTIVE' }
+  model.value = { code: '', name: '', unit: '', category: '', purpose: 'OPERATING', safetyStockThreshold: null, shelfLifeDays: null, status: 'ACTIVE' }
   formVisible.value = true
 }
 
@@ -46,6 +47,7 @@ function openEditModal(row: InventoryItem) {
     name: row.name,
     unit: row.unit,
     category: row.category ?? '',
+    purpose: row.purpose,
     safetyStockThreshold: row.safetyStockThreshold,
     shelfLifeDays: row.shelfLifeDays,
     status: row.status,
@@ -73,6 +75,7 @@ async function handleSubmit() {
         name: model.value.name,
         unit: model.value.unit,
         category: model.value.category || undefined,
+        purpose: model.value.purpose,
         safetyStockThreshold: model.value.safetyStockThreshold ?? undefined,
         shelfLifeDays: model.value.shelfLifeDays ?? undefined,
       })
@@ -89,6 +92,7 @@ const columns: DataTableColumns<InventoryItem> = [
   { key: 'name', title: '物品名称' },
   { key: 'code', title: '编码' },
   { key: 'unit', title: '计量单位' },
+  { key: 'purpose', title: '用途', render: (row) => WAREHOUSE_PURPOSE_LABEL_MAP[row.purpose] },
   { key: 'safetyStockThreshold', title: '安全库存阈值', render: (row) => row.safetyStockThreshold ?? '不预警' },
   { key: 'shelfLifeDays', title: '保质期(天)', render: (row) => row.shelfLifeDays ?? '不追踪' },
   { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, COMMON_STATUS_MAP) },
@@ -123,6 +127,15 @@ onMounted(fetchList)
             <n-input v-model:value="model.unit" placeholder="如 kg/件/箱" />
           </n-form-item>
           <n-form-item label="分类"><n-input v-model:value="model.category" /></n-form-item>
+          <n-form-item v-if="!editingRow" label="用途">
+            <n-select
+              v-model:value="model.purpose"
+              :options="[
+                { label: '经营性', value: 'OPERATING' },
+                { label: '后勤/办公用品', value: 'LOGISTICS' },
+              ]"
+            />
+          </n-form-item>
           <n-form-item label="安全库存阈值"><n-input-number v-model:value="model.safetyStockThreshold" :min="0" style="width: 100%" placeholder="留空=不预警" /></n-form-item>
           <n-form-item label="保质期(天)"><n-input-number v-model:value="model.shelfLifeDays" :min="1" style="width: 100%" placeholder="留空=不追踪效期" /></n-form-item>
           <n-form-item v-if="editingRow" label="状态">
