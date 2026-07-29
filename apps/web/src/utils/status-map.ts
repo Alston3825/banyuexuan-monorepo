@@ -345,6 +345,12 @@ export const UTILITY_EXPENSE_TYPE_LABEL_MAP: Record<string, string> = {
   OTHER: '其他',
 }
 
+export const AI_SUGGESTION_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING: { label: '待确认', type: 'warning' },
+  ACCEPTED: { label: '已采纳', type: 'success' },
+  DISMISSED: { label: '已忽略', type: 'default' },
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',

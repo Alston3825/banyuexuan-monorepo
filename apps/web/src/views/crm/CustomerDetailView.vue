@@ -29,6 +29,7 @@ import { renderStatusBadge, OPPORTUNITY_STAGE_MAP, CONTRACT_STATUS_MAP, CUSTOMER
 import { toMajorUnits, toMinorUnits } from '../../utils/money'
 import { message } from '../../utils/discrete-api'
 import FollowUpTimeline from '../../components/crm/FollowUpTimeline.vue'
+import AiCustomerServicePanel from '../../components/ai/AiCustomerServicePanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -219,6 +220,13 @@ onMounted(fetchAll)
       </template>
       <n-data-table :columns="contractColumns" :data="contracts" :row-key="(r: Contract) => r.id" />
     </n-card>
+
+    <AiCustomerServicePanel
+      v-if="customer"
+      business-type="CUSTOMER"
+      :business-id="customerId"
+      :store-id="customer.primaryStoreId ?? storeOptions[0]?.value ?? ''"
+    />
 
     <FollowUpTimeline business-type="CUSTOMER" :business-id="customerId" />
 

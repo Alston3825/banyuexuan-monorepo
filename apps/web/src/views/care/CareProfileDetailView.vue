@@ -57,6 +57,7 @@ import {
 } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
 import CareAbnormalityFollowUps from '../../components/care/CareAbnormalityFollowUps.vue'
+import AiCareAbnormalitySuggestion from '../../components/ai/AiCareAbnormalitySuggestion.vue'
 
 const route = useRoute()
 const motherProfileId = route.params.id as string
@@ -727,6 +728,7 @@ onMounted(fetchAll)
           <n-descriptions-item v-if="activeAbnormality.resolveNote" label="处理说明">{{ activeAbnormality.resolveNote }}</n-descriptions-item>
         </n-descriptions>
         <CareAbnormalityFollowUps v-if="['OPEN', 'FOLLOWING'].includes(activeAbnormality.status)" :abnormality-id="activeAbnormality.id" @followed="fetchAll" />
+        <AiCareAbnormalitySuggestion :abnormality-id="activeAbnormality.id" />
         <template #footer>
           <n-space justify="end">
             <n-button @click="abnormalityDrawerVisible = false">关闭</n-button>
