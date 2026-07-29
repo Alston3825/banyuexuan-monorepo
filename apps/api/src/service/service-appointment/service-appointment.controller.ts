@@ -7,6 +7,7 @@ import { QueryServiceAppointmentDto } from './dto/query-service-appointment.dto'
 import { CancelServiceAppointmentDto } from './dto/cancel-service-appointment.dto';
 import { FeedbackServiceAppointmentDto } from './dto/feedback-service-appointment.dto';
 import { VersionDto } from './dto/version.dto';
+import { QueryServiceReportDto } from './dto/query-service-report.dto';
 
 @ApiTags('service/appointment')
 @Controller('service/appointments')
@@ -17,6 +18,13 @@ export class ServiceAppointmentController {
   @RequirePermission('service.appointment.view')
   findAll(@Query() query: QueryServiceAppointmentDto) {
     return this.serviceAppointmentService.findMany(query);
+  }
+
+  // 必须在 :id 路由之前注册，否则 "report" 会被当作 id 匹配到 findOne。
+  @Get('report')
+  @RequirePermission('service.appointment.view')
+  report(@Query() query: QueryServiceReportDto) {
+    return this.serviceAppointmentService.report(query);
   }
 
   @Get(':id')

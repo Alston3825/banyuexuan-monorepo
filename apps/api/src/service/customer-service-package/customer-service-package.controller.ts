@@ -4,6 +4,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CustomerServicePackageService } from './customer-service-package.service';
 import { CreateCustomerServicePackageDto } from './dto/create-customer-service-package.dto';
 import { QueryCustomerServicePackageDto } from './dto/query-customer-service-package.dto';
+import { QueryCustomerServicePackageReportDto } from './dto/query-customer-service-package-report.dto';
 
 @ApiTags('service/customer-package')
 @Controller('service/customer-packages')
@@ -14,6 +15,13 @@ export class CustomerServicePackageController {
   @RequirePermission('service.customer-package.view')
   findAll(@Query() query: QueryCustomerServicePackageDto) {
     return this.customerServicePackageService.findMany(query);
+  }
+
+  // 必须在 :id 路由之前注册，否则 "report" 会被当作 id 匹配到 findOne。
+  @Get('report')
+  @RequirePermission('service.customer-package.view')
+  report(@Query() query: QueryCustomerServicePackageReportDto) {
+    return this.customerServicePackageService.report(query);
   }
 
   @Get(':id')

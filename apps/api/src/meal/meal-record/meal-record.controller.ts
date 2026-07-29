@@ -5,6 +5,7 @@ import { MealRecordService } from './meal-record.service';
 import { QueryMealRecordDto } from './dto/query-meal-record.dto';
 import { SelectMealRecordDto } from './dto/select-meal-record.dto';
 import { FeedbackMealRecordDto } from './dto/feedback-meal-record.dto';
+import { QueryMealReportDto } from './dto/query-meal-report.dto';
 
 @ApiTags('meal/record')
 @Controller('meal/records')
@@ -15,6 +16,13 @@ export class MealRecordController {
   @RequirePermission('meal.record.view')
   findAll(@Query() query: QueryMealRecordDto) {
     return this.mealRecordService.findMany(query);
+  }
+
+  // 必须在 :id 路由之前注册，否则 "report" 会被当作 id 匹配到 findOne。
+  @Get('report')
+  @RequirePermission('meal.record.view')
+  report(@Query() query: QueryMealReportDto) {
+    return this.mealRecordService.report(query);
   }
 
   @Get(':id')

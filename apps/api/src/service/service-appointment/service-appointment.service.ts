@@ -8,8 +8,20 @@ import { CreateServiceAppointmentDto } from './dto/create-service-appointment.dt
 import { QueryServiceAppointmentDto } from './dto/query-service-appointment.dto';
 import { CancelServiceAppointmentDto } from './dto/cancel-service-appointment.dto';
 import { FeedbackServiceAppointmentDto } from './dto/feedback-service-appointment.dto';
+import { QueryServiceReportDto } from './dto/query-service-report.dto';
 
 const includeAppointment = { product: true, therapist: true, sourcePackage: { include: { package: true } } };
+
+export interface ServiceAppointmentReport {
+  totalAppointments: number;
+  bookedCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  noShowCount: number;
+  avgRating: number | null;
+  byProduct: { productId: string; name: string; completedCount: number }[];
+  byTherapist: { therapistId: string; name: string; completedCount: number }[];
+}
 
 /**
  * 预约：BOOKED -(完成)-> COMPLETED（若来自服务包则消耗额度）；BOOKED -(取消/爽约)-> CANCELLED/NO_SHOW。
@@ -35,6 +47,78 @@ export class ServiceAppointmentService {
       include: includeAppointment,
       orderBy: { scheduledAt: 'desc' },
     });
+  }
+
+  /**
+   * 产康服务基础报表（P2交付物"膳食预算与产康结算的基础报表"）：预约执行情况
+   * 与技师业绩统计。本期不做真正的结算/分成计算，只做数量层面的统计。
+   */
+  async report(query: QueryServiceReportDto = {}): Promise<ServiceAppointmentReport> {
+    const appointments = await this.prisma.serviceAppointment.findMany({
+      where: {
+        tenantId: this.ctx.tenantId,
+        storeId: query.storeId,
+        scheduledAt: {
+          gte: query.startDate ? new Date(query.startDate) : undefined,
+          lte: query.endDate ? new Date(query.endDate) : undefined,
+        },
+      },
+      include: { product: true, therapist: true },
+    });
+
+    let bookedCount = 0;
+    let completedCount = 0;
+    let cancelledCount = 0;
+    let noShowCount = 0;
+    let ratingSum = 0;
+    let ratingCount = 0;
+    const byProductMap = new Map<string, { name: string; count: number }>();
+    const byTherapistMap = new Map<string, { name: string; count: number }>();
+
+    for (const appointment of appointments) {
+      if (appointment.rating !== null) {
+        ratingSum += appointment.rating;
+        ratingCount += 1;
+      }
+      switch (appointment.status) {
+        case 'BOOKED':
+          bookedCount += 1;
+          break;
+        case 'COMPLETED': {
+          completedCount += 1;
+          const product = byProductMap.get(appointment.productId);
+          if (product) product.count += 1;
+          else byProductMap.set(appointment.productId, { name: appointment.product.name, count: 1 });
+          if (appointment.therapistId && appointment.therapist) {
+            const therapist = byTherapistMap.get(appointment.therapistId);
+            if (therapist) therapist.count += 1;
+            else byTherapistMap.set(appointment.therapistId, { name: appointment.therapist.name, count: 1 });
+          }
+          break;
+        }
+        case 'CANCELLED':
+          cancelledCount += 1;
+          break;
+        case 'NO_SHOW':
+          noShowCount += 1;
+          break;
+      }
+    }
+
+    return {
+      totalAppointments: appointments.length,
+      bookedCount,
+      completedCount,
+      cancelledCount,
+      noShowCount,
+      avgRating: ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 100) / 100 : null,
+      byProduct: [...byProductMap.entries()]
+        .map(([productId, v]) => ({ productId, name: v.name, completedCount: v.count }))
+        .sort((a, b) => b.completedCount - a.completedCount),
+      byTherapist: [...byTherapistMap.entries()]
+        .map(([therapistId, v]) => ({ therapistId, name: v.name, completedCount: v.count }))
+        .sort((a, b) => b.completedCount - a.completedCount),
+    };
   }
 
   async findOneOrThrow(id: string) {
