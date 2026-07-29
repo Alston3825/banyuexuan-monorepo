@@ -271,6 +271,39 @@ export const WAREHOUSE_PURPOSE_LABEL_MAP: Record<string, string> = {
   LOGISTICS: '后勤',
 }
 
+export const EMPLOYEE_PROFILE_STATUS_MAP: Record<string, StatusMeta> = {
+  ACTIVE: { label: '在职', type: 'success' },
+  ON_LEAVE: { label: '休假中', type: 'warning' },
+  TERMINATED: { label: '已离职', type: 'default' },
+}
+
+export const EMPLOYMENT_TYPE_LABEL_MAP: Record<string, string> = {
+  EMPLOYEE: '员工制',
+  NON_EMPLOYEE: '非员工制',
+}
+
+export const COMMISSION_TYPE_LABEL_MAP: Record<string, string> = {
+  SALES: '业绩提成',
+  LABOR: '手工费',
+}
+
+export const COMMISSION_RECORD_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '已通过', type: 'success' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+}
+
+export const PAYROLL_RECORD_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '已审批(待发放)', type: 'info' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+  PAID: { label: '已发放', type: 'success' },
+}
+
 export const SCOPE_TYPE_LABEL_MAP: Record<string, string> = {
   TENANT: '租户级',
   REGION: '区域级',

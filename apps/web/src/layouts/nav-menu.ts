@@ -43,6 +43,7 @@ import {
   BusinessOutline,
   WarningOutline,
   TimeOutline,
+  PersonCircleOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -141,6 +142,18 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('物品管理', '/inventory/items'), key: '/inventory/items', icon: icon(CubeOutline) },
       { label: linkLabel('仓库管理', '/inventory/warehouses'), key: '/inventory/warehouses', icon: icon(Layers) },
       { label: linkLabel('供应商管理', '/inventory/suppliers'), key: '/inventory/suppliers', icon: icon(BusinessOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '人事',
+    key: 'group-hr',
+    children: [
+      { label: linkLabel('员工档案', '/hr/employee-profiles'), key: '/hr/employee-profiles', icon: icon(PersonCircleOutline) },
+      { label: linkLabel('排班管理', '/hr/schedule-entries'), key: '/hr/schedule-entries', icon: icon(CalendarOutline) },
+      { label: linkLabel('班次定义', '/hr/shift-definitions'), key: '/hr/shift-definitions', icon: icon(TimeOutline) },
+      { label: linkLabel('业绩提成', '/hr/commission-records'), key: '/hr/commission-records', icon: icon(TrendingUp) },
+      { label: linkLabel('薪资管理', '/hr/payroll-records'), key: '/hr/payroll-records', icon: icon(Cash) },
     ],
   },
   {
