@@ -2559,6 +2559,7 @@ model UtilityExpense {
 enum AiSuggestionScenario {
   CUSTOMER_SERVICE
   CARE_ABNORMALITY
+  BUSINESS_ANALYTICS
 }
 
 enum AiSuggestionStatus {

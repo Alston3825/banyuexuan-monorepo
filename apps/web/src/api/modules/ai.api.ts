@@ -1,5 +1,6 @@
 import { http } from '../client'
 import type { AiSuggestion, AskCustomerServiceDto, CareAbnormalitySuggestionAnswer, CustomerServiceAnswer } from '../types/ai'
+import type { BusinessAnalysisResult, QueryBusinessReportParams } from '../types/analytics'
 
 export const aiSuggestionApi = {
   list: (params?: { scenario?: string; businessType?: string; businessId?: string; status?: string }) =>
@@ -14,4 +15,8 @@ export const customerServiceAgentApi = {
 
 export const careAbnormalityAgentApi = {
   suggest: (abnormalityId: string) => http.post<CareAbnormalitySuggestionAnswer>(`/ai/care-abnormality-agent/${abnormalityId}/suggest`).then((r) => r.data),
+}
+
+export const businessAnalyticsAgentApi = {
+  analyze: (body: QueryBusinessReportParams) => http.post<BusinessAnalysisResult>('/ai/business-analytics-agent/analyze', body).then((r) => r.data),
 }

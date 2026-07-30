@@ -81,6 +81,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'iot/device-types', name: 'iot-device-types', component: () => import('../views/iot/DeviceTypesView.vue'), meta: { title: '设备类型' } },
       { path: 'iot/devices', name: 'iot-devices', component: () => import('../views/iot/DevicesView.vue'), meta: { title: '设备台账' } },
       { path: 'iot/device-events', name: 'iot-device-events', component: () => import('../views/iot/DeviceEventsView.vue'), meta: { title: '事件与模拟' } },
+      { path: 'analytics/dashboard', name: 'analytics-dashboard', component: () => import('../views/analytics/AnalyticsDashboardView.vue'), meta: { title: '经营分析看板' } },
       { path: 'payment/records', name: 'payment-records', component: () => import('../views/payment/PaymentsView.vue'), meta: { title: '收款记录' } },
       { path: 'iam/accounts', name: 'accounts', component: () => import('../views/iam/AccountsView.vue'), meta: { title: '账号管理' } },
       { path: 'iam/roles', name: 'roles', component: () => import('../views/iam/RolesView.vue'), meta: { title: '角色管理' } },
