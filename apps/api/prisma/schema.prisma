@@ -111,6 +111,9 @@ model Store {
   vehicleBookings         VehicleBooking[]
   utilityExpenses         UtilityExpense[]
   aiSuggestions           AiSuggestion[]
+  devices                 Device[]
+  deviceEvents            DeviceEvent[]
+  deviceConnectionLogs    DeviceConnectionLog[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -916,6 +919,7 @@ model Room {
   store       Store           @relation(fields: [storeId], references: [id])
   roomType    RoomType        @relation(fields: [roomTypeId], references: [id])
   occupancies RoomOccupancy[]
+  devices     Device[]
 
   @@unique([tenantId, storeId, roomNo])
   @@index([tenantId, storeId])
@@ -2632,4 +2636,143 @@ model KnowledgeChunk {
 
   @@index([tenantId, documentId])
   @@map("knowledge_chunks")
+}
+
+// ==================== IoT 设备网关（P4遗留补齐，见业务规则确认记录"P4遗留IoT设备网关框架补齐"） ====================
+// V1不采购真实硬件，只搭建"设备网关"架构（设备台账 + Device Shadow期望态/上报态 + 事件流水 + 连接审计），
+// 用前端"模拟设备事件"面板代替真实MQTT网关触发事件上报，验证"上报→业务记录自动生成"链路。
+// 本轮只把两类设备事件接入真实业务表：呼叫/客房服务(CALL_SERVICE -> RoomCall)、
+// 能耗计量(UTILITY_METER -> UtilityExpense按"门店+月份+费用类型"覆盖登记，语义是替代人工登记而非叠加流水)；
+// 其余5类设备类别（体征监测/安防看护/门禁出入/身份结算/打印）本轮只做台账登记与事件留痕，不触发业务表写入。
+
+enum DeviceCategory {
+  VITAL_SIGN // 体征监测
+  SECURITY // 安防看护
+  ACCESS_CONTROL // 门禁出入
+  CALL_SERVICE // 呼叫/客房服务
+  IDENTITY_SETTLEMENT // 身份结算
+  PRINTING // 打印
+  UTILITY_METER // 能耗计量
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  DISABLED
+}
+
+enum DeviceConnectionLogType {
+  ONLINE
+  OFFLINE
+  COMMAND_ISSUED
+  COMMAND_CONFIRMED
+}
+
+/// 设备类型：协议/品类主数据，总部制定，同 room.type/care.field 口径不开放给 STORE_MANAGER。
+model DeviceType {
+  id                          String         @id @default(cuid())
+  tenantId                    String         @map("tenant_id")
+  category                    DeviceCategory
+  name                        String
+  protocol                    String // 自由文本，如 "MQTT"/"RTSP/MQTT"/"串口转HTTP"，对应开发文档接入协议列
+  requiresCommandConfirmation Boolean        @default(false) @map("requires_command_confirmation") // 门禁/监控等敏感设备下发指令需二次确认
+  status                      CommonStatus   @default(ACTIVE)
+  createdBy                   String         @map("created_by")
+  createdAt                   DateTime       @default(now()) @map("created_at")
+  updatedAt                   DateTime       @updatedAt @map("updated_at")
+  version                     Int            @default(0)
+
+  devices Device[]
+
+  @@unique([tenantId, name])
+  @@map("device_types")
+}
+
+/// 设备台账：门店级物理设备实例，店长可自行登记维护（同 room.room/warehouse 口径）。
+model Device {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  storeId      String       @map("store_id")
+  deviceTypeId String       @map("device_type_id")
+  code         String // 设备编号
+  name         String
+  roomId       String?      @map("room_id") // 呼叫器/门禁等绑定具体房间；能耗计量总表等可不绑定
+  status       DeviceStatus @default(OFFLINE)
+  lastSeenAt   DateTime?    @map("last_seen_at")
+  createdBy    String       @map("created_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  version      Int          @default(0)
+
+  store          Store                 @relation(fields: [storeId], references: [id])
+  deviceType     DeviceType            @relation(fields: [deviceTypeId], references: [id])
+  room           Room?                 @relation(fields: [roomId], references: [id])
+  shadow         DeviceShadow?
+  events         DeviceEvent[]
+  connectionLogs DeviceConnectionLog[]
+
+  @@unique([tenantId, storeId, code])
+  @@index([tenantId, storeId])
+  @@map("devices")
+}
+
+/// Device Shadow：设备期望态(desired，网关下发指令写入)与上报态(reported，设备确认后写入)分离存储，
+/// 网络不稳定时指令先存desired，设备恢复连接后再同步，核心业务不因设备离线中断（开发文档3.4节设计要点）。
+model DeviceShadow {
+  id              String    @id @default(cuid())
+  deviceId        String    @unique @map("device_id")
+  desiredState    Json?     @map("desired_state")
+  desiredVersion  Int       @default(0) @map("desired_version")
+  reportedState   Json?     @map("reported_state")
+  reportedVersion Int       @default(0) @map("reported_version")
+  lastCommandAt   DateTime? @map("last_command_at")
+  lastReportedAt  DateTime? @map("last_reported_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_shadows")
+}
+
+/// 设备事件流水：模拟/真实网关上报的原始事件；processedAt/businessRefType/businessRefId记录是否
+/// 及如何转换为正式业务记录，processingError记录转换失败原因（不静默丢弃，便于排查）。
+model DeviceEvent {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  storeId         String    @map("store_id")
+  deviceId        String    @map("device_id")
+  eventType       String    @map("event_type")
+  payload         Json
+  occurredAt      DateTime  @default(now()) @map("occurred_at")
+  processedAt     DateTime? @map("processed_at")
+  businessRefType String?   @map("business_ref_type")
+  businessRefId   String?   @map("business_ref_id")
+  processingError String?   @map("processing_error") @db.Text
+  createdBy       String    @map("created_by") // 本轮为模拟面板操作人；接入真实网关后可改为系统账号
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  device Device @relation(fields: [deviceId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, deviceId])
+  @@index([tenantId, storeId, occurredAt])
+  @@map("device_events")
+}
+
+/// 设备接入审计：上下线、指令下发/确认记录留痕（开发文档"设备接入审计"要求）。
+model DeviceConnectionLog {
+  id        String                  @id @default(cuid())
+  tenantId  String                  @map("tenant_id")
+  storeId   String                  @map("store_id")
+  deviceId  String                  @map("device_id")
+  logType   DeviceConnectionLogType @map("log_type")
+  detail    Json?
+  createdBy String?                 @map("created_by")
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  device Device @relation(fields: [deviceId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, deviceId])
+  @@map("device_connection_logs")
 }

@@ -345,6 +345,22 @@ export const UTILITY_EXPENSE_TYPE_LABEL_MAP: Record<string, string> = {
   OTHER: '其他',
 }
 
+export const DEVICE_CATEGORY_LABEL_MAP: Record<string, string> = {
+  VITAL_SIGN: '体征监测',
+  SECURITY: '安防看护',
+  ACCESS_CONTROL: '门禁出入',
+  CALL_SERVICE: '呼叫/客房服务',
+  IDENTITY_SETTLEMENT: '身份结算',
+  PRINTING: '打印',
+  UTILITY_METER: '能耗计量',
+}
+
+export const DEVICE_STATUS_MAP: Record<string, StatusMeta> = {
+  ONLINE: { label: '在线', type: 'success' },
+  OFFLINE: { label: '离线', type: 'default' },
+  DISABLED: { label: '已停用', type: 'error' },
+}
+
 export const AI_SUGGESTION_STATUS_MAP: Record<string, StatusMeta> = {
   PENDING: { label: '待确认', type: 'warning' },
   ACCEPTED: { label: '已采纳', type: 'success' },

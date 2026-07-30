@@ -49,6 +49,7 @@ import {
   CarOutline,
   FlashOutline,
   LibraryOutline,
+  HardwareChipOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -196,6 +197,16 @@ export const navMenuOptions: MenuOption[] = [
     key: 'group-ai',
     children: [
       { label: linkLabel('知识库文档', '/ai/knowledge-documents'), key: '/ai/knowledge-documents', icon: icon(LibraryOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '设备网关',
+    key: 'group-iot',
+    children: [
+      { label: linkLabel('设备台账', '/iot/devices'), key: '/iot/devices', icon: icon(HardwareChipOutline) },
+      { label: linkLabel('事件与模拟', '/iot/device-events'), key: '/iot/device-events', icon: icon(HardwareChipOutline) },
+      { label: linkLabel('设备类型', '/iot/device-types'), key: '/iot/device-types', icon: icon(HardwareChipOutline) },
     ],
   },
 
