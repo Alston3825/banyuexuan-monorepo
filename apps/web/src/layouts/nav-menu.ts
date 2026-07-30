@@ -68,6 +68,12 @@ export const navMenuOptions: MenuOption[] = [
   // ==================== 业务模块 ====================
   {
     type: 'group',
+    label: '经营分析',
+    key: 'group-analytics',
+    children: [{ label: linkLabel('经营分析看板', '/analytics/dashboard'), key: '/analytics/dashboard', icon: icon(StatsChartOutline) }],
+  },
+  {
+    type: 'group',
     label: '客户与线索',
     key: 'group-crm',
     children: [

@@ -22,6 +22,7 @@ import { OfficeModule } from './office/office.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { AiModule } from './ai/ai.module';
 import { IotModule } from './iot/iot.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -52,6 +53,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     LogisticsModule,
     AiModule,
     IotModule,
+    AnalyticsModule,
     HealthModule,
   ],
   providers: [

@@ -1,4 +1,4 @@
-export type AiSuggestionScenario = 'CUSTOMER_SERVICE' | 'CARE_ABNORMALITY'
+export type AiSuggestionScenario = 'CUSTOMER_SERVICE' | 'CARE_ABNORMALITY' | 'BUSINESS_ANALYTICS'
 export type AiSuggestionStatus = 'PENDING' | 'ACCEPTED' | 'DISMISSED'
 
 export interface AiSuggestion {

@@ -190,11 +190,15 @@ async function main() {
     { code: 'ai.care-abnormality-agent', name: 'AI助手-护理异常建议', type: 'PAGE', parentCode: 'ai' },
     { code: 'ai.suggestion', name: 'AI助手-建议记录', type: 'PAGE', parentCode: 'ai' },
     { code: 'ai.knowledge-document', name: 'AI助手-知识库文档', type: 'PAGE', parentCode: 'ai' },
+    { code: 'ai.business-analytics-agent', name: 'AI助手-经营分析解读', type: 'PAGE', parentCode: 'ai' },
 
     { code: 'iot', name: '设备网关', type: 'MODULE' },
     { code: 'iot.device-type', name: '设备网关-设备类型', type: 'PAGE', parentCode: 'iot' },
     { code: 'iot.device-registry', name: '设备网关-设备台账', type: 'PAGE', parentCode: 'iot' },
     { code: 'iot.device-event', name: '设备网关-事件与模拟', type: 'PAGE', parentCode: 'iot' },
+
+    { code: 'analytics', name: '经营分析', type: 'MODULE' },
+    { code: 'analytics.dashboard', name: '经营分析-看板', type: 'PAGE', parentCode: 'analytics' },
 
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
@@ -423,6 +427,7 @@ async function main() {
   for (const action of ['view', 'create', 'update', 'delete']) {
     permSpecs.push({ code: `ai.knowledge-document.${action}`, name: `AI助手-知识库文档-${action}`, type: 'BUTTON', parentCode: 'ai.knowledge-document' });
   }
+  permSpecs.push({ code: 'ai.business-analytics-agent.analyze', name: 'AI助手-经营分析解读-analyze', type: 'BUTTON', parentCode: 'ai.business-analytics-agent' });
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `iot.device-type.${action}`, name: `设备网关-设备类型-${action}`, type: 'BUTTON', parentCode: 'iot.device-type' });
   }
@@ -432,6 +437,7 @@ async function main() {
   for (const action of ['view', 'simulate', 'issue-command', 'confirm-command']) {
     permSpecs.push({ code: `iot.device-event.${action}`, name: `设备网关-事件与模拟-${action}`, type: 'BUTTON', parentCode: 'iot.device-event' });
   }
+  permSpecs.push({ code: 'analytics.dashboard.view', name: '经营分析-看板-view', type: 'BUTTON', parentCode: 'analytics.dashboard' });
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -560,6 +566,9 @@ async function main() {
   // (iot.device-registry)是各门店自己安装/更换的物理资产，同 room.room/warehouse口径，
   // 店长可自行管理；事件与模拟(iot.device-event，含模拟上报/下发指令/确认指令)是日常
   // 验证/排查设备联通性的操作，同样开放给店长。
+  // 经营分析：看板(analytics.dashboard)与AI经营分析解读(ai.business-analytics-agent)都开放给
+  // 店长——查询范围由BusinessReportService按DataScopeService强制收紧到店长自己门店，不依赖
+  // 权限点本身做门店隔离，同AiSuggestion其他两个Agent"辅助工具、全部动作开放"的口径一致。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -627,7 +636,9 @@ async function main() {
           code.startsWith('ai.suggestion') ||
           code.startsWith('iot.device-type') ||
           code.startsWith('iot.device-registry') ||
-          code.startsWith('iot.device-event')),
+          code.startsWith('iot.device-event') ||
+          code.startsWith('ai.business-analytics-agent') ||
+          code.startsWith('analytics.dashboard')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
