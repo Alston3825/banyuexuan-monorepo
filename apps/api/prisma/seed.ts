@@ -191,6 +191,11 @@ async function main() {
     { code: 'ai.suggestion', name: 'AI助手-建议记录', type: 'PAGE', parentCode: 'ai' },
     { code: 'ai.knowledge-document', name: 'AI助手-知识库文档', type: 'PAGE', parentCode: 'ai' },
 
+    { code: 'iot', name: '设备网关', type: 'MODULE' },
+    { code: 'iot.device-type', name: '设备网关-设备类型', type: 'PAGE', parentCode: 'iot' },
+    { code: 'iot.device-registry', name: '设备网关-设备台账', type: 'PAGE', parentCode: 'iot' },
+    { code: 'iot.device-event', name: '设备网关-事件与模拟', type: 'PAGE', parentCode: 'iot' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -418,6 +423,15 @@ async function main() {
   for (const action of ['view', 'create', 'update', 'delete']) {
     permSpecs.push({ code: `ai.knowledge-document.${action}`, name: `AI助手-知识库文档-${action}`, type: 'BUTTON', parentCode: 'ai.knowledge-document' });
   }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `iot.device-type.${action}`, name: `设备网关-设备类型-${action}`, type: 'BUTTON', parentCode: 'iot.device-type' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `iot.device-registry.${action}`, name: `设备网关-设备台账-${action}`, type: 'BUTTON', parentCode: 'iot.device-registry' });
+  }
+  for (const action of ['view', 'simulate', 'issue-command', 'confirm-command']) {
+    permSpecs.push({ code: `iot.device-event.${action}`, name: `设备网关-事件与模拟-${action}`, type: 'BUTTON', parentCode: 'iot.device-event' });
+  }
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -540,6 +554,12 @@ async function main() {
   // 人工决策），全部动作开放给STORE_MANAGER，不额外收紧。知识库文档(ai.knowledge-document)
   // 是被全租户共享的AI参考内容源，同 care.field/room.type 这类总部主数据口径，不开放给
   // STORE_MANAGER编辑，避免多店各自维护导致AI回答口径不一致。
+  // 设备网关：设备类型(iot.device-type，协议/品类主数据)同 room.type/care.field 口径不开放
+  // create/update 给STORE_MANAGER；但view需要开放——店长登记设备台账时要选择设备类型，
+  // 同 logistics.vehicle 口径（车辆主数据不可编辑但用车申请要能引用）。设备台账
+  // (iot.device-registry)是各门店自己安装/更换的物理资产，同 room.room/warehouse口径，
+  // 店长可自行管理；事件与模拟(iot.device-event，含模拟上报/下发指令/确认指令)是日常
+  // 验证/排查设备联通性的操作，同样开放给店长。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -550,6 +570,8 @@ async function main() {
     'finance.customer-account.adjust',
     'logistics.vehicle.create',
     'logistics.vehicle.update',
+    'iot.device-type.create',
+    'iot.device-type.update',
   ]);
   const storeManagerCodes = permSpecs
     .map((p) => p.code)
@@ -602,7 +624,10 @@ async function main() {
           code.startsWith('logistics.utility-expense') ||
           code.startsWith('ai.customer-service-agent') ||
           code.startsWith('ai.care-abnormality-agent') ||
-          code.startsWith('ai.suggestion')),
+          code.startsWith('ai.suggestion') ||
+          code.startsWith('iot.device-type') ||
+          code.startsWith('iot.device-registry') ||
+          code.startsWith('iot.device-event')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
