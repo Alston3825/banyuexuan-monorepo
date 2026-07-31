@@ -200,6 +200,10 @@ async function main() {
     { code: 'analytics', name: '经营分析', type: 'MODULE' },
     { code: 'analytics.dashboard', name: '经营分析-看板', type: 'PAGE', parentCode: 'analytics' },
 
+    { code: 'training', name: '培训与考核', type: 'MODULE' },
+    { code: 'training.exam', name: '培训与考核-试卷管理', type: 'PAGE', parentCode: 'training' },
+    { code: 'training.exam-attempt', name: '培训与考核-我的考试', type: 'PAGE', parentCode: 'training' },
+
     { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
     { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
   ];
@@ -438,6 +442,12 @@ async function main() {
     permSpecs.push({ code: `iot.device-event.${action}`, name: `设备网关-事件与模拟-${action}`, type: 'BUTTON', parentCode: 'iot.device-event' });
   }
   permSpecs.push({ code: 'analytics.dashboard.view', name: '经营分析-看板-view', type: 'BUTTON', parentCode: 'analytics.dashboard' });
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `training.exam.${action}`, name: `培训与考核-试卷管理-${action}`, type: 'BUTTON', parentCode: 'training.exam' });
+  }
+  for (const action of ['view', 'submit', 'grade']) {
+    permSpecs.push({ code: `training.exam-attempt.${action}`, name: `培训与考核-我的考试-${action}`, type: 'BUTTON', parentCode: 'training.exam-attempt' });
+  }
 
   const codeToId = new Map<string, string>();
   // 先建父节点（MODULE），保证 parentId 可解析
@@ -569,6 +579,9 @@ async function main() {
   // 经营分析：看板(analytics.dashboard)与AI经营分析解读(ai.business-analytics-agent)都开放给
   // 店长——查询范围由BusinessReportService按DataScopeService强制收紧到店长自己门店，不依赖
   // 权限点本身做门店隔离，同AiSuggestion其他两个Agent"辅助工具、全部动作开放"的口径一致。
+  // 培训与考核：试卷管理(training.exam)是总部统一培训标准，同room.type/care.field口径不开放
+  // 给STORE_MANAGER；我的考试(training.exam-attempt，含参加考试/查看自己成绩/批阅简答题)是
+  // 员工日常操作+店长审核自己门店员工的操作，全部动作开放。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -638,7 +651,8 @@ async function main() {
           code.startsWith('iot.device-registry') ||
           code.startsWith('iot.device-event') ||
           code.startsWith('ai.business-analytics-agent') ||
-          code.startsWith('analytics.dashboard')),
+          code.startsWith('analytics.dashboard') ||
+          code.startsWith('training.exam-attempt')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
