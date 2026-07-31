@@ -361,6 +361,24 @@ export const DEVICE_STATUS_MAP: Record<string, StatusMeta> = {
   DISABLED: { label: '已停用', type: 'error' },
 }
 
+export const TRAINING_EXAM_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PUBLISHED: { label: '已发布', type: 'success' },
+  ARCHIVED: { label: '已归档', type: 'default' },
+}
+
+export const EXAM_QUESTION_TYPE_LABEL_MAP: Record<string, string> = {
+  SINGLE_CHOICE: '单选题',
+  MULTIPLE_CHOICE: '多选题',
+  TRUE_FALSE: '判断题',
+  SHORT_ANSWER: '简答题',
+}
+
+export const EXAM_ATTEMPT_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING_GRADING: { label: '待批阅', type: 'warning' },
+  COMPLETED: { label: '已完成', type: 'success' },
+}
+
 export const AI_SUGGESTION_STATUS_MAP: Record<string, StatusMeta> = {
   PENDING: { label: '待确认', type: 'warning' },
   ACCEPTED: { label: '已采纳', type: 'success' },

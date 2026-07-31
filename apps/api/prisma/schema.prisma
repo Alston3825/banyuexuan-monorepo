@@ -223,6 +223,8 @@ model Account {
   generalMemos          GeneralMemo[]
   vehicleBookings       VehicleBooking[]
   acceptedAiSuggestions AiSuggestion[]
+  examAttempts          ExamAttempt[]           @relation("ExamAttemptAccount")
+  gradedExamAttempts    ExamAttempt[]           @relation("ExamAttemptGradedBy")
 
   @@unique([tenantId, username])
   @@index([tenantId, storeId])
@@ -2776,4 +2778,110 @@ model DeviceConnectionLog {
 
   @@index([tenantId, deviceId])
   @@map("device_connection_logs")
+}
+
+// ==================== 员工培训与考核（P5切片，见业务规则确认记录"员工培训与考核模块启动前"） ====================
+// 完全是员工内部工具，不涉及客户端/小程序（对应"商城与知识库自建vs对接评估报告"里知识库-对内的结论）。
+// 试卷/题目为总部统一培训标准，仅SUPER_ADMIN维护；参加考试对全体员工开放；简答题批阅由店长一步给分完成，
+// 不接入通用工作流引擎。不做"我要学习"打卡审计，不限制重考次数。
+
+enum TrainingExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExamQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum ExamAttemptStatus {
+  PENDING_GRADING // 含简答题，等待人工批阅
+  COMPLETED // 全部客观题或简答题已批阅完毕
+}
+
+/// 试卷：总部统一培训标准，studyMaterial为自由文本学习资料（不新建独立文档系统）。
+model TrainingExam {
+  id            String             @id @default(cuid())
+  tenantId      String             @map("tenant_id")
+  title         String
+  studyMaterial String?            @map("study_material") @db.Text
+  passScore     Int?               @map("pass_score") // 及格分数线，可选
+  status        TrainingExamStatus @default(DRAFT)
+  createdBy     String             @map("created_by")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  version       Int                @default(0)
+
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@map("training_exams")
+}
+
+/// 题目：单选/多选/判断题程序自动判分，简答题固定人工批阅。
+model ExamQuestion {
+  id            String           @id @default(cuid())
+  tenantId      String           @map("tenant_id")
+  examId        String           @map("exam_id")
+  order         Int
+  type          ExamQuestionType
+  content       String           @db.Text
+  options       Json? // 选择题用：[{ key: 'A', text: '...' }, ...]；判断题/简答题为 null
+  correctAnswer Json?            @map("correct_answer") // 选择题存正确选项key数组；判断题存 true/false；简答题为 null（人工判分）
+  score         Int // 该题分值
+
+  exam    TrainingExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers ExamAnswer[]
+
+  @@index([tenantId, examId])
+  @@map("exam_questions")
+}
+
+/// 员工一次作答：answers/autoScore由提交时程序计算，manualScore/gradedBy由批阅时人工填写。
+model ExamAttempt {
+  id          String            @id @default(cuid())
+  tenantId    String            @map("tenant_id")
+  examId      String            @map("exam_id")
+  accountId   String            @map("account_id")
+  autoScore   Int               @default(0) @map("auto_score")
+  manualScore Int?              @map("manual_score")
+  totalScore  Int?              @map("total_score") // 全部判分完成后写入（autoScore+manualScore之和）
+  status      ExamAttemptStatus @default(PENDING_GRADING)
+  submittedAt DateTime          @default(now()) @map("submitted_at")
+  gradedById  String?           @map("graded_by_id")
+  gradedAt    DateTime?         @map("graded_at")
+  createdBy   String            @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  version     Int               @default(0)
+
+  exam     TrainingExam @relation(fields: [examId], references: [id])
+  account  Account      @relation("ExamAttemptAccount", fields: [accountId], references: [id])
+  gradedBy Account?     @relation("ExamAttemptGradedBy", fields: [gradedById], references: [id])
+  answers  ExamAnswer[]
+
+  @@index([tenantId, examId])
+  @@index([tenantId, accountId])
+  @@map("exam_attempts")
+}
+
+/// 单题作答：selectedKeys为选择题答案；textAnswer为简答题答案；isCorrect/score为该题判分结果。
+model ExamAnswer {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  attemptId    String   @map("attempt_id")
+  questionId   String   @map("question_id")
+  selectedKeys Json?    @map("selected_keys") // 选择题/判断题答案
+  textAnswer   String?  @map("text_answer") @db.Text // 简答题答案
+  isCorrect    Boolean? @map("is_correct") // 客观题自动判分结果；简答题人工批阅后填写
+  score        Int      @default(0) // 该题得分
+
+  attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id])
+
+  @@index([tenantId, attemptId])
+  @@map("exam_answers")
 }

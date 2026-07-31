@@ -50,6 +50,7 @@ import {
   FlashOutline,
   LibraryOutline,
   HardwareChipOutline,
+  SchoolOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -213,6 +214,16 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('设备台账', '/iot/devices'), key: '/iot/devices', icon: icon(HardwareChipOutline) },
       { label: linkLabel('事件与模拟', '/iot/device-events'), key: '/iot/device-events', icon: icon(HardwareChipOutline) },
       { label: linkLabel('设备类型', '/iot/device-types'), key: '/iot/device-types', icon: icon(HardwareChipOutline) },
+    ],
+  },
+  {
+    type: 'group',
+    label: '培训与考核',
+    key: 'group-training',
+    children: [
+      { label: linkLabel('我的考试', '/training/my-exams'), key: '/training/my-exams', icon: icon(SchoolOutline) },
+      { label: linkLabel('考试批阅', '/training/grading'), key: '/training/grading', icon: icon(SchoolOutline) },
+      { label: linkLabel('试卷管理', '/training/exams'), key: '/training/exams', icon: icon(SchoolOutline) },
     ],
   },
 
