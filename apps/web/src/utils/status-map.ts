@@ -182,6 +182,18 @@ export const CARE_PLAN_TASK_STATUS_MAP: Record<string, StatusMeta> = {
   MISSED: { label: '已错过', type: 'default' },
 }
 
+export const CARE_OUTREACH_PLAN_STATUS_MAP: Record<string, StatusMeta> = {
+  ACTIVE: { label: '跟进中', type: 'warning' },
+  COMPLETED: { label: '已完成', type: 'success' },
+  TERMINATED: { label: '已终止', type: 'error' },
+}
+
+export const CARE_OUTREACH_TASK_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING: { label: '待跟进', type: 'warning' },
+  COMPLETED: { label: '已完成', type: 'success' },
+  SKIPPED: { label: '已跳过', type: 'default' },
+}
+
 export const CARE_ABNORMALITY_STATUS_MAP: Record<string, StatusMeta> = {
   OPEN: { label: '待处理', type: 'error' },
   FOLLOWING: { label: '跟进中', type: 'warning' },

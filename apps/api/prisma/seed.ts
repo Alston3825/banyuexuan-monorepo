@@ -138,6 +138,8 @@ async function main() {
     { code: 'care.plan', name: '护理-护理计划', type: 'PAGE', parentCode: 'care' },
     { code: 'care.record', name: '护理-护理记录', type: 'PAGE', parentCode: 'care' },
     { code: 'care.abnormality', name: '护理-护理异常', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.outreach-template', name: '护理-关怀模板管理', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.outreach-plan', name: '护理-离店后关怀', type: 'PAGE', parentCode: 'care' },
 
     { code: 'meal', name: '月子餐', type: 'MODULE' },
     { code: 'meal.item', name: '月子餐-菜品管理', type: 'PAGE', parentCode: 'meal' },
@@ -316,6 +318,12 @@ async function main() {
   }
   for (const action of ['view', 'follow-up', 'resolve', 'ignore']) {
     permSpecs.push({ code: `care.abnormality.${action}`, name: `护理-护理异常-${action}`, type: 'BUTTON', parentCode: 'care.abnormality' });
+  }
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `care.outreach-template.${action}`, name: `护理-关怀模板管理-${action}`, type: 'BUTTON', parentCode: 'care.outreach-template' });
+  }
+  for (const action of ['view', 'create', 'terminate', 'complete-task']) {
+    permSpecs.push({ code: `care.outreach-plan.${action}`, name: `护理-离店后关怀-${action}`, type: 'BUTTON', parentCode: 'care.outreach-plan' });
   }
 
   for (const action of ['view', 'create', 'update']) {
@@ -582,6 +590,10 @@ async function main() {
   // 培训与考核：试卷管理(training.exam)是总部统一培训标准，同room.type/care.field口径不开放
   // 给STORE_MANAGER；我的考试(training.exam-attempt，含参加考试/查看自己成绩/批阅简答题)是
   // 员工日常操作+店长审核自己门店员工的操作，全部动作开放。
+  // 离店后关怀跟踪：关怀模板(care.outreach-template)是总部统一制定的运营标准，同
+  // care.plan-template口径不开放给STORE_MANAGER；生成计划/查看/终止/完成任务
+  // (care.outreach-plan，含complete-task)是店长/护理人员日常跟进自己门店客户的操作，
+  // 全部动作开放。
   const storeManagerExcluded = new Set([
     'platform.store.delete',
     'platform.account.field.phone.view',
@@ -652,7 +664,8 @@ async function main() {
           code.startsWith('iot.device-event') ||
           code.startsWith('ai.business-analytics-agent') ||
           code.startsWith('analytics.dashboard') ||
-          code.startsWith('training.exam-attempt')),
+          code.startsWith('training.exam-attempt') ||
+          code.startsWith('care.outreach-plan')),
     );
   for (const code of storeManagerCodes) {
     const permissionPointId = codeToId.get(code);
