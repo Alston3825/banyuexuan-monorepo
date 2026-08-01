@@ -19,6 +19,7 @@ describe('P5 员工培训与考核 (e2e)', () => {
 
   let adminToken: string;
   let storeManagerToken: string;
+  let otherStoreManagerToken: string; // test_user，绑定另一门店，用于验证跨店越权已修复
   let examId: string;
   let singleChoiceQuestionId: string;
   let shortAnswerQuestionId: string;
@@ -45,6 +46,8 @@ describe('P5 员工培训与考核 (e2e)', () => {
     adminToken = body<LoginResponse>(adminLogin).accessToken;
     const storeManagerLogin = await request(server).post('/api/v1/auth/login').send({ username: 'store_manager', password: SEED_PASSWORD }).expect(201);
     storeManagerToken = body<LoginResponse>(storeManagerLogin).accessToken;
+    const otherLogin = await request(server).post('/api/v1/auth/login').send({ username: 'test_user', password: SEED_PASSWORD }).expect(201);
+    otherStoreManagerToken = body<LoginResponse>(otherLogin).accessToken;
   });
 
   afterAll(async () => {
@@ -160,5 +163,34 @@ describe('P5 员工培训与考核 (e2e)', () => {
       .set(authed(storeManagerToken))
       .send({ answers: [{ answerId: shortAnswerAnswerId, score: 10 }] })
       .expect(400); // 已批阅完成的作答不能重复批阅
+  });
+
+  // ==================== 安全回归：跨门店越权（安全审查发现，已修复） ====================
+
+  it('7. 待批阅列表与批阅接口不再泄露/可篡改其他门店的考试作答', async () => {
+    const submitted = await request(server)
+      .post('/api/v1/training/attempts')
+      .set(authed(storeManagerToken))
+      .send({
+        examId,
+        answers: [
+          { questionId: singleChoiceQuestionId, selectedKeys: ['A'] },
+          { questionId: shortAnswerQuestionId, textAnswer: '第二次作答，用于验证跨店批阅越权已修复。' },
+        ],
+      })
+      .expect(201);
+    const attempt = body<ExamAttempt>(submitted);
+    expect(attempt.status).toBe('PENDING_GRADING');
+
+    // 另一门店(test_user)看不到这条待批阅记录
+    const otherPending = await request(server).get('/api/v1/training/attempts/pending-grading').set(authed(otherStoreManagerToken)).expect(200);
+    expect(body<ExamAttempt[]>(otherPending).some((a) => a.id === attempt.id)).toBe(false);
+
+    // 另一门店(test_user)也不能直接按id批阅这条作答（门店归属校验先于"answerId是否属于该作答"校验触发）
+    await request(server)
+      .post(`/api/v1/training/attempts/${attempt.id}/grade`)
+      .set(authed(otherStoreManagerToken))
+      .send({ answers: [{ answerId: 'nonexistent-placeholder', score: 0 }] })
+      .expect(403);
   });
 });
