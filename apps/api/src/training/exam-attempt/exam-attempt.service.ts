@@ -3,6 +3,7 @@ import { ExamQuestion } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { DataScopeService } from '../../common/scope/data-scope.service';
 import { SubmitExamAttemptDto } from './dto/submit-exam-attempt.dto';
 import { GradeExamAttemptDto } from './dto/grade-exam-attempt.dto';
 
@@ -18,7 +19,7 @@ const sanitizedQuestionSelect = {
 
 const attemptInclude = {
   exam: { select: { id: true, title: true, passScore: true } },
-  account: { select: { id: true, realName: true, username: true } },
+  account: { select: { id: true, realName: true, username: true, storeId: true } },
   answers: { include: { question: { select: sanitizedQuestionSelect } } },
 };
 
@@ -38,6 +39,7 @@ export class ExamAttemptService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly dataScopeService: DataScopeService,
   ) {}
 
   listAvailableExams() {
@@ -66,17 +68,22 @@ export class ExamAttemptService {
     });
   }
 
-  /** 待批阅列表：给店长看有哪些简答题作答需要批阅。 */
-  findPendingGrading() {
+  /** 待批阅列表：给店长看自己门店员工有哪些简答题作答需要批阅，不泄露其他门店的数据。 */
+  async findPendingGrading() {
+    const allowed = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
     return this.prisma.examAttempt.findMany({
-      where: { tenantId: this.ctx.tenantId, status: 'PENDING_GRADING' },
+      where: {
+        tenantId: this.ctx.tenantId,
+        status: 'PENDING_GRADING',
+        account: allowed === 'ALL' ? undefined : { storeId: { in: allowed } },
+      },
       include: attemptInclude,
       orderBy: { submittedAt: 'asc' },
     });
   }
 
   async findOneAttemptOrThrow(id: string) {
-    const attempt = await this.prisma.examAttempt.findUnique({ where: { id }, include: attemptInclude });
+    const attempt = await this.prisma.examAttempt.findUnique({ where: { id, tenantId: this.ctx.tenantId }, include: attemptInclude });
     if (!attempt) throw new NotFoundException(`ExamAttempt ${id} 不存在`);
     return attempt;
   }
@@ -136,6 +143,7 @@ export class ExamAttemptService {
 
   async grade(attemptId: string, dto: GradeExamAttemptDto) {
     const before = await this.findOneAttemptOrThrow(attemptId);
+    await this.dataScopeService.assertStoreAccessible(this.ctx, before.account.storeId);
     if (before.status !== 'PENDING_GRADING') {
       throw new BadRequestException(`该作答当前状态「${before.status}」不允许批阅`);
     }

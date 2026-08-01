@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { DataScopeService } from '../../common/scope/data-scope.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { addDays } from '../../common/utils/date.util';
 import { CreateCareOutreachPlanDto } from './dto/create-care-outreach-plan.dto';
@@ -24,6 +25,7 @@ export class CareOutreachPlanService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly dataScopeService: DataScopeService,
   ) {}
 
   findMany(query: QueryCareOutreachPlanDto = {}) {
@@ -35,15 +37,16 @@ export class CareOutreachPlanService {
   }
 
   async findOneOrThrow(id: string) {
-    const plan = await this.prisma.careOutreachPlan.findUnique({ where: { id }, include: includePlan });
+    const plan = await this.prisma.careOutreachPlan.findUnique({ where: { id, tenantId: this.ctx.tenantId }, include: includePlan });
     if (!plan) throw new NotFoundException(`CareOutreachPlan ${id} 不存在`);
     return plan;
   }
 
-  /** 待跟进任务：跨计划查询所有 PENDING 状态的关怀任务，供店长/护理人员日常巡查。 */
-  findPendingTasks() {
+  /** 待跟进任务：查询调用方门店范围内 PENDING 状态的关怀任务，不泄露其他门店的客户信息。 */
+  async findPendingTasks() {
+    const allowed = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
     return this.prisma.careOutreachTask.findMany({
-      where: { tenantId: this.ctx.tenantId, status: 'PENDING' },
+      where: { tenantId: this.ctx.tenantId, status: 'PENDING', storeId: allowed === 'ALL' ? undefined : { in: allowed } },
       include: { plan: { include: { motherProfile: { include: { customer: true } } } } },
       orderBy: { scheduledDate: 'asc' },
     });
@@ -96,6 +99,7 @@ export class CareOutreachPlanService {
 
   async terminate(id: string, reason: string, expectedVersion: number) {
     const before = await this.findOneOrThrow(id);
+    await this.dataScopeService.assertStoreAccessible(this.ctx, before.storeId);
     if (before.version !== expectedVersion) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
@@ -127,8 +131,9 @@ export class CareOutreachPlanService {
 
   /** 完成/跳过关怀任务：简单打卡+备注，不复用结构化临床记录引擎。全部任务处理完毕后计划自动置为COMPLETED。 */
   async completeTask(taskId: string, dto: CompleteCareOutreachTaskDto) {
-    const task = await this.prisma.careOutreachTask.findUnique({ where: { id: taskId } });
+    const task = await this.prisma.careOutreachTask.findFirst({ where: { id: taskId, tenantId: this.ctx.tenantId } });
     if (!task) throw new NotFoundException(`CareOutreachTask ${taskId} 不存在`);
+    await this.dataScopeService.assertStoreAccessible(this.ctx, task.storeId);
     if (task.status !== 'PENDING') {
       throw new BadRequestException(`该关怀任务当前状态「${task.status}」不允许处理`);
     }

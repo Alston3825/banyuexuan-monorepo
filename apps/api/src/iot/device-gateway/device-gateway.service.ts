@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { RoomCallService } from '../../room/room-call/room-call.service';
 import { UtilityExpenseService } from '../../logistics/utility-expense/utility-expense.service';
+import { DataScopeService } from '../../common/scope/data-scope.service';
 
 type DeviceWithType = { id: string; storeId: string; deviceType: { category: DeviceCategory } };
 
@@ -21,11 +22,26 @@ export class DeviceGatewayService {
     private readonly ctx: RequestContextService,
     private readonly roomCallService: RoomCallService,
     private readonly utilityExpenseService: UtilityExpenseService,
+    private readonly dataScopeService: DataScopeService,
   ) {}
 
+  /** 设备的门店归属校验：既防跨租户（tenantId过滤），也防同租户跨门店操作他人设备。 */
+  private async getDeviceOrThrow(deviceId: string) {
+    const device = await this.prisma.device.findFirst({ where: { id: deviceId, tenantId: this.ctx.tenantId } });
+    if (!device) throw new NotFoundException(`Device ${deviceId} 不存在`);
+    await this.dataScopeService.assertStoreAccessible(this.ctx, device.storeId);
+    return device;
+  }
+
+  private async getDeviceWithTypeOrThrow(deviceId: string) {
+    const device = await this.prisma.device.findFirst({ where: { id: deviceId, tenantId: this.ctx.tenantId }, include: { deviceType: true } });
+    if (!device) throw new NotFoundException(`Device ${deviceId} 不存在`);
+    await this.dataScopeService.assertStoreAccessible(this.ctx, device.storeId);
+    return device;
+  }
+
   async reportEvent(dto: { deviceId: string; eventType: string; payload?: Record<string, unknown> }): Promise<DeviceEvent> {
-    const device = await this.prisma.device.findUnique({ where: { id: dto.deviceId }, include: { deviceType: true } });
-    if (!device) throw new NotFoundException(`Device ${dto.deviceId} 不存在`);
+    const device = await this.getDeviceWithTypeOrThrow(dto.deviceId);
 
     const wasOffline = device.status !== 'ONLINE';
     await this.prisma.device.update({ where: { id: device.id }, data: { status: 'ONLINE', lastSeenAt: new Date() } });
@@ -73,23 +89,32 @@ export class DeviceGatewayService {
     return event;
   }
 
-  findEvents(query: { deviceId?: string; storeId?: string } = {}): Promise<DeviceEvent[]> {
+  async findEvents(query: { deviceId?: string; storeId?: string } = {}): Promise<DeviceEvent[]> {
+    if (query.storeId) {
+      await this.dataScopeService.assertStoreAccessible(this.ctx, query.storeId);
+      return this.prisma.deviceEvent.findMany({
+        where: { tenantId: this.ctx.tenantId, deviceId: query.deviceId, storeId: query.storeId },
+        orderBy: { occurredAt: 'desc' },
+        take: 100,
+      });
+    }
+    const allowed = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
     return this.prisma.deviceEvent.findMany({
-      where: { tenantId: this.ctx.tenantId, deviceId: query.deviceId, storeId: query.storeId },
+      where: { tenantId: this.ctx.tenantId, deviceId: query.deviceId, storeId: allowed === 'ALL' ? undefined : { in: allowed } },
       orderBy: { occurredAt: 'desc' },
       take: 100,
     });
   }
 
   async getShadow(deviceId: string): Promise<DeviceShadow> {
+    await this.getDeviceOrThrow(deviceId);
     const shadow = await this.prisma.deviceShadow.findUnique({ where: { deviceId } });
     if (!shadow) throw new NotFoundException(`Device ${deviceId} 的 Shadow 不存在`);
     return shadow;
   }
 
   async issueCommand(deviceId: string, desiredState: Record<string, unknown>): Promise<DeviceShadow> {
-    const device = await this.prisma.device.findUnique({ where: { id: deviceId } });
-    if (!device) throw new NotFoundException(`Device ${deviceId} 不存在`);
+    const device = await this.getDeviceOrThrow(deviceId);
     const shadow = await this.prisma.deviceShadow.update({
       where: { deviceId },
       data: { desiredState: desiredState as never, desiredVersion: { increment: 1 }, lastCommandAt: new Date() },
@@ -108,8 +133,7 @@ export class DeviceGatewayService {
   }
 
   async confirmCommand(deviceId: string): Promise<DeviceShadow> {
-    const device = await this.prisma.device.findUnique({ where: { id: deviceId } });
-    if (!device) throw new NotFoundException(`Device ${deviceId} 不存在`);
+    const device = await this.getDeviceOrThrow(deviceId);
     const shadow = await this.prisma.deviceShadow.findUnique({ where: { deviceId } });
     if (!shadow) throw new NotFoundException(`Device ${deviceId} 的 Shadow 不存在`);
     if (shadow.desiredVersion === shadow.reportedVersion) {
@@ -147,7 +171,7 @@ export class DeviceGatewayService {
     const roomId = payload.roomId as string | undefined;
     if (!roomId) throw new BadRequestException('呼叫事件缺少 roomId');
     const occupancy = await this.prisma.roomOccupancy.findFirst({
-      where: { tenantId: this.ctx.tenantId, roomId, status: 'CHECKED_IN' },
+      where: { tenantId: this.ctx.tenantId, storeId: device.storeId, roomId, status: 'CHECKED_IN' },
     });
     if (!occupancy) throw new BadRequestException(`房间 ${roomId} 当前没有在住占用记录，无法生成呼叫记录`);
     const reason = (payload.reason as string) || `设备呼叫（设备编号：${device.id}）`;

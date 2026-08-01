@@ -59,4 +59,12 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    proxy: {
+      '/api/v1': {
+        target: process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

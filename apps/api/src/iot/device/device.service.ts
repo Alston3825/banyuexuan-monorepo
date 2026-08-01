@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { BaseScopedCrudService } from '../../common/base/base-scoped-crud.service';
+import { DataScopeService } from '../../common/scope/data-scope.service';
 
 /** 设备台账：门店级物理设备实例，店长可自行管理（同 room.room/warehouse 口径）。 */
 @Injectable()
@@ -12,6 +13,7 @@ export class DeviceService extends BaseScopedCrudService<Device> {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly dataScopeService: DataScopeService,
     auditLogService: AuditLogService,
     ctx: RequestContextService,
   ) {
@@ -22,9 +24,15 @@ export class DeviceService extends BaseScopedCrudService<Device> {
     return this.prisma.device;
   }
 
-  findMany(query: { storeId?: string } = {}): Promise<Device[]> {
+  /** storeId 若指定必须在调用方门店范围内；未指定则收紧到调用方范围内的全部门店（同 business-report 的 resolveStoreScope 口径）。 */
+  async findMany(query: { storeId?: string } = {}): Promise<Device[]> {
+    if (query.storeId) {
+      await this.dataScopeService.assertStoreAccessible(this.ctx, query.storeId);
+      return this.prisma.device.findMany({ where: { tenantId: this.ctx.tenantId, storeId: query.storeId }, orderBy: { createdAt: 'desc' } });
+    }
+    const allowed = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
     return this.prisma.device.findMany({
-      where: { tenantId: this.ctx.tenantId, storeId: query.storeId },
+      where: { tenantId: this.ctx.tenantId, storeId: allowed === 'ALL' ? undefined : { in: allowed } },
       orderBy: { createdAt: 'desc' },
     });
   }

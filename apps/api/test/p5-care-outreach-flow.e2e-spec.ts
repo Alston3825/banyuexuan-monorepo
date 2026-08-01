@@ -19,6 +19,7 @@ describe('P5 离店后关怀跟踪 (e2e)', () => {
 
   let adminToken: string;
   let storeManagerToken: string;
+  let otherStoreManagerToken: string; // test_user，绑定另一门店，用于验证跨店越权已修复
   let customerId: string;
   let motherProfileId: string;
   let templateId: string;
@@ -48,6 +49,8 @@ describe('P5 离店后关怀跟踪 (e2e)', () => {
     adminToken = body<LoginResponse>(adminLogin).accessToken;
     const storeManagerLogin = await request(server).post('/api/v1/auth/login').send({ username: 'store_manager', password: SEED_PASSWORD }).expect(201);
     storeManagerToken = body<LoginResponse>(storeManagerLogin).accessToken;
+    const otherLogin = await request(server).post('/api/v1/auth/login').send({ username: 'test_user', password: SEED_PASSWORD }).expect(201);
+    otherStoreManagerToken = body<LoginResponse>(otherLogin).accessToken;
 
     const createdCustomer = await request(server)
       .post('/api/v1/crm/customers')
@@ -163,5 +166,35 @@ describe('P5 离店后关怀跟踪 (e2e)', () => {
     const result = body<CareOutreachPlan & { tasks: { status: string }[] }>(terminated);
     expect(result.status).toBe('TERMINATED');
     expect(result.tasks.every((t) => t.status === 'SKIPPED')).toBe(true);
+  });
+
+  // ==================== 安全回归：跨门店越权（安全审查发现，已修复） ====================
+
+  it('9. 待跟进任务列表与任务操作不再泄露/可篡改其他门店的客户关怀数据', async () => {
+    const created = await request(server)
+      .post('/api/v1/care/outreach-plans')
+      .set(authed(storeManagerToken))
+      .send({ motherProfileId, templateId, checkedOutAt: '2026-03-01T00:00:00.000Z' })
+      .expect(201);
+    const plan = body<CareOutreachPlan & { tasks: { id: string }[] }>(created);
+    const taskId = plan.tasks[0].id;
+
+    // 另一门店(test_user)看不到这条待跟进任务（含客户PII）
+    const otherPending = await request(server).get('/api/v1/care/outreach-plans/pending-tasks').set(authed(otherStoreManagerToken)).expect(200);
+    expect(body<{ id: string }[]>(otherPending).some((t) => t.id === taskId)).toBe(false);
+
+    // 另一门店(test_user)不能打卡完成这个任务
+    await request(server)
+      .patch(`/api/v1/care/outreach-plans/tasks/${taskId}/complete`)
+      .set(authed(otherStoreManagerToken))
+      .send({ status: 'COMPLETED' })
+      .expect(403);
+
+    // 另一门店(test_user)也不能终止这个计划
+    await request(server)
+      .patch(`/api/v1/care/outreach-plans/${plan.id}/terminate`)
+      .set(authed(otherStoreManagerToken))
+      .send({ reason: '越权尝试', version: plan.version })
+      .expect(403);
   });
 });

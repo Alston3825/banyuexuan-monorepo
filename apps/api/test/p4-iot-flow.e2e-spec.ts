@@ -29,10 +29,13 @@ describe('P4遗留 IoT设备网关 (e2e)', () => {
 
   let adminToken: string;
   let storeManagerToken: string;
+  let otherStoreManagerToken: string; // test_user，绑定另一门店，用于验证跨店越权已修复
   let storeId: string;
+  let otherStoreId: string;
   let customerId: string;
   let roomAId: string; // 有在住占用（CHECKED_IN），呼叫事件应能成功转换
   let roomBId: string; // 占用记录仍是 RESERVED（未入住），呼叫事件应转换失败但事件仍留痕
+  let otherStoreCallDeviceId: string; // 另一门店的呼叫设备，用于验证跨店房间注入已被拦截
 
   let callDeviceTypeId: string;
   let utilityDeviceTypeId: string;
@@ -67,9 +70,19 @@ describe('P4遗留 IoT设备网关 (e2e)', () => {
       .send({ username: 'store_manager', password: SEED_PASSWORD })
       .expect(201);
     storeManagerToken = body<LoginResponse>(storeManagerLogin).accessToken;
+    const otherLogin = await request(server).post('/api/v1/auth/login').send({ username: 'test_user', password: SEED_PASSWORD }).expect(201);
+    otherStoreManagerToken = body<LoginResponse>(otherLogin).accessToken;
 
     const stores = await request(server).get('/api/v1/platform/stores').set(authed(adminToken)).expect(200);
     storeId = body<{ id: string }[]>(stores)[0].id;
+    // test_user 的门店范围来自角色的门店级授权(AccountRoleAssignment.scopeId)，不是 Account.storeId
+    // （该账号是HQ级测试账号，homeStore为空，只靠角色授权限定在另一门店）。
+    const accounts = body<{ id: string; username: string }[]>(await request(server).get('/api/v1/platform/accounts').set(authed(adminToken)).expect(200));
+    const testUserId = accounts.find((a) => a.username === 'test_user')!.id;
+    const testUserDetail = body<{ roleAssignments: { scopeType: string; scopeId: string | null }[] }>(
+      await request(server).get(`/api/v1/platform/accounts/${testUserId}`).set(authed(adminToken)).expect(200),
+    );
+    otherStoreId = testUserDetail.roleAssignments.find((a) => a.scopeType === 'STORE')!.scopeId!;
 
     const createdCustomer = await request(server)
       .post('/api/v1/crm/customers')
@@ -170,6 +183,14 @@ describe('P4遗留 IoT设备网关 (e2e)', () => {
       .send({ storeId, deviceTypeId: vitalDeviceTypeId, code: `BAND-${runTag}`, name: '妈妈体征手环', roomId: roomAId })
       .expect(201);
     vitalDeviceId = body<Device>(vitalDevice).id;
+
+    // 另一门店(test_user)自己的呼叫设备，用于验证"跨店房间注入"越权是否已被拦截
+    const otherStoreCallDevice = await request(server)
+      .post('/api/v1/iot/devices')
+      .set(authed(otherStoreManagerToken))
+      .send({ storeId: otherStoreId, deviceTypeId: callDeviceTypeId, code: `OTHER-CALL-${runTag}`, name: '异店呼叫器' })
+      .expect(201);
+    otherStoreCallDeviceId = body<Device>(otherStoreCallDevice).id;
   });
 
   afterAll(async () => {
@@ -299,5 +320,35 @@ describe('P4遗留 IoT设备网关 (e2e)', () => {
     );
     expect(events.length).toBeGreaterThan(0);
     expect(events.every((e) => e.deviceId === callDeviceId)).toBe(true);
+  });
+
+  // ==================== 安全回归：跨门店越权（安全审查发现，已修复） ====================
+
+  it('9. 设备台账列表不再泄露其他门店：不传storeId时只看到自己门店的设备，显式查询他店storeId会被拒绝', async () => {
+    const ownList = body<Device[]>(await request(server).get('/api/v1/iot/devices').set(authed(otherStoreManagerToken)).expect(200));
+    expect(ownList.every((d) => d.id !== callDeviceId)).toBe(true); // 看不到 storeId(示例店) 的设备
+    expect(ownList.some((d) => d.id === otherStoreCallDeviceId)).toBe(true); // 能看到自己门店的设备
+
+    await request(server).get('/api/v1/iot/devices').set(authed(otherStoreManagerToken)).query({ storeId }).expect(403);
+  });
+
+  it('10. 跨门店不能查看/下发指令到他店设备的 Shadow', async () => {
+    await request(server).get(`/api/v1/iot/gateway/devices/${vitalDeviceId}/shadow`).set(authed(otherStoreManagerToken)).expect(403);
+    await request(server)
+      .post(`/api/v1/iot/gateway/devices/${vitalDeviceId}/commands`)
+      .set(authed(otherStoreManagerToken))
+      .send({ desiredState: { hacked: true } })
+      .expect(403);
+  });
+
+  it('11. 跨门店呼叫事件注入已被拦截：异店设备引用示例店房间不再生成 RoomCall', async () => {
+    const reported = await request(server)
+      .post('/api/v1/iot/gateway/events')
+      .set(authed(otherStoreManagerToken))
+      .send({ deviceId: otherStoreCallDeviceId, eventType: 'CALL_TRIGGER', payload: { roomId: roomAId, reason: '跨店伪造呼叫' } })
+      .expect(201);
+    const event = body<DeviceEvent>(reported);
+    expect(event.businessRefType).toBeNull(); // 未生成 RoomCall
+    expect(event.processingError).toContain('没有在住占用记录'); // 因为按device.storeId限定后查不到该房间
   });
 });
