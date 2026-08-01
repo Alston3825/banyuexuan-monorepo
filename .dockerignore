@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.local
+**/.env.prod
+.git
+.claude
+月子中心管理软件截图与操作视频
+docs
+*.md

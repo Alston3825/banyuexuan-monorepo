@@ -10,6 +10,10 @@ class Settings(BaseSettings):
 
     port: int = 8000
 
+    # production 时强制要求 internal_api_key 非空（见 main.py 启动校验），
+    # 避免生产环境忘记设置共享密钥导致本服务对内网任何调用方不设防
+    environment: str = "development"
+
     # 服务间认证：apps/api 调用本服务时携带的共享密钥（见业务规则确认记录"P4模型网关"章节，
     # V1 用共享密钥而非完整服务间 OAuth）。
     internal_api_key: Optional[str] = None

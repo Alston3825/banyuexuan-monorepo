@@ -13,6 +13,7 @@ __pycache__/
 # Env
 .env
 .env.local
+.env.prod
 
 # OS
 .DS_Store
