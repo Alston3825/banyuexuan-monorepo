@@ -1,0 +1,46 @@
+# 生产环境编排：只包含应用本身三个服务。MySQL/Redis 用腾讯云托管的云数据库/云Redis，
+# 不在这里跑容器——这是与 docker-compose.yml（本地开发用，含 mysql/redis 容器）的关键区别。
+#
+# 用法：在服务器上把仓库clone/拉到本地后：
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# 真实的 .env.prod 不提交仓库，参考 .env.prod.example 在服务器上手工创建，
+# 详见 docs/环境与密钥管理手册.md。
+
+name: banyuexuan-prod
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:3000:3000" # 只监听本机回环地址，公网访问统一走 web 容器的 nginx 反代
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    build:
+      context: apps/ai-service
+    restart: unless-stopped
+    env_file: .env.prod
+    # 不对外暴露端口：只在 docker 内部网络内被 api 通过服务名 ai-service:8000 访问，
+    # 不写 ports 映射，公网/宿主机都无法直接连接，降低共享密钥被绕过直连的风险
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+networks:
+  default:
+    name: banyuexuan-prod-net

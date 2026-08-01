@@ -1,14 +1,46 @@
 /**
- * P0 本地开发种子数据。密码仅供本地开发登录使用，不是生产凭证——
- * 见 apps/api/.env 的 SEED_DEV_PASSWORD（未设置时回退到下面的默认值）。
+ * 平台初始化种子脚本：RBAC权限目录/角色/工作流定义/系统参数这些"结构性配置"在开发和生产环境
+ * 都要跑（否则应用功能不完整），下半部分的示例业务数据（CRM示例线索/客户/合同/预订/收款、
+ * store_manager示例账号）只在非生产环境创建。
+ *
+ * 生产环境首次上线执行： NODE_ENV=production SEED_TENANT_CODE=<真实租户代码>
+ * SEED_TENANT_NAME=<真实租户名> SEED_STORE_CODE=<真实门店代码> SEED_STORE_NAME=<真实门店名>
+ * SEED_ADMIN_USERNAME=<管理员账号> SEED_ADMIN_PASSWORD=<强密码，openssl rand -base64 16生成>
+ * npx prisma db seed —— 各变量不设置会报错拒绝执行（生产环境不允许沿用开发默认值），
+ * 详见 docs/环境与密钥管理手册.md。
+ *
+ * 开发环境不设置任何上述变量即可，行为与之前完全一致（密码见 SEED_DEV_PASSWORD，
+ * 未设置时回退到下面的默认值，不是生产凭证）。
  */
-import { PrismaClient, PermissionPointType } from '@prisma/client';
+import { PrismaClient, PermissionPointType, Account } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { generateBusinessNo } from '../src/common/utils/business-no.util';
 
 const prisma = new PrismaClient();
 
+const isProduction = process.env.NODE_ENV === 'production';
 const SEED_PASSWORD = process.env.SEED_DEV_PASSWORD ?? 'Passw0rd!23';
+
+const TENANT_CODE = process.env.SEED_TENANT_CODE ?? 'banyuexuan';
+const TENANT_NAME = process.env.SEED_TENANT_NAME ?? '伴月轩月子中心（示例租户）';
+const STORE_CODE = process.env.SEED_STORE_CODE ?? 'ST001';
+const STORE_NAME = process.env.SEED_STORE_NAME ?? '伴月轩·示例店';
+const ADMIN_USERNAME = process.env.SEED_ADMIN_USERNAME ?? 'admin';
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? SEED_PASSWORD;
+
+if (isProduction) {
+  const missing = ['SEED_TENANT_CODE', 'SEED_TENANT_NAME', 'SEED_STORE_CODE', 'SEED_STORE_NAME', 'SEED_ADMIN_USERNAME', 'SEED_ADMIN_PASSWORD'].filter(
+    (key) => !process.env[key],
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `生产环境(NODE_ENV=production)运行seed必须显式提供以下环境变量，不能沿用开发默认值：${missing.join(', ')}`,
+    );
+  }
+  if (ADMIN_PASSWORD === 'Passw0rd!23' || ADMIN_PASSWORD.length < 12) {
+    throw new Error('SEED_ADMIN_PASSWORD 不能是开发默认密码，且长度至少12位，请用 openssl rand -base64 16 生成');
+  }
+}
 
 interface PermSpec {
   code: string;
@@ -23,9 +55,9 @@ async function main() {
 
   // ---------- 平台基础资料 ----------
   const tenant = await prisma.tenant.upsert({
-    where: { code: 'banyuexuan' },
+    where: { code: TENANT_CODE },
     update: {},
-    create: { code: 'banyuexuan', name: '伴月轩月子中心（示例租户）' },
+    create: { code: TENANT_CODE, name: TENANT_NAME },
   });
 
   const region = await prisma.region.upsert({
@@ -35,13 +67,13 @@ async function main() {
   });
 
   const store = await prisma.store.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: 'ST001' } },
+    where: { tenantId_code: { tenantId: tenant.id, code: STORE_CODE } },
     update: {},
     create: {
       tenantId: tenant.id,
       regionId: region.id,
-      code: 'ST001',
-      name: '伴月轩·示例店',
+      code: STORE_CODE,
+      name: STORE_NAME,
       status: 'ACTIVE',
       createdBy: 'SEED',
     },
@@ -680,10 +712,12 @@ async function main() {
   }
 
   // ---------- 账号 ----------
-  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+  // 生产环境管理员密码必须来自 SEED_ADMIN_PASSWORD（已在文件顶部校验过强度），
+  // 不能沿用 SEED_DEV_PASSWORD 这个开发默认值
+  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
   const adminAccount = await prisma.account.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: 'admin' } },
+    where: { tenantId_username: { tenantId: tenant.id, username: ADMIN_USERNAME } },
     update: {},
     create: {
       tenantId: tenant.id,
@@ -691,27 +725,10 @@ async function main() {
       departmentId: department.id,
       teamId: team.id,
       positionId: position.id,
-      username: 'admin',
+      username: ADMIN_USERNAME,
       realName: '超级管理员',
       phone: '13800000000',
-      passwordHash,
-      createdBy: 'SEED',
-    },
-  });
-
-  const storeManagerAccount = await prisma.account.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: 'store_manager' } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      storeId: store.id,
-      departmentId: department.id,
-      teamId: team.id,
-      positionId: position.id,
-      username: 'store_manager',
-      realName: '示例店店长',
-      phone: '13900000000',
-      passwordHash,
+      passwordHash: adminPasswordHash,
       createdBy: 'SEED',
     },
   });
@@ -729,19 +746,91 @@ async function main() {
     },
   });
 
-  await prisma.accountRoleAssignment.upsert({
-    where: { id: `seed-storemgr-${storeManagerRole.id}` },
-    update: {},
-    create: {
-      id: `seed-storemgr-${storeManagerRole.id}`,
-      tenantId: tenant.id,
-      accountId: storeManagerAccount.id,
-      roleId: storeManagerRole.id,
-      scopeType: 'STORE',
-      scopeId: store.id,
-      grantedBy: 'SEED',
-    },
-  });
+  // 示例店长账号只在非生产环境创建（生产环境的真实店长账号由超管登录后台手动创建）。
+  // 声明在if外面是因为后面CRM示例数据(demoCustomer.assignedToId等)也要引用这个账号，
+  // 两处虽然分属两个不同的 `if (!isProduction)` 代码块，但条件完全一致，不会出现越权访问未生产环境变量的情况。
+  let storeManagerAccount: Account | undefined;
+  if (!isProduction) {
+    const demoPasswordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+    storeManagerAccount = await prisma.account.upsert({
+      where: { tenantId_username: { tenantId: tenant.id, username: 'store_manager' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        storeId: store.id,
+        departmentId: department.id,
+        teamId: team.id,
+        positionId: position.id,
+        username: 'store_manager',
+        realName: '示例店店长',
+        phone: '13900000000',
+        passwordHash: demoPasswordHash,
+        createdBy: 'SEED',
+      },
+    });
+
+    await prisma.accountRoleAssignment.upsert({
+      where: { id: `seed-storemgr-${storeManagerRole.id}` },
+      update: {},
+      create: {
+        id: `seed-storemgr-${storeManagerRole.id}`,
+        tenantId: tenant.id,
+        accountId: storeManagerAccount.id,
+        roleId: storeManagerRole.id,
+        scopeType: 'STORE',
+        scopeId: store.id,
+        grantedBy: 'SEED',
+      },
+    });
+
+    // test_user：绑定第二家门店的店长账号，专供e2e测试验证"跨门店越权/数据隔离"场景使用
+    // （多个 test/*.e2e-spec.ts 依赖这个账号，此前这个账号只存在于长期未重置的共享开发库里，
+    // 从未真正在 seed.ts 里创建过——干净的数据库(比如CI流水线的全新库)跑seed后这个账号并不存在，
+    // 导致依赖它的测试全部401失败。这里补上，让测试套件不再依赖"恰好没被清空的开发库"这种偶然状态）。
+    const secondStore = await prisma.store.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: `${STORE_CODE}2` } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        regionId: region.id,
+        code: `${STORE_CODE}2`,
+        name: '伴月轩·测试店',
+        status: 'ACTIVE',
+        createdBy: 'SEED',
+      },
+    });
+
+    const testUserAccount = await prisma.account.upsert({
+      where: { tenantId_username: { tenantId: tenant.id, username: 'test_user' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        storeId: secondStore.id,
+        departmentId: department.id,
+        teamId: team.id,
+        positionId: position.id,
+        username: 'test_user',
+        realName: '测试店店长',
+        phone: '13900000001',
+        passwordHash: demoPasswordHash,
+        createdBy: 'SEED',
+      },
+    });
+
+    await prisma.accountRoleAssignment.upsert({
+      where: { id: `seed-testuser-${storeManagerRole.id}` },
+      update: {},
+      create: {
+        id: `seed-testuser-${storeManagerRole.id}`,
+        tenantId: tenant.id,
+        accountId: testUserAccount.id,
+        roleId: storeManagerRole.id,
+        scopeType: 'STORE',
+        scopeId: secondStore.id,
+        grantedBy: 'SEED',
+      },
+    });
+  }
 
   // ---------- 工作流定义：DEMO_APPROVAL ----------
   const workflowDefinition = await prisma.workflowDefinition.upsert({
@@ -933,6 +1022,9 @@ async function main() {
     }
   }
 
+  // ---------- 以下均为示例业务数据（标签/CRM线索客户/合同/预订/收款），仅本地开发/预发环境需要，
+  // 生产环境首次上线不应该有虚构的示例客户/合同数据 ----------
+  if (!isProduction) {
   // ---------- 标签：示例标签绑定到示例店 ----------
   const tag = await prisma.tag.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: '示例标签' } },
@@ -976,7 +1068,7 @@ async function main() {
         phone: '13700000002',
         source: 'REFERRAL',
         primaryStoreId: store.id,
-        assignedToId: storeManagerAccount.id,
+        assignedToId: storeManagerAccount!.id,
         createdBy: 'SEED',
       },
     });
@@ -992,7 +1084,7 @@ async function main() {
         opportunityNo: generateBusinessNo('O'),
         customerId: demoCustomer.id,
         stage: 'FOLLOWING',
-        assignedToId: storeManagerAccount.id,
+        assignedToId: storeManagerAccount!.id,
         createdBy: 'SEED',
       },
     });
@@ -1118,10 +1210,15 @@ async function main() {
       },
     });
   }
+  } // end if (!isProduction) 示例业务数据
 
   console.log('seed 完成:');
   console.log(`  租户: ${tenant.code} / 门店: ${store.code} / 区域: ${region.code}`);
-  console.log(`  账号: admin / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
+  if (isProduction) {
+    console.log(`  账号: ${ADMIN_USERNAME}（密码为 SEED_ADMIN_PASSWORD 指定的值，请勿在日志/文档中记录明文）`);
+  } else {
+    console.log(`  账号: ${ADMIN_USERNAME} / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
+  }
   console.log(
     `  工作流定义: DEMO_APPROVAL/HR_PAYROLL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND + 库存五单据 + HR_COMMISSION（均为店长审批）`,
   );
