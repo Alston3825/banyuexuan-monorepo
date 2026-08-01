@@ -114,6 +114,8 @@ model Store {
   devices                 Device[]
   deviceEvents            DeviceEvent[]
   deviceConnectionLogs    DeviceConnectionLog[]
+  careOutreachPlans       CareOutreachPlan[]
+  careOutreachTasks       CareOutreachTask[]
 
   @@unique([tenantId, code])
   @@index([tenantId, regionId])
@@ -209,22 +211,23 @@ model Account {
   updatedAt    DateTime      @updatedAt @map("updated_at")
   version      Int           @default(0)
 
-  store                 Store?                  @relation(fields: [storeId], references: [id])
-  department            Department?             @relation(fields: [departmentId], references: [id])
-  team                  Team?                   @relation(fields: [teamId], references: [id])
-  position              Position?               @relation(fields: [positionId], references: [id])
-  roleAssignments       AccountRoleAssignment[]
-  refreshTokens         RefreshToken[]
-  assignedCustomers     Customer[]
-  assignedLeads         Lead[]
-  assignedOpportunities SalesOpportunity[]
-  employeeProfile       EmployeeProfile?
-  expenseClaims         ExpenseClaim[]
-  generalMemos          GeneralMemo[]
-  vehicleBookings       VehicleBooking[]
-  acceptedAiSuggestions AiSuggestion[]
-  examAttempts          ExamAttempt[]           @relation("ExamAttemptAccount")
-  gradedExamAttempts    ExamAttempt[]           @relation("ExamAttemptGradedBy")
+  store                  Store?                  @relation(fields: [storeId], references: [id])
+  department             Department?             @relation(fields: [departmentId], references: [id])
+  team                   Team?                   @relation(fields: [teamId], references: [id])
+  position               Position?               @relation(fields: [positionId], references: [id])
+  roleAssignments        AccountRoleAssignment[]
+  refreshTokens          RefreshToken[]
+  assignedCustomers      Customer[]
+  assignedLeads          Lead[]
+  assignedOpportunities  SalesOpportunity[]
+  employeeProfile        EmployeeProfile?
+  expenseClaims          ExpenseClaim[]
+  generalMemos           GeneralMemo[]
+  vehicleBookings        VehicleBooking[]
+  acceptedAiSuggestions  AiSuggestion[]
+  examAttempts           ExamAttempt[]           @relation("ExamAttemptAccount")
+  gradedExamAttempts     ExamAttempt[]           @relation("ExamAttemptGradedBy")
+  completedOutreachTasks CareOutreachTask[]
 
   @@unique([tenantId, username])
   @@index([tenantId, storeId])
@@ -1227,13 +1230,14 @@ model MotherProfile {
   updatedAt            DateTime       @updatedAt @map("updated_at")
   version              Int            @default(0)
 
-  store         Store             @relation(fields: [storeId], references: [id])
-  customer      Customer          @relation(fields: [customerId], references: [id])
-  occupancy     RoomOccupancy?    @relation(fields: [occupancyId], references: [id])
+  store         Store              @relation(fields: [storeId], references: [id])
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  occupancy     RoomOccupancy?     @relation(fields: [occupancyId], references: [id])
   babies        BabyProfile[]
   carePlans     CarePlan[]
   careRecords   CareRecord[]
   abnormalities CareAbnormality[]
+  outreachPlans CareOutreachPlan[]
 
   @@index([tenantId, customerId])
   @@map("mother_profiles")
@@ -1335,6 +1339,107 @@ model CarePlanTask {
 
   @@index([carePlanId, scheduledDate])
   @@map("care_plan_tasks")
+}
+
+// ==================== 离店后关怀跟踪（P5"会员体系/大健康延伸"切片，见业务规则确认记录"离店后关怀跟踪模块实现中"） ====================
+// 具体关怀节点的天数/内容不由AI预设，只搭建可配置框架；由店长/护理人员手动为已离店的妈妈档案生成计划
+// （不随房态离店流程自动触发），是结构上完全独立于CarePlan(住院期间护理方案)的运营型回访工具。
+
+enum CareOutreachPlanStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+enum CareOutreachTaskStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+/// 关怀模板：总部统一定义关怀节点框架，同 care.plan-template/care.form-template 口径仅
+/// SUPER_ADMIN维护。具体第几天提醒什么内容由用户/护理团队自行配置，不预设任何医学随访规则。
+model CareOutreachTemplate {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  items CareOutreachTemplateItem[]
+  plans CareOutreachPlan[]
+
+  @@unique([tenantId, code])
+  @@map("care_outreach_templates")
+}
+
+model CareOutreachTemplateItem {
+  id         String  @id @default(cuid())
+  templateId String  @map("template_id")
+  dayOffset  Int     @map("day_offset") // 离店日之后第几天，0=离店当天
+  title      String
+  content    String? @db.Text // 提醒要点/话术，自由文本，由用户/护理团队自行填写
+
+  template CareOutreachTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, dayOffset, title])
+  @@map("care_outreach_template_items")
+}
+
+/// 关怀计划：由店长/护理人员在母婴档案页手动选择模板生成（不随RoomOccupancy离店流程自动
+/// 触发，避免侵入已充分测试的核心状态机，也便于按客户情况灵活选择模板）。
+model CareOutreachPlan {
+  id              String                 @id @default(cuid())
+  tenantId        String                 @map("tenant_id")
+  storeId         String                 @map("store_id")
+  planNo          String                 @map("plan_no")
+  templateId      String                 @map("template_id")
+  motherProfileId String                 @map("mother_profile_id")
+  checkedOutAt    DateTime               @map("checked_out_at") // 生成计划时锚定的离店日期，节点日期=此日期+dayOffset天
+  status          CareOutreachPlanStatus @default(ACTIVE)
+  terminateReason String?                @map("terminate_reason") @db.Text
+  createdBy       String                 @map("created_by")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  version         Int                    @default(0)
+
+  store         Store                @relation(fields: [storeId], references: [id])
+  template      CareOutreachTemplate @relation(fields: [templateId], references: [id])
+  motherProfile MotherProfile        @relation(fields: [motherProfileId], references: [id])
+  tasks         CareOutreachTask[]
+
+  @@unique([tenantId, planNo])
+  @@index([tenantId, motherProfileId])
+  @@map("care_outreach_plans")
+}
+
+/// 关怀任务：完成方式是简单打卡+备注（同AiSuggestion.accept/dismiss模式），不复用
+/// CareFormTemplate/CareRecord的结构化临床记录引擎——回访提醒与住院期间规范化护理记录性质不同。
+model CareOutreachTask {
+  id             String                 @id @default(cuid())
+  tenantId       String                 @map("tenant_id")
+  storeId        String                 @map("store_id")
+  planId         String                 @map("plan_id")
+  dayOffset      Int                    @map("day_offset")
+  scheduledDate  DateTime               @map("scheduled_date")
+  title          String
+  content        String?                @db.Text
+  status         CareOutreachTaskStatus @default(PENDING)
+  completedById  String?                @map("completed_by_id")
+  completedAt    DateTime?              @map("completed_at")
+  completionNote String?                @map("completion_note") @db.Text
+
+  plan        CareOutreachPlan @relation(fields: [planId], references: [id])
+  completedBy Account?         @relation(fields: [completedById], references: [id])
+  store       Store            @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, planId])
+  @@index([tenantId, storeId, scheduledDate])
+  @@map("care_outreach_tasks")
 }
 
 /// 护理执行记录：一旦提交不可编辑（原记录不可变）。当天遗漏的记录通过"补录"提交

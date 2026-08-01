@@ -5,12 +5,17 @@ import type {
   CareAbnormalityFollowUp,
   CareFieldDefinition,
   CareFormTemplate,
+  CareOutreachPendingTask,
+  CareOutreachPlan,
+  CareOutreachTemplate,
   CarePlan,
   CarePlanTemplate,
   CareRecord,
   CreateBabyProfileDto,
   CreateCareFieldDefinitionDto,
   CreateCareFormTemplateDto,
+  CreateCareOutreachPlanDto,
+  CreateCareOutreachTemplateDto,
   CreateCarePlanDto,
   CreateCarePlanTemplateDto,
   CreateCareRecordDto,
@@ -18,6 +23,7 @@ import type {
   CreateMotherProfileDto,
   MotherProfile,
   TagBinding,
+  UpdateCareOutreachTemplateDto,
   UpdateBabyProfileDto,
   UpdateCareFieldDefinitionDto,
   UpdateCareFormTemplateDto,
@@ -99,4 +105,21 @@ export const careAbnormalityApi = {
     http.post<CareAbnormality>(`/care/abnormalities/${id}/resolve`, { resolveNote, version }).then((r) => r.data),
   ignore: (id: string, resolveNote: string | undefined, version: number) =>
     http.post<CareAbnormality>(`/care/abnormalities/${id}/ignore`, { resolveNote, version }).then((r) => r.data),
+}
+
+export const careOutreachTemplateApi = {
+  list: () => http.get<CareOutreachTemplate[]>('/care/outreach-templates').then((r) => r.data),
+  create: (body: CreateCareOutreachTemplateDto) => http.post<CareOutreachTemplate>('/care/outreach-templates', body).then((r) => r.data),
+  update: (id: string, body: UpdateCareOutreachTemplateDto) => http.patch<CareOutreachTemplate>(`/care/outreach-templates/${id}`, body).then((r) => r.data),
+}
+
+export const careOutreachPlanApi = {
+  list: (motherProfileId?: string) => http.get<CareOutreachPlan[]>('/care/outreach-plans', { params: { motherProfileId } }).then((r) => r.data),
+  get: (id: string) => http.get<CareOutreachPlan>(`/care/outreach-plans/${id}`).then((r) => r.data),
+  create: (body: CreateCareOutreachPlanDto) => http.post<CareOutreachPlan>('/care/outreach-plans', body).then((r) => r.data),
+  terminate: (id: string, reason: string, version: number) =>
+    http.patch<CareOutreachPlan>(`/care/outreach-plans/${id}/terminate`, { reason, version }).then((r) => r.data),
+  pendingTasks: () => http.get<CareOutreachPendingTask[]>('/care/outreach-plans/pending-tasks').then((r) => r.data),
+  completeTask: (taskId: string, status: 'COMPLETED' | 'SKIPPED', completionNote?: string) =>
+    http.patch(`/care/outreach-plans/tasks/${taskId}/complete`, { status, completionNote }).then((r) => r.data),
 }

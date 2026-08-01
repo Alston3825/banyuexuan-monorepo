@@ -57,6 +57,7 @@ import {
 } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
 import CareAbnormalityFollowUps from '../../components/care/CareAbnormalityFollowUps.vue'
+import CareOutreachPanel from '../../components/care/CareOutreachPanel.vue'
 import AiCareAbnormalitySuggestion from '../../components/ai/AiCareAbnormalitySuggestion.vue'
 
 const route = useRoute()
@@ -534,10 +535,12 @@ onMounted(fetchAll)
       <n-data-table v-else :columns="planColumns" :data="plans" :row-key="(r: CarePlan) => r.id" />
     </n-card>
 
-    <n-card title="护理异常">
+    <n-card title="护理异常" style="margin-bottom: 16px">
       <n-empty v-if="abnormalities.length === 0" description="暂无护理异常" />
       <n-data-table v-else :columns="abnormalityColumns" :data="abnormalities" :row-key="(r: CareAbnormality) => r.id" />
     </n-card>
+
+    <CareOutreachPanel :mother-profile-id="motherProfileId" />
 
     <!-- 编辑妈妈档案 -->
     <n-modal :show="editVisible" @update:show="(v) => (editVisible = v)">

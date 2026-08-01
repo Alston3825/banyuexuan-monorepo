@@ -307,3 +307,73 @@ export interface CareAbnormalityFollowUp {
   createdBy: string
   createdAt: string
 }
+
+export type CareOutreachPlanStatus = 'ACTIVE' | 'COMPLETED' | 'TERMINATED'
+export type CareOutreachTaskStatus = 'PENDING' | 'COMPLETED' | 'SKIPPED'
+
+export interface CareOutreachTemplateItem {
+  id: string
+  dayOffset: number
+  title: string
+  content: string | null
+}
+
+export interface CareOutreachTemplate extends ScopedEntityBase {
+  code: string
+  name: string
+  status: 'ACTIVE' | 'INACTIVE'
+  items: CareOutreachTemplateItem[]
+}
+
+export interface CareOutreachTemplateItemInput {
+  dayOffset: number
+  title: string
+  content?: string
+}
+
+export interface CreateCareOutreachTemplateDto {
+  code: string
+  name: string
+  items: CareOutreachTemplateItemInput[]
+}
+
+export interface UpdateCareOutreachTemplateDto {
+  name?: string
+  status?: 'ACTIVE' | 'INACTIVE'
+  items?: CareOutreachTemplateItemInput[]
+  version: number
+}
+
+export interface CareOutreachTask {
+  id: string
+  planId: string
+  dayOffset: number
+  scheduledDate: string
+  title: string
+  content: string | null
+  status: CareOutreachTaskStatus
+  completedById: string | null
+  completedAt: string | null
+  completionNote: string | null
+}
+
+export interface CareOutreachPlan extends ScopedEntityBase {
+  storeId: string
+  planNo: string
+  templateId: string
+  motherProfileId: string
+  checkedOutAt: string
+  status: CareOutreachPlanStatus
+  terminateReason: string | null
+  tasks: CareOutreachTask[]
+}
+
+export interface CareOutreachPendingTask extends CareOutreachTask {
+  plan: CareOutreachPlan & { motherProfile: { customer: { name: string } } }
+}
+
+export interface CreateCareOutreachPlanDto {
+  motherProfileId: string
+  templateId: string
+  checkedOutAt: string
+}

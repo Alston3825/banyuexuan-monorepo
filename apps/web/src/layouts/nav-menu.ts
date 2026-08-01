@@ -51,6 +51,7 @@ import {
   LibraryOutline,
   HardwareChipOutline,
   SchoolOutline,
+  HeartOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -113,6 +114,8 @@ export const navMenuOptions: MenuOption[] = [
       { label: linkLabel('护理字段管理', '/care/fields'), key: '/care/fields', icon: icon(ListOutline) },
       { label: linkLabel('护理项目管理', '/care/form-templates'), key: '/care/form-templates', icon: icon(ClipboardOutline) },
       { label: linkLabel('护理方案管理', '/care/plan-templates'), key: '/care/plan-templates', icon: icon(JournalOutline) },
+      { label: linkLabel('待跟进关怀', '/care/outreach-tasks'), key: '/care/outreach-tasks', icon: icon(HeartOutline) },
+      { label: linkLabel('关怀模板管理', '/care/outreach-templates'), key: '/care/outreach-templates', icon: icon(HeartOutline) },
     ],
   },
   {
