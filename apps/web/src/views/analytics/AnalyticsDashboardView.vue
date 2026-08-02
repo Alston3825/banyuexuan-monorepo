@@ -10,6 +10,7 @@ import type { Store } from '../../api/types/store'
 import { PAYMENT_METHOD_LABEL_MAP } from '../../utils/status-map'
 import { toMajorUnits } from '../../utils/money'
 import { message } from '../../utils/discrete-api'
+import { extractErrorMessage } from '../../utils/error-message'
 
 const ALL_STORES = ''
 
@@ -26,6 +27,7 @@ const occupancySummary = ref<OccupancySummary | null>(null)
 const loading = ref(false)
 const analyzing = ref(false)
 const analysis = ref<AiSuggestion | null>(null)
+const analyzeError = ref('')
 
 /** n-date-picker 的 daterange 返回本地时区午夜的时间戳，用 toISOString() 会因转 UTC 偏移一天，需取本地日期分量。 */
 function toDateParam(ts: number): string {
@@ -54,6 +56,7 @@ async function fetchAll() {
 }
 
 async function handleAnalyze() {
+  analyzeError.value = ''
   if (!dateRange.value) {
     message.error('请选择统计时间区间')
     return
@@ -68,6 +71,8 @@ async function handleAnalyze() {
     financeSummary.value = result.financeSummary
     occupancySummary.value = result.occupancySummary
     analysis.value = result.suggestion
+  } catch (error) {
+    analyzeError.value = extractErrorMessage(error, 'AI暂时不可用，请稍后重试')
   } finally {
     analyzing.value = false
   }
@@ -122,6 +127,7 @@ storeApi.list().then((list) => (stores.value = list))
       <n-card title="AI 经营分析解读">
         <n-alert type="info" :bordered="false" style="margin-bottom: 12px">分析仅供管理参考，不构成正式经营决策依据，最终决策需要管理者结合更多信息判断。</n-alert>
         <n-button type="primary" :loading="analyzing" @click="handleAnalyze" style="margin-bottom: 12px">生成AI经营解读</n-button>
+        <n-alert v-if="analyzeError" type="error" closable style="margin-bottom: 12px" @close="analyzeError = ''">{{ analyzeError }}</n-alert>
         <div v-if="analysis" style="white-space: pre-wrap">{{ analysis.outputText }}</div>
       </n-card>
     </template>

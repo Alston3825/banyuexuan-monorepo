@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace=@banyuexuan/web", "--", "--port", "5180"],
       "port": 5180
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:dev", "--workspace=@banyuexuan/api"],
+      "port": 3000
     }
   ]
 }

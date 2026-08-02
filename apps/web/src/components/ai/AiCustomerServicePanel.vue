@@ -4,6 +4,7 @@ import { NButton, NEmpty, NSpace, NCard, NInput, NAlert, NTag } from 'naive-ui'
 import { aiSuggestionApi, customerServiceAgentApi } from '../../api/modules/ai.api'
 import type { AiSuggestion } from '../../api/types/ai'
 import { message } from '../../utils/discrete-api'
+import { extractErrorMessage } from '../../utils/error-message'
 
 const props = defineProps<{ businessType: 'LEAD' | 'CUSTOMER'; businessId: string; storeId: string }>()
 
@@ -11,6 +12,10 @@ const suggestions = ref<AiSuggestion[]>([])
 const loading = ref(false)
 const asking = ref(false)
 const question = ref('')
+// 全局message toast在“组件内异步函数await之后”这类调用场景下偶发不生效（Vue实例上下文在await后
+// 的状态与naive-ui discrete API交互的已知边界情况），这里用组件内的响应式状态兜底，保证用户一定能
+// 看到失败反馈，不完全依赖message toast。
+const askError = ref('')
 
 async function fetchList() {
   loading.value = true
@@ -22,8 +27,9 @@ async function fetchList() {
 }
 
 async function handleAsk() {
+  askError.value = ''
   if (!question.value.trim()) {
-    message.error('请输入问题')
+    askError.value = '请输入问题'
     return
   }
   asking.value = true
@@ -34,6 +40,8 @@ async function handleAsk() {
     }
     question.value = ''
     await fetchList()
+  } catch (error) {
+    askError.value = extractErrorMessage(error, 'AI暂时不可用，请稍后重试或转人工处理')
   } finally {
     asking.value = false
   }
@@ -59,6 +67,7 @@ onMounted(fetchList)
       <n-input v-model:value="question" placeholder="向AI提问，如：这个客户目前跟进到什么阶段？" @keyup.enter="handleAsk" />
       <n-button type="primary" :loading="asking" @click="handleAsk">提问</n-button>
     </n-space>
+    <n-alert v-if="askError" type="error" closable style="margin-bottom: 12px" @close="askError = ''">{{ askError }}</n-alert>
     <n-empty v-if="!loading && suggestions.length === 0" description="暂无AI问答记录" />
     <n-space v-else vertical :size="12">
       <n-card v-for="s in suggestions" :key="s.id" size="small" embedded>
