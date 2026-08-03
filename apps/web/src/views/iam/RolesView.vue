@@ -41,17 +41,17 @@ const formVisible = ref(false)
 const editingRow = ref<Role | null>(null)
 const submitting = ref(false)
 const formRef = ref<FormInst | null>(null)
-const model = ref({ code: '', name: '', description: '' })
+const model = ref({ name: '', description: '' })
 
 function openCreateModal() {
   editingRow.value = null
-  model.value = { code: '', name: '', description: '' }
+  model.value = { name: '', description: '' }
   formVisible.value = true
 }
 
 function openEditModal(row: Role) {
   editingRow.value = row
-  model.value = { code: row.code, name: row.name, description: row.description ?? '' }
+  model.value = { name: row.name, description: row.description ?? '' }
   formVisible.value = true
 }
 
@@ -67,7 +67,7 @@ async function handleSubmit() {
       })
       message.success('角色已更新')
     } else {
-      await roleApi.create({ code: model.value.code, name: model.value.name, description: model.value.description })
+      await roleApi.create({ name: model.value.name, description: model.value.description })
       message.success('角色已创建')
     }
     formVisible.value = false
@@ -129,7 +129,6 @@ async function handleCheckedKeysChange(newKeys: (string | number)[]) {
 }
 
 const columns: DataTableColumns<Role> = [
-  { key: 'code', title: '编码' },
   { key: 'name', title: '名称' },
   { key: 'description', title: '描述', render: (row) => row.description ?? '-' },
   {
@@ -170,9 +169,6 @@ onMounted(fetchList)
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑角色' : '新建角色'" style="width: 460px" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="80">
-          <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
-            <n-input v-model:value="model.code" />
-          </n-form-item>
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />
           </n-form-item>

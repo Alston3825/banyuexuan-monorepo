@@ -1,8 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateTeamDto {
-  @ApiProperty() @IsString() code: string;
+  @ApiProperty({ required: false, description: '不填则系统自动生成' })
+  @IsOptional()
+  @IsString()
+  code?: string;
   @ApiProperty() @IsString() name: string;
   @ApiProperty() @IsString() departmentId: string;
 }

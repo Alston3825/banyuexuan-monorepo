@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { DataScopeService } from '../../common/scope/data-scope.service';
+import { generateBusinessNo } from '../../common/utils/business-no.util';
 
 @Injectable()
 export class StoreService {
@@ -27,9 +28,15 @@ export class StoreService {
     return store;
   }
 
-  async create(data: { code: string; name: string; regionId: string; address?: string }): Promise<Store> {
+  async create(data: { code?: string; name: string; regionId: string; address?: string }): Promise<Store> {
     const created = await this.prisma.store.create({
-      data: { ...data, tenantId: this.ctx.tenantId!, createdBy: this.ctx.accountId!, status: 'ACTIVE' },
+      data: {
+        ...data,
+        code: data.code ?? generateBusinessNo('ST'),
+        tenantId: this.ctx.tenantId!,
+        createdBy: this.ctx.accountId!,
+        status: 'ACTIVE',
+      },
     });
     await this.auditLogService.record({
       action: 'CREATE',

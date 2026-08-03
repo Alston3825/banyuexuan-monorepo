@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { BaseScopedCrudService } from '../../common/base/base-scoped-crud.service';
+import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { Region } from '@prisma/client';
 
 @Injectable()
@@ -21,7 +22,7 @@ export class RegionService extends BaseScopedCrudService<Region> {
     return this.prisma.region;
   }
 
-  create(data: { code: string; name: string }): Promise<Region> {
-    return super.create({ ...data, tenantId: this.ctx.tenantId });
+  create(data: { code?: string; name: string }): Promise<Region> {
+    return super.create({ ...data, code: data.code ?? generateBusinessNo('RG'), tenantId: this.ctx.tenantId });
   }
 }

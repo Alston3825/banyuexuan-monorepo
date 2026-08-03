@@ -3,6 +3,7 @@ import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { generateBusinessNo } from '../../common/utils/business-no.util';
 
 @Injectable()
 export class RoleService {
@@ -25,9 +26,14 @@ export class RoleService {
     return role;
   }
 
-  async create(data: { code: string; name: string; description?: string }): Promise<Role> {
+  async create(data: { code?: string; name: string; description?: string }): Promise<Role> {
     const created = await this.prisma.role.create({
-      data: { ...data, tenantId: this.ctx.tenantId!, createdBy: this.ctx.accountId! },
+      data: {
+        ...data,
+        code: data.code ?? generateBusinessNo('RL'),
+        tenantId: this.ctx.tenantId!,
+        createdBy: this.ctx.accountId!,
+      },
     });
     await this.auditLogService.record({
       action: 'CREATE',

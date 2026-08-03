@@ -11,7 +11,7 @@ export interface Store extends ScopedEntityBase {
 }
 
 export interface CreateStoreDto {
-  code: string
+  code?: string
   name: string
   regionId: string
   address?: string

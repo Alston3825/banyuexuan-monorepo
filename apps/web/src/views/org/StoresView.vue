@@ -28,7 +28,7 @@ const formVisible = ref(false)
 const editingRow = ref<Store | null>(null)
 const submitting = ref(false)
 const formRef = ref<FormInst | null>(null)
-const model = ref({ code: '', name: '', address: '', regionId: '', status: 'ACTIVE' as Store['status'] })
+const model = ref({ name: '', address: '', regionId: '', status: 'ACTIVE' as Store['status'] })
 
 async function fetchList() {
   loading.value = true
@@ -46,13 +46,13 @@ async function fetchRegionOptions() {
 
 function openCreateModal() {
   editingRow.value = null
-  model.value = { code: '', name: '', address: '', regionId: '', status: 'ACTIVE' }
+  model.value = { name: '', address: '', regionId: '', status: 'ACTIVE' }
   formVisible.value = true
 }
 
 function openEditModal(row: Store) {
   editingRow.value = row
-  model.value = { code: row.code, name: row.name, address: row.address ?? '', regionId: row.regionId, status: row.status }
+  model.value = { name: row.name, address: row.address ?? '', regionId: row.regionId, status: row.status }
   formVisible.value = true
 }
 
@@ -70,7 +70,6 @@ async function handleSubmit() {
       message.success('门店已更新')
     } else {
       await storeApi.create({
-        code: model.value.code,
         name: model.value.name,
         address: model.value.address,
         regionId: model.value.regionId,
@@ -100,7 +99,6 @@ function confirmClose(row: Store) {
 }
 
 const columns: DataTableColumns<Store> = [
-  { key: 'code', title: '编码' },
   { key: 'name', title: '名称' },
   { key: 'address', title: '地址', render: (row) => row.address ?? '-' },
   { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, STORE_STATUS_MAP) },
@@ -138,9 +136,6 @@ onMounted(async () => {
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑门店' : '新建门店'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
-          <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
-            <n-input v-model:value="model.code" />
-          </n-form-item>
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />
           </n-form-item>

@@ -9,7 +9,7 @@ export interface Department extends ScopedEntityBase {
 }
 
 export interface CreateDepartmentDto {
-  code: string
+  code?: string
   name: string
   storeId?: string
   parentId?: string

@@ -9,7 +9,7 @@ export interface Team extends ScopedEntityBase {
 }
 
 export interface CreateTeamDto {
-  code: string
+  code?: string
   name: string
   departmentId: string
 }
