@@ -7,7 +7,7 @@ export interface Region extends ScopedEntityBase {
 }
 
 export interface CreateRegionDto {
-  code: string
+  code?: string
   name: string
 }
 

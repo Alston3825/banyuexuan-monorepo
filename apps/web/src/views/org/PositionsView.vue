@@ -11,14 +11,12 @@ import { renderStatusBadge, COMMON_STATUS_MAP } from '../../utils/status-map'
 const crud = useCrudResource(positionApi, '职位', (row) => row.name)
 
 const columns: CrudColumn<Position>[] = [
-  { key: 'code', title: '编码' },
   { key: 'name', title: '名称' },
   { key: 'rank', title: '级别', render: (row) => (row.rank ?? '-').toString() },
   { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, COMMON_STATUS_MAP) },
 ]
 
 const fields: CrudFormField[] = [
-  { key: 'code', label: '编码', component: 'input', showOn: 'create', rules: [{ required: true, message: '请输入编码' }] },
   { key: 'name', label: '名称', component: 'input', showOn: 'both', rules: [{ required: true, message: '请输入名称' }] },
   { key: 'rank', label: '级别', component: 'number', showOn: 'create' },
   {

@@ -24,7 +24,7 @@ export interface Role {
 }
 
 export interface CreateRoleDto {
-  code: string
+  code?: string
   name: string
   description?: string
 }

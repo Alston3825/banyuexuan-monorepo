@@ -8,7 +8,7 @@ export interface Position extends ScopedEntityBase {
 }
 
 export interface CreatePositionDto {
-  code: string
+  code?: string
   name: string
   rank?: number
 }
