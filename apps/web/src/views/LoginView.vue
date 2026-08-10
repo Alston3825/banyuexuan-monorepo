@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { NCard, NForm, NFormItem, NInput, NButton, type FormInst, type FormRules } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
 import { message } from '../utils/discrete-api'
+import BeianFooter from '../components/BeianFooter.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,6 +47,7 @@ async function handleSubmit() {
         <n-button type="primary" block :loading="loading" @click="handleSubmit">登录</n-button>
       </n-form>
     </n-card>
+    <BeianFooter />
   </div>
 </template>
 
@@ -53,6 +55,7 @@ async function handleSubmit() {
 .login-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: #f5f6f8;
