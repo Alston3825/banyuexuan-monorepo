@@ -15,6 +15,11 @@ __pycache__/
 .env.local
 .env.prod
 
+# scripts/deploy.sh 在服务器上运行时生成的产物，跟具体某台服务器绑定，不入库
+.deploy-https-domain
+docker-compose.https.override.yml
+backups/
+
 # OS
 .DS_Store
 

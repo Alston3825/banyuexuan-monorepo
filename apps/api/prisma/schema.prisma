@@ -2035,6 +2035,8 @@ model WarehouseStock {
   itemId      String   @map("item_id")
   quantity    Int      @default(0)
   avgCost     Int      @default(0) @map("avg_cost") // 移动加权平均单位成本，最小货币单位
+  version     Int      @default(0) // 乐观锁：quantity/avgCost 是"读旧值算新值再写回"，并发入出库
+  // 必须靠这个字段做重试保护，纯 increment/decrement 不足以保护成本这类需要重新计算的字段
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   warehouse Warehouse     @relation(fields: [warehouseId], references: [id])

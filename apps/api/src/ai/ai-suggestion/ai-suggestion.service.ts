@@ -3,6 +3,7 @@ import { AiSuggestion, AiSuggestionScenario } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { QueryAiSuggestionDto } from './dto/query-ai-suggestion.dto';
 
 export interface RecordSuggestionInput {
@@ -92,10 +93,12 @@ export class AiSuggestionService {
     const before = await this.findOneOrThrow(id);
     if (before.version !== expectedVersion) throw new ConflictException('数据已被他人修改，请刷新后重试');
     if (before.status !== 'PENDING') throw new BadRequestException(`该AI建议当前状态「${before.status}」不允许此操作`);
-    const updated = await this.prisma.aiSuggestion.update({
-      where: { id },
-      data: { status: target, acceptedById: this.ctx.accountId, acceptedAt: new Date(), version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.aiSuggestion.update({
+        where: { id, version: expectedVersion },
+        data: { status: target, acceptedById: this.ctx.accountId, acceptedAt: new Date(), version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'AiSuggestion',

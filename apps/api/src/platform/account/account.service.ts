@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { DataScopeService } from '../../common/scope/data-scope.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { PasswordService } from '../../auth/password.service';
 
 /** 所有对外返回的账号查询一律省略 passwordHash，即使是哈希值也不应该出现在 API 响应里。 */
@@ -73,11 +74,13 @@ export class AccountService {
     if (before.version !== expectedVersion) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.prisma.account.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-      omit: ACCOUNT_OMIT,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.account.update({
+        where: { id, version: expectedVersion },
+        data: { ...data, version: { increment: 1 } },
+        omit: ACCOUNT_OMIT,
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'Account',

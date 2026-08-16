@@ -5,6 +5,7 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { DataScopeService } from '../../common/scope/data-scope.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { addDays } from '../../common/utils/date.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCareOutreachPlanDto } from './dto/create-care-outreach-plan.dto';
 import { QueryCareOutreachPlanDto } from './dto/query-care-outreach-plan.dto';
 import { CompleteCareOutreachTaskDto } from './dto/complete-care-outreach-task.dto';
@@ -106,9 +107,9 @@ export class CareOutreachPlanService {
     if (before.status !== 'ACTIVE') {
       throw new BadRequestException(`关怀计划当前状态「${before.status}」不允许终止`);
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const plan = await tx.careOutreachPlan.update({
-        where: { id },
+        where: { id, version: expectedVersion },
         data: { status: 'TERMINATED', terminateReason: reason, version: { increment: 1 } },
       });
       await tx.careOutreachTask.updateMany({
@@ -116,7 +117,7 @@ export class CareOutreachPlanService {
         data: { status: 'SKIPPED', completionNote: `计划已终止：${reason}` },
       });
       return plan;
-    });
+    }));
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'CareOutreachPlan',

@@ -3,6 +3,7 @@ import { KnowledgeDocument } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { AiGatewayClient } from '../ai-gateway/ai-gateway.client';
 import { chunkText } from '../common/chunk-text.util';
 import { CreateKnowledgeDocumentDto } from './dto/create-knowledge-document.dto';
@@ -51,16 +52,18 @@ export class KnowledgeDocumentService {
     const before = await this.findOneOrThrow(id);
     if (before.version !== dto.version) throw new ConflictException('数据已被他人修改，请刷新后重试');
 
-    const updated = await this.prisma.knowledgeDocument.update({
-      where: { id },
-      data: {
-        title: dto.title,
-        content: dto.content,
-        category: dto.category,
-        status: dto.status,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.knowledgeDocument.update({
+        where: { id, version: dto.version },
+        data: {
+          title: dto.title,
+          content: dto.content,
+          category: dto.category,
+          status: dto.status,
+          version: { increment: 1 },
+        },
+      }),
+    );
     if (dto.content !== undefined && dto.content !== before.content) {
       await this.rebuildChunks(id, dto.content);
     }

@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../context/request-context.service';
 
@@ -58,10 +59,22 @@ export abstract class BaseScopedCrudService<T extends ScopedEntity> {
     if (before.version !== expectedVersion) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.delegate.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-    });
+    // where 里带上 version 条件，让"读取校验通过"和"落库"这两步之间的并发窗口也受数据库保护：
+    // 两个并发请求都读到同一份旧数据、都通过上面的内存校验后，只有先到达数据库的那个 update
+    // 能匹配到这一行（version 还是旧值）成功执行；后到达的因为 version 已被前者改掉而匹配不到
+    // 任何行，Prisma 抛 P2025，在这里转换成和"内存校验不通过"一样的 409，而不是静默覆盖。
+    let updated: T;
+    try {
+      updated = await this.delegate.update({
+        where: { id, version: expectedVersion },
+        data: { ...data, version: { increment: 1 } },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+        throw new ConflictException('数据已被他人修改，请刷新后重试');
+      }
+      throw err;
+    }
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: this.entityType,

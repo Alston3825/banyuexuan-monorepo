@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { ContractRecordService } from '../../contract/contract-record/contract-record.service';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
@@ -103,10 +104,12 @@ export class PaymentRecordService {
       },
       this.actor(),
     );
-    const updated = await this.prisma.payment.update({
-      where: { id },
-      data: { status: 'PENDING_REFUND', refundReason, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.payment.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_REFUND', refundReason, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'Payment',

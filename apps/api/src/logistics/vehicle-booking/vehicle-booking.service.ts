@@ -3,6 +3,7 @@ import { VehicleBooking } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateVehicleBookingDto } from './dto/create-vehicle-booking.dto';
 import { QueryVehicleBookingDto } from './dto/query-vehicle-booking.dto';
 
@@ -75,11 +76,13 @@ export class VehicleBookingService {
     const before = await this.findOneOrThrow(id);
     if (before.version !== expectedVersion) throw new ConflictException('数据已被他人修改，请刷新后重试');
     if (before.status !== 'BOOKED') throw new BadRequestException(`使用申请当前状态「${before.status}」不允许取消`);
-    const updated = await this.prisma.vehicleBooking.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeBooking,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.vehicleBooking.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeBooking,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'VehicleBooking',

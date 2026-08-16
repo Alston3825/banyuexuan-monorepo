@@ -3,6 +3,7 @@ import { EmployeeProfile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateEmployeeProfileDto } from './dto/create-employee-profile.dto';
 import { UpdateEmployeeProfileDto } from './dto/update-employee-profile.dto';
 import { QueryEmployeeProfileDto } from './dto/query-employee-profile.dto';
@@ -107,18 +108,20 @@ export class EmployeeProfileService {
     const before = await this.findOneOrThrow(id);
     if (before.version !== dto.version) throw new ConflictException('数据已被他人修改，请刷新后重试');
     const { version: _version, ...data } = dto;
-    const updated = await this.prisma.employeeProfile.update({
-      where: { id },
-      data: {
-        ...data,
-        healthCertExpiresAt: data.healthCertExpiresAt ? new Date(data.healthCertExpiresAt) : undefined,
-        contractExpiresAt: data.contractExpiresAt ? new Date(data.contractExpiresAt) : undefined,
-        probationEndsAt: data.probationEndsAt ? new Date(data.probationEndsAt) : undefined,
-        terminationDate: data.terminationDate ? new Date(data.terminationDate) : undefined,
-        version: { increment: 1 },
-      },
-      include: includeProfile,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.employeeProfile.update({
+        where: { id, version: dto.version },
+        data: {
+          ...data,
+          healthCertExpiresAt: data.healthCertExpiresAt ? new Date(data.healthCertExpiresAt) : undefined,
+          contractExpiresAt: data.contractExpiresAt ? new Date(data.contractExpiresAt) : undefined,
+          probationEndsAt: data.probationEndsAt ? new Date(data.probationEndsAt) : undefined,
+          terminationDate: data.terminationDate ? new Date(data.terminationDate) : undefined,
+          version: { increment: 1 },
+        },
+        include: includeProfile,
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'EmployeeProfile',

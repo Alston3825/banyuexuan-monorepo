@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { StockIssue } from '@prisma/client';
+import { Prisma, StockIssue } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -7,6 +7,7 @@ import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { consumeBatchesFefo } from '../common/fefo-batch.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateStockIssueDto } from './dto/create-stock-issue.dto';
 import { QueryStockIssueDto } from './dto/query-stock-issue.dto';
 
@@ -83,7 +84,13 @@ export class StockIssueService {
 
     const warehouse = await this.prisma.warehouse.findUniqueOrThrow({ where: { id: before.warehouseId } });
     if (!warehouse.requiresApproval) {
-      const updated = await this.prisma.stockIssue.update({ where: { id }, data: { status: 'APPROVED', version: { increment: 1 } }, include: includeIssue });
+      const updated = await runVersionedUpdate(() =>
+        this.prisma.stockIssue.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'APPROVED', version: { increment: 1 } },
+          include: includeIssue,
+        }),
+      );
       await this.auditLogService.record({
         action: 'STATE_TRANSITION',
         entityType: 'StockIssue',
@@ -100,7 +107,13 @@ export class StockIssueService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.issueNo, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.stockIssue.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeIssue });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockIssue.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeIssue,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockIssue',
@@ -119,11 +132,13 @@ export class StockIssueService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`出库/领用单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.stockIssue.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeIssue,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockIssue.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeIssue,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockIssue',
@@ -144,26 +159,37 @@ export class StockIssueService {
 
     const issueWithItems = await this.prisma.stockIssue.findUniqueOrThrow({ where: { id }, include: { items: true } });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       for (const line of issueWithItems.items) {
         const stock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } } });
         if (!stock || stock.quantity < line.quantity) {
           throw new BadRequestException(`执行时物品库存不足（可能与其他单据并发冲突），请重新核对后再试`);
         }
-        await tx.warehouseStock.update({
-          where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } },
-          data: { quantity: stock.quantity - line.quantity },
-        });
+        // 原子 decrement + where 带 quantity 下限：avgCost 在这里不变（注释里说明的既定
+        // 设计），扣减量是单据上写死的 line.quantity，不依赖重新读取库存后再计算，所以
+        // 不需要像入库单那样整体重试重算——库存被并发改到不够扣时，直接报错让操作员知道
+        // 需要重新核对，比静默覆盖或死循环重试更清楚。
+        try {
+          await tx.warehouseStock.update({
+            where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId }, quantity: { gte: line.quantity } },
+            data: { quantity: { decrement: line.quantity } },
+          });
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            throw new BadRequestException(`执行时物品库存不足（可能与其他单据并发冲突），请重新核对后再试`);
+          }
+          throw err;
+        }
         await consumeBatchesFefo(tx, before.warehouseId, line.itemId, line.quantity);
         await tx.stockIssueItem.update({ where: { id: line.id }, data: { unitCost: stock.avgCost } });
       }
 
       return tx.stockIssue.update({
-        where: { id },
+        where: { id, version: expectedVersion },
         data: { status: 'COMPLETED', completedAt: new Date(), version: { increment: 1 } },
         include: includeIssue,
       });
-    });
+    }));
 
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',

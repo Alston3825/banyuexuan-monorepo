@@ -3,6 +3,7 @@ import { MealPlanTemplate } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateMealPlanTemplateDto } from './dto/create-meal-plan-template.dto';
 import { UpdateMealPlanTemplateDto } from './dto/update-meal-plan-template.dto';
 import { MealPlanTemplateItemDto } from './dto/meal-plan-template-item.dto';
@@ -66,9 +67,9 @@ export class MealPlanTemplateService {
     const before = await this.findOneOrThrow(id);
     if (before.version !== dto.version) throw new ConflictException('数据已被他人修改，请刷新后重试');
     if (dto.items) await this.assertItemsValid(dto.items, before.totalDays);
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const template = await tx.mealPlanTemplate.update({
-        where: { id },
+        where: { id, version: dto.version },
         data: { name: dto.name, status: dto.status, version: { increment: 1 } },
       });
       if (dto.items) {
@@ -78,7 +79,7 @@ export class MealPlanTemplateService {
         });
       }
       return template;
-    });
+    }));
     const withItems = await this.findOneOrThrow(updated.id);
     await this.auditLogService.record({
       action: 'UPDATE',

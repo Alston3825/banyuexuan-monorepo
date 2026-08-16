@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { QueryPurchaseOrderDto } from './dto/query-purchase-order.dto';
@@ -93,11 +94,13 @@ export class PurchaseOrderService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.orderNo, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.purchaseOrder.update({
-      where: { id },
-      data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
-      include: includeOrder,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.purchaseOrder.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeOrder,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'PurchaseOrder',
@@ -116,11 +119,13 @@ export class PurchaseOrderService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`采购单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.purchaseOrder.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeOrder,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.purchaseOrder.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeOrder,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'PurchaseOrder',

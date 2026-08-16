@@ -3,6 +3,7 @@ import { ScheduleEntry } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateScheduleEntryDto } from './dto/create-schedule-entry.dto';
 import { UpdateScheduleEntryDto } from './dto/update-schedule-entry.dto';
 import { QueryScheduleEntryDto } from './dto/query-schedule-entry.dto';
@@ -79,11 +80,13 @@ export class ScheduleEntryService {
       const shiftDefinition = await this.prisma.shiftDefinition.findUnique({ where: { id: dto.shiftDefinitionId } });
       if (!shiftDefinition) throw new NotFoundException(`ShiftDefinition ${dto.shiftDefinitionId} 不存在`);
     }
-    const updated = await this.prisma.scheduleEntry.update({
-      where: { id },
-      data: { shiftDefinitionId: dto.shiftDefinitionId, remark: dto.remark, version: { increment: 1 } },
-      include: includeEntry,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.scheduleEntry.update({
+        where: { id, version: dto.version },
+        data: { shiftDefinitionId: dto.shiftDefinitionId, remark: dto.remark, version: { increment: 1 } },
+        include: includeEntry,
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'ScheduleEntry',

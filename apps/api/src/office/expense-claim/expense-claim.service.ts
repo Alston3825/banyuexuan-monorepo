@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { CreateExpenseClaimDto } from './dto/create-expense-claim.dto';
 import { QueryExpenseClaimDto } from './dto/query-expense-claim.dto';
@@ -66,7 +67,9 @@ export class ExpenseClaimService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: `报销申请-${id}`, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.expenseClaim.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeClaim });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.expenseClaim.update({ where: { id, version: expectedVersion }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeClaim }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'ExpenseClaim',
@@ -85,11 +88,13 @@ export class ExpenseClaimService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`报销申请当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.expenseClaim.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeClaim,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.expenseClaim.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeClaim,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'ExpenseClaim',

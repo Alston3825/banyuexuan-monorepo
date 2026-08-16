@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreatePayrollRecordDto } from './dto/create-payroll-record.dto';
 import { QueryPayrollRecordDto } from './dto/query-payroll-record.dto';
 
@@ -12,10 +13,16 @@ const DEFINITION_CODE = 'HR_PAYROLL';
 const BUSINESS_TYPE = 'PAYROLL_RECORD';
 const includeRecord = { employeeProfile: { include: { account: { select: { id: true, realName: true } } } } };
 
+// "period"(如"2026-08")是业务概念上的"北京时间自然月"，不是"UTC自然月"——用户/运营
+// 理解的"8月的提成"以北京时间(UTC+8)为准。如果直接用 Date.UTC(year, month-1, 1) 构造
+// 边界，北京时间月初/月末前后8小时内创建的 CommissionRecord 会被错误地划进相邻那期，
+// 导致薪资单汇总提成时漏算或多算。这里统一减去8小时偏移，把"北京时间自然月"边界换算
+// 成对应的 UTC 时间点再用于数据库查询。
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
 function parsePeriodRange(period: string): { start: Date; end: Date } {
   const [year, month] = period.split('-').map(Number);
-  const start = new Date(Date.UTC(year, month - 1, 1));
-  const end = new Date(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1));
+  const start = new Date(Date.UTC(year, month - 1, 1) - BEIJING_OFFSET_MS);
+  const end = new Date(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1) - BEIJING_OFFSET_MS);
   return { start, end };
 }
 
@@ -97,7 +104,13 @@ export class PayrollRecordService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: `薪资单-${before.period}`, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.payrollRecord.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeRecord });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.payrollRecord.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeRecord,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'PayrollRecord',
@@ -114,11 +127,13 @@ export class PayrollRecordService {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
     if (before.status !== 'APPROVED') throw new BadRequestException(`薪资单当前状态「${before.status}」不允许标记发放`);
-    const updated = await this.prisma.payrollRecord.update({
-      where: { id },
-      data: { status: 'PAID', paidAt: new Date(), version: { increment: 1 } },
-      include: includeRecord,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.payrollRecord.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PAID', paidAt: new Date(), version: { increment: 1 } },
+        include: includeRecord,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'PayrollRecord',
@@ -137,11 +152,13 @@ export class PayrollRecordService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`薪资单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.payrollRecord.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeRecord,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.payrollRecord.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeRecord,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'PayrollRecord',

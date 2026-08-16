@@ -43,14 +43,21 @@ http.interceptors.response.use(
 
     const rawMsg = response?.data?.message
     const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg
+    // 从这个拦截器的 rejected-promise 链条里直接调用 discrete message API 经实测会静默
+    // 不渲染（DOM里最终0个.n-message节点，但message.xxx()确实被调用了）——跟组件异步函数
+    // await之后调用discrete API失败是同一类问题（AiCustomerServicePanel等组件也踩过）。
+    // 用 setTimeout 把调用挪到当前微任务/错误处理流程之外的下一个宏任务里能稳定绕开。
+    const showMessage = (fn: () => void) => setTimeout(fn, 200)
     if (status === 403) {
-      message.warning(msg ?? '无权限执行该操作')
+      showMessage(() => message.warning(msg ?? '无权限执行该操作'))
+    } else if (status === 409) {
+      showMessage(() => message.error(msg ?? '数据已被他人修改，请刷新页面后重试'))
     } else if (status === 422 || status === 400) {
-      message.error(msg ?? '请求参数有误')
+      showMessage(() => message.error(msg ?? '请求参数有误'))
     } else if (status && status >= 500) {
-      message.error('服务器错误，请稍后重试')
+      showMessage(() => message.error('服务器错误，请稍后重试'))
     } else if (!response) {
-      message.error('网络请求失败，请检查连接')
+      showMessage(() => message.error('网络请求失败，请检查连接'))
     }
     return Promise.reject(error)
   },

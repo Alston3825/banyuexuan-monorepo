@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateTrainingExamDto } from './dto/create-training-exam.dto';
 import { UpdateTrainingExamDto } from './dto/update-training-exam.dto';
 
@@ -80,9 +81,9 @@ export class TrainingExamService {
     if (dto.questions && before.status !== 'DRAFT') {
       throw new BadRequestException('试卷已发布，可能已有员工作答，不能整体替换题目列表；如需变更内容请重新创建试卷');
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const exam = await tx.trainingExam.update({
-        where: { id },
+        where: { id, version: dto.version },
         data: {
           title: dto.title,
           studyMaterial: dto.studyMaterial,
@@ -107,7 +108,7 @@ export class TrainingExamService {
         });
       }
       return exam;
-    });
+    }));
     const withQuestions = await this.findOneOrThrow(updated.id);
     await this.auditLogService.record({
       action: 'UPDATE',

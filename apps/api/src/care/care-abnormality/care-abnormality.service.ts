@@ -3,6 +3,7 @@ import { CareAbnormality } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { FollowUpService } from '../../crm/follow-up/follow-up.service';
 import { QueryCareAbnormalityDto } from './dto/query-care-abnormality.dto';
 import { FollowUpCareAbnormalityDto } from './dto/follow-up-care-abnormality.dto';
@@ -92,16 +93,18 @@ export class CareAbnormalityService {
     if (!['OPEN', 'FOLLOWING'].includes(before.status)) {
       throw new BadRequestException(`护理异常当前状态「${before.status}」不允许此操作`);
     }
-    const updated = await this.prisma.careAbnormality.update({
-      where: { id },
-      data: {
-        status: target,
-        resolveNote: dto.resolveNote,
-        resolvedBy: this.ctx.accountId,
-        resolvedAt: new Date(),
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.careAbnormality.update({
+        where: { id, version: dto.version },
+        data: {
+          status: target,
+          resolveNote: dto.resolveNote,
+          resolvedBy: this.ctx.accountId,
+          resolvedAt: new Date(),
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'CareAbnormality',
