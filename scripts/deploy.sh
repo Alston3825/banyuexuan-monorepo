@@ -197,6 +197,17 @@ elif [[ -n "${DOMAIN:-}" ]]; then
     apt-get update -y
     apt-get install -y nginx certbot python3-certbot-nginx
 
+    # 顺带把 www 子域名也配上：只用 -d $DOMAIN 申请的证书，浏览器访问 www.$DOMAIN 时
+    # 域名对不上会显示"连接不是私密连接"——这里先探测 www.$DOMAIN 是否真的解析到了
+    # 什么地址，解析不到就不强行加进去（避免certbot因为一个不存在的域名验证失败，
+    # 拖累主域名也申请不成功）。DOMAIN本身已经是www开头就不重复再加一次。
+    SERVER_NAMES="$DOMAIN"
+    CERT_DOMAIN_ARGS="-d $DOMAIN"
+    if [[ "$DOMAIN" != www.* ]] && getent hosts "www.$DOMAIN" >/dev/null 2>&1; then
+      SERVER_NAMES="$DOMAIN www.$DOMAIN"
+      CERT_DOMAIN_ARGS="-d $DOMAIN -d www.$DOMAIN"
+    fi
+
     # 把 web 容器改成只监听本机8080，80/443交给宿主机nginx，nginx再反代过去。
     # 注意：compose对list类型字段（ports）默认是"多个-f文件的值合并/拼接"而不是"后面
     # 的覆盖前面的"，如果这里不加 !override，最终容器会同时监听0.0.0.0:80（继承自
@@ -215,7 +226,7 @@ EOF
     cat > "/etc/nginx/sites-available/banyuexuan.conf" <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${SERVER_NAMES};
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host \$host;
@@ -237,7 +248,7 @@ EOF
     if [[ -n "${CERT_EMAIL:-}" ]]; then
       CERTBOT_EMAIL_ARGS="-m ${CERT_EMAIL}"
     fi
-    if certbot --nginx -d "$DOMAIN" --redirect --agree-tos --non-interactive $CERTBOT_EMAIL_ARGS; then
+    if certbot --nginx $CERT_DOMAIN_ARGS --redirect --agree-tos --non-interactive $CERTBOT_EMAIL_ARGS; then
       echo "$DOMAIN" > "$HTTPS_MARKER"
       echo "HTTPS 配置成功，证书会由 certbot 自带的定时任务自动续期，不需要你手动管理。"
     else
