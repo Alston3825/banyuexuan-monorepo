@@ -81,6 +81,10 @@ jobs:
     needs: [api-test, ai-service-test, web-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+      TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+      TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - name: Build api image
@@ -90,18 +94,18 @@ jobs:
       - name: Build ai-service image
         run: docker build -t banyuexuan-ai-service:${{ github.sha }} apps/ai-service
       - name: Login to Tencent TCR
-        if: ${{ secrets.TCR_REGISTRY != '' }}
+        if: ${{ env.TCR_REGISTRY != '' }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.TCR_REGISTRY }}
-          username: ${{ secrets.TCR_USERNAME }}
-          password: ${{ secrets.TCR_PASSWORD }}
+          registry: ${{ env.TCR_REGISTRY }}
+          username: ${{ env.TCR_USERNAME }}
+          password: ${{ env.TCR_PASSWORD }}
       - name: Push images to TCR
-        if: ${{ secrets.TCR_REGISTRY != '' }}
+        if: ${{ env.TCR_REGISTRY != '' }}
         run: |
           for svc in api web ai-service; do
-            docker tag banyuexuan-$svc:${{ github.sha }} ${{ secrets.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
-            docker tag banyuexuan-$svc:${{ github.sha }} ${{ secrets.TCR_REGISTRY }}/banyuexuan-$svc:latest
-            docker push ${{ secrets.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
-            docker push ${{ secrets.TCR_REGISTRY }}/banyuexuan-$svc:latest
+            docker tag banyuexuan-$svc:${{ github.sha }} ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
+            docker tag banyuexuan-$svc:${{ github.sha }} ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:latest
+            docker push ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
+            docker push ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:latest
           done
