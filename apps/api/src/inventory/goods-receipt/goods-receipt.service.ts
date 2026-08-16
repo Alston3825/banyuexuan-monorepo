@@ -6,6 +6,7 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { addDays } from '../../common/utils/date.util';
+import { retryOnVersionConflict, runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
 import { QueryGoodsReceiptDto } from './dto/query-goods-receipt.dto';
@@ -84,7 +85,13 @@ export class GoodsReceiptService {
     if (before.status !== 'DRAFT') throw new BadRequestException(`入库单当前状态「${before.status}」不允许提交`);
 
     if (before.purchaseOrderId) {
-      const updated = await this.prisma.goodsReceipt.update({ where: { id }, data: { status: 'APPROVED', version: { increment: 1 } }, include: includeReceipt });
+      const updated = await runVersionedUpdate(() =>
+        this.prisma.goodsReceipt.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'APPROVED', version: { increment: 1 } },
+          include: includeReceipt,
+        }),
+      );
       await this.auditLogService.record({
         action: 'STATE_TRANSITION',
         entityType: 'GoodsReceipt',
@@ -99,7 +106,13 @@ export class GoodsReceiptService {
 
     const warehouse = await this.prisma.warehouse.findUniqueOrThrow({ where: { id: before.warehouseId } });
     if (!warehouse.requiresApproval) {
-      const updated = await this.prisma.goodsReceipt.update({ where: { id }, data: { status: 'APPROVED', version: { increment: 1 } }, include: includeReceipt });
+      const updated = await runVersionedUpdate(() =>
+        this.prisma.goodsReceipt.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'APPROVED', version: { increment: 1 } },
+          include: includeReceipt,
+        }),
+      );
       await this.auditLogService.record({
         action: 'STATE_TRANSITION',
         entityType: 'GoodsReceipt',
@@ -116,7 +129,13 @@ export class GoodsReceiptService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.receiptNo, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.goodsReceipt.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeReceipt });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.goodsReceipt.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeReceipt,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'GoodsReceipt',
@@ -135,11 +154,13 @@ export class GoodsReceiptService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`入库单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.goodsReceipt.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeReceipt,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.goodsReceipt.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeReceipt,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'GoodsReceipt',
@@ -160,43 +181,55 @@ export class GoodsReceiptService {
 
     const receiptWithItems = await this.prisma.goodsReceipt.findUniqueOrThrow({ where: { id }, include: { items: { include: { item: true } } } });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const now = new Date();
-      for (const line of receiptWithItems.items) {
-        const existing = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } } });
-        const oldQuantity = existing?.quantity ?? 0;
-        const oldAvgCost = existing?.avgCost ?? 0;
-        const newQuantity = oldQuantity + line.quantity;
-        const newAvgCost = newQuantity === 0 ? 0 : Math.round((oldQuantity * oldAvgCost + line.quantity * line.unitCost) / newQuantity);
+    // 整个事务包一层重试：一旦任意一行的 WarehouseStock 落库时发现被并发改过（P2025/P2002），
+    // Prisma 事务整体回滚，重新从头读取所有行的最新库存再算一遍——不能只重试出问题的那一行，
+    // 因为事务是全有全无的，回滚后之前几行"看似已生效"的改动其实也已经撤销了。
+    const updated = await retryOnVersionConflict(() =>
+      this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        for (const line of receiptWithItems.items) {
+          const existing = await tx.warehouseStock.findUnique({
+            where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } },
+          });
+          const oldQuantity = existing?.quantity ?? 0;
+          const oldAvgCost = existing?.avgCost ?? 0;
+          const newQuantity = oldQuantity + line.quantity;
+          const newAvgCost = newQuantity === 0 ? 0 : Math.round((oldQuantity * oldAvgCost + line.quantity * line.unitCost) / newQuantity);
 
-        await tx.warehouseStock.upsert({
-          where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } },
-          create: { warehouseId: before.warehouseId, itemId: line.itemId, quantity: newQuantity, avgCost: newAvgCost },
-          update: { quantity: newQuantity, avgCost: newAvgCost },
+          if (existing) {
+            await tx.warehouseStock.update({
+              where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId }, version: existing.version },
+              data: { quantity: newQuantity, avgCost: newAvgCost, version: { increment: 1 } },
+            });
+          } else {
+            await tx.warehouseStock.create({
+              data: { warehouseId: before.warehouseId, itemId: line.itemId, quantity: newQuantity, avgCost: newAvgCost },
+            });
+          }
+
+          await tx.stockBatch.create({
+            data: {
+              tenantId: this.ctx.tenantId!,
+              warehouseId: before.warehouseId,
+              itemId: line.itemId,
+              batchNo: generateBusinessNo('BAT'),
+              quantity: line.quantity,
+              unitCost: line.unitCost,
+              receivedAt: now,
+              expiresAt: line.item.shelfLifeDays ? addDays(now, line.item.shelfLifeDays) : null,
+              sourceType: 'GOODS_RECEIPT',
+              sourceId: before.id,
+            },
+          });
+        }
+
+        return tx.goodsReceipt.update({
+          where: { id },
+          data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
+          include: includeReceipt,
         });
-
-        await tx.stockBatch.create({
-          data: {
-            tenantId: this.ctx.tenantId!,
-            warehouseId: before.warehouseId,
-            itemId: line.itemId,
-            batchNo: generateBusinessNo('BAT'),
-            quantity: line.quantity,
-            unitCost: line.unitCost,
-            receivedAt: now,
-            expiresAt: line.item.shelfLifeDays ? addDays(now, line.item.shelfLifeDays) : null,
-            sourceType: 'GOODS_RECEIPT',
-            sourceId: before.id,
-          },
-        });
-      }
-
-      return tx.goodsReceipt.update({
-        where: { id },
-        data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
-        include: includeReceipt,
-      });
-    });
+      }),
+    );
 
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',

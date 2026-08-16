@@ -10,6 +10,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { QueryContractDto } from './dto/query-contract.dto';
@@ -110,15 +111,17 @@ export class ContractRecordService {
         '合同已签署或不处于草稿状态，不能再编辑内容',
       );
     }
-    const updated = await this.prisma.contract.update({
-      where: { id },
-      data: {
-        ...data,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.contract.update({
+        where: { id, version: expectedVersion },
+        data: {
+          ...data,
+          startDate: data.startDate ? new Date(data.startDate) : undefined,
+          endDate: data.endDate ? new Date(data.endDate) : undefined,
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'Contract',
@@ -138,14 +141,16 @@ export class ContractRecordService {
     if (before.status !== 'DRAFT' || before.signedByCustomerAt) {
       throw new BadRequestException('合同不处于「待签署」状态');
     }
-    const updated = await this.prisma.contract.update({
-      where: { id },
-      data: {
-        signedByCustomerAt: new Date(),
-        signedByCustomerIp: this.ctx.ip,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.contract.update({
+        where: { id, version: expectedVersion },
+        data: {
+          signedByCustomerAt: new Date(),
+          signedByCustomerIp: this.ctx.ip,
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'Contract',
@@ -175,10 +180,12 @@ export class ContractRecordService {
       },
       this.actor(),
     );
-    const updated = await this.prisma.contract.update({
-      where: { id },
-      data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.contract.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'Contract',
@@ -203,10 +210,12 @@ export class ContractRecordService {
         `合同当前状态「${before.status}」不允许作废`,
       );
     }
-    const updated = await this.prisma.contract.update({
-      where: { id },
-      data: { status: 'VOIDED', voidReason, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.contract.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'VOIDED', voidReason, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'VOID',
       entityType: 'Contract',

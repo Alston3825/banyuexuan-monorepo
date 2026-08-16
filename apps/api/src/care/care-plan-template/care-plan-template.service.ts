@@ -3,6 +3,7 @@ import { CarePlanTemplate } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCarePlanTemplateDto } from './dto/create-care-plan-template.dto';
 import { UpdateCarePlanTemplateDto } from './dto/update-care-plan-template.dto';
 import { QueryCarePlanTemplateDto } from './dto/query-care-plan-template.dto';
@@ -96,9 +97,9 @@ export class CarePlanTemplateService {
     if (dto.items) {
       await this.assertItemsValid(dto.items, before.targetType, before.totalDays);
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const template = await tx.carePlanTemplate.update({
-        where: { id },
+        where: { id, version: dto.version },
         data: {
           name: dto.name,
           status: dto.status,
@@ -116,7 +117,7 @@ export class CarePlanTemplateService {
         });
       }
       return template;
-    });
+    }));
     const withItems = await this.findOneOrThrow(updated.id);
     await this.auditLogService.record({
       action: 'UPDATE',

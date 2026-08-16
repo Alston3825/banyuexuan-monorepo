@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 export interface ConsumedBatch {
@@ -39,7 +39,22 @@ export async function consumeBatchesFefo(
   for (const batch of orderedBatches) {
     if (remaining <= 0) break;
     const take = Math.min(batch.quantity, remaining);
-    await tx.stockBatch.update({ where: { id: batch.id }, data: { quantity: batch.quantity - take } });
+    // 原子 decrement + where 带 quantity 下限条件：避免"读到 batch.quantity 后用字面量减法
+    // 写回"这种非原子写法——两笔并发出库单同时消耗同一批次时，字面量写法会让后提交的
+    // 覆盖前一个的扣减结果（丢失更新，实际扣减量比应扣的少，库存虚高）。P2025（where
+    // 匹配不到行）说明这一批次在本函数读取之后已经被别的并发操作改变了数量，直接报错
+    // 让调用方整体事务回滚重试，而不是继续按过期的批次快照往下算。
+    try {
+      await tx.stockBatch.update({
+        where: { id: batch.id, quantity: { gte: take } },
+        data: { quantity: { decrement: take } },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+        throw new ConflictException(`批次库存被并发修改，请重试（批次ID: ${batch.id}）`);
+      }
+      throw err;
+    }
     consumed.push({ batchId: batch.id, quantity: take, unitCost: batch.unitCost, receivedAt: batch.receivedAt, expiresAt: batch.expiresAt });
     remaining -= take;
   }

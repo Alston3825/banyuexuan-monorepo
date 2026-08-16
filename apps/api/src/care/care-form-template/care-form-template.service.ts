@@ -3,6 +3,7 @@ import { CareFormTemplate } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCareFormTemplateDto } from './dto/create-care-form-template.dto';
 import { UpdateCareFormTemplateDto } from './dto/update-care-form-template.dto';
 import { QueryCareFormTemplateDto } from './dto/query-care-form-template.dto';
@@ -98,9 +99,9 @@ export class CareFormTemplateService {
         before.targetType,
       );
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const template = await tx.careFormTemplate.update({
-        where: { id },
+        where: { id, version: dto.version },
         data: {
           name: dto.name,
           scene: dto.scene,
@@ -120,7 +121,7 @@ export class CareFormTemplateService {
         });
       }
       return template;
-    });
+    }));
     const withFields = await this.findOneOrThrow(updated.id);
     await this.auditLogService.record({
       action: 'UPDATE',

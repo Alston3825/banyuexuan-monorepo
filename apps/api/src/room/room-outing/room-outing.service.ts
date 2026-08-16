@@ -3,6 +3,7 @@ import { RoomOuting } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateRoomOutingDto } from './dto/create-room-outing.dto';
 import { QueryRoomOutingDto } from './dto/query-room-outing.dto';
 
@@ -49,19 +50,19 @@ export class RoomOutingService {
   async checkOut(id: string, expectedVersion: number): Promise<RoomOuting> {
     const before = await this.assertVersion(id, expectedVersion);
     if (before.status !== 'PLANNED') throw new BadRequestException(`外出记录当前状态「${before.status}」不允许签出`);
-    return this.transition(before, 'OUT', { actualOutAt: new Date() }, 'PLANNED -> OUT');
+    return this.transition(before, 'OUT', { actualOutAt: new Date() }, 'PLANNED -> OUT', expectedVersion);
   }
 
   async checkBack(id: string, expectedVersion: number): Promise<RoomOuting> {
     const before = await this.assertVersion(id, expectedVersion);
     if (before.status !== 'OUT') throw new BadRequestException(`外出记录当前状态「${before.status}」不允许签回`);
-    return this.transition(before, 'RETURNED', { actualBackAt: new Date() }, 'OUT -> RETURNED');
+    return this.transition(before, 'RETURNED', { actualBackAt: new Date() }, 'OUT -> RETURNED', expectedVersion);
   }
 
   async cancel(id: string, cancelReason: string, expectedVersion: number): Promise<RoomOuting> {
     const before = await this.assertVersion(id, expectedVersion);
     if (before.status !== 'PLANNED') throw new BadRequestException(`外出记录当前状态「${before.status}」不允许取消`);
-    return this.transition(before, 'CANCELLED', { cancelReason }, `PLANNED -> CANCELLED：${cancelReason}`);
+    return this.transition(before, 'CANCELLED', { cancelReason }, `PLANNED -> CANCELLED：${cancelReason}`, expectedVersion);
   }
 
   private async assertVersion(id: string, expectedVersion: number): Promise<RoomOuting> {
@@ -75,11 +76,14 @@ export class RoomOutingService {
     status: RoomOuting['status'],
     extra: Record<string, unknown>,
     remark: string,
+    expectedVersion: number,
   ): Promise<RoomOuting> {
-    const updated = await this.prisma.roomOuting.update({
-      where: { id: before.id },
-      data: { status, ...extra, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.roomOuting.update({
+        where: { id: before.id, version: expectedVersion },
+        data: { status, ...extra, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'RoomOuting',

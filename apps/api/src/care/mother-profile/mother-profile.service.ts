@@ -3,6 +3,7 @@ import { MotherProfile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { CreateMotherProfileDto } from './dto/create-mother-profile.dto';
 import { UpdateMotherProfileDto } from './dto/update-mother-profile.dto';
@@ -133,18 +134,20 @@ export class MotherProfileService {
     if (before.version !== dto.version) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.prisma.motherProfile.update({
-      where: { id },
-      data: {
-        occupancyId: dto.occupancyId,
-        deliveryMethod: dto.deliveryMethod,
-        deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : undefined,
-        gestationalWeeks: dto.gestationalWeeks,
-        expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : undefined,
-        remark: dto.remark,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.motherProfile.update({
+        where: { id, version: dto.version },
+        data: {
+          occupancyId: dto.occupancyId,
+          deliveryMethod: dto.deliveryMethod,
+          deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : undefined,
+          gestationalWeeks: dto.gestationalWeeks,
+          expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : undefined,
+          remark: dto.remark,
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'MotherProfile',

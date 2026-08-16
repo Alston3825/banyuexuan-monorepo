@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { addDays } from '../../common/utils/date.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCarePlanDto } from './dto/create-care-plan.dto';
 import { QueryCarePlanDto } from './dto/query-care-plan.dto';
 
@@ -112,9 +113,9 @@ export class CarePlanService {
     if (before.status !== 'ACTIVE') {
       throw new BadRequestException(`护理计划当前状态「${before.status}」不允许终止`);
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const plan = await tx.carePlan.update({
-        where: { id },
+        where: { id, version: expectedVersion },
         data: { status: 'TERMINATED', terminateReason: reason, version: { increment: 1 } },
       });
       await tx.carePlanTask.updateMany({
@@ -122,7 +123,7 @@ export class CarePlanService {
         data: { status: 'MISSED' },
       });
       return plan;
-    });
+    }));
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'CarePlan',

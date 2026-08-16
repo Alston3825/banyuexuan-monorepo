@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../customer/customer.service';
 import { QueryOpportunityDto } from './dto/query-opportunity.dto';
 
@@ -77,10 +78,12 @@ export class OpportunityService {
   ): Promise<SalesOpportunity> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
-    const updated = await this.prisma.salesOpportunity.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.salesOpportunity.update({
+        where: { id, version: expectedVersion },
+        data: { ...data, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'SalesOpportunity',
@@ -99,10 +102,12 @@ export class OpportunityService {
     if (ALLOWED_ADVANCE[before.stage] !== targetStage) {
       throw new BadRequestException(`销售机会当前阶段「${before.stage}」不允许流转到「${targetStage}」`);
     }
-    const updated = await this.prisma.salesOpportunity.update({
-      where: { id },
-      data: { stage: targetStage, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.salesOpportunity.update({
+        where: { id, version: expectedVersion },
+        data: { stage: targetStage, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'SalesOpportunity',
@@ -121,10 +126,12 @@ export class OpportunityService {
     if (!['FOLLOWING', 'QUOTED'].includes(before.stage)) {
       throw new BadRequestException(`销售机会当前阶段「${before.stage}」不允许标记流失`);
     }
-    const updated = await this.prisma.salesOpportunity.update({
-      where: { id },
-      data: { stage: 'LOST', lostReason, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.salesOpportunity.update({
+        where: { id, version: expectedVersion },
+        data: { stage: 'LOST', lostReason, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'SalesOpportunity',

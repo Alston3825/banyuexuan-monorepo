@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { QueryLeaveRequestDto } from './dto/query-leave-request.dto';
@@ -74,7 +75,9 @@ export class LeaveRequestService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: `请假申请-${id}`, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.leaveRequest.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeRequest });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.leaveRequest.update({ where: { id, version: expectedVersion }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeRequest }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'LeaveRequest',
@@ -93,11 +96,13 @@ export class LeaveRequestService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`请假申请当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.leaveRequest.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeRequest,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.leaveRequest.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeRequest,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'LeaveRequest',

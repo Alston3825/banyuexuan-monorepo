@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { StockTransfer } from '@prisma/client';
+import { Prisma, StockTransfer } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -7,6 +7,7 @@ import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { consumeBatchesFefo } from '../common/fefo-batch.util';
+import { retryOnVersionConflict, runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateStockTransferDto } from './dto/create-stock-transfer.dto';
 import { QueryStockTransferDto } from './dto/query-stock-transfer.dto';
 
@@ -84,7 +85,13 @@ export class StockTransferService {
 
     const fromWarehouse = await this.prisma.warehouse.findUniqueOrThrow({ where: { id: before.fromWarehouseId } });
     if (!fromWarehouse.requiresApproval) {
-      const updated = await this.prisma.stockTransfer.update({ where: { id }, data: { status: 'APPROVED', version: { increment: 1 } }, include: includeTransfer });
+      const updated = await runVersionedUpdate(() =>
+        this.prisma.stockTransfer.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'APPROVED', version: { increment: 1 } },
+          include: includeTransfer,
+        }),
+      );
       await this.auditLogService.record({
         action: 'STATE_TRANSITION',
         entityType: 'StockTransfer',
@@ -101,7 +108,13 @@ export class StockTransferService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.transferNo, storeId: fromWarehouse.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.stockTransfer.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeTransfer });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockTransfer.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeTransfer,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockTransfer',
@@ -120,11 +133,13 @@ export class StockTransferService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`调拨单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.stockTransfer.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeTransfer,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockTransfer.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeTransfer,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockTransfer',
@@ -144,56 +159,76 @@ export class StockTransferService {
 
     const transferWithItems = await this.prisma.stockTransfer.findUniqueOrThrow({ where: { id }, include: { items: true } });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const now = new Date();
-      for (const line of transferWithItems.items) {
-        const fromStock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.fromWarehouseId, itemId: line.itemId } } });
-        if (!fromStock || fromStock.quantity < line.quantity) {
-          throw new BadRequestException('执行时调出仓库库存不足（可能与其他单据并发冲突），请重新核对后再试');
+    // 整个事务包一层重试，理由同 GoodsReceiptService.execute()：源仓库扣减/目标仓库
+    // 移动加权平均成本重算都依赖"读当前值再算"，且事务是全有全无的，回滚后要重新从头
+    // 读所有行的最新库存再算一遍，不能只重试出问题的那一行。
+    const updated = await retryOnVersionConflict(() =>
+      this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        for (const line of transferWithItems.items) {
+          const fromStock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.fromWarehouseId, itemId: line.itemId } } });
+          if (!fromStock || fromStock.quantity < line.quantity) {
+            throw new BadRequestException('执行时调出仓库库存不足（可能与其他单据并发冲突），请重新核对后再试');
+          }
+          const transferUnitCost = fromStock.avgCost;
+
+          // 源仓库：扣减量是单据上写死的，原子 decrement + 下限 where 足够，不需要重算。
+          try {
+            await tx.warehouseStock.update({
+              where: { warehouseId_itemId: { warehouseId: before.fromWarehouseId, itemId: line.itemId }, quantity: { gte: line.quantity } },
+              data: { quantity: { decrement: line.quantity } },
+            });
+          } catch (err) {
+            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+              throw new BadRequestException('执行时调出仓库库存不足（可能与其他单据并发冲突），请重新核对后再试');
+            }
+            throw err;
+          }
+          const consumedBatches = await consumeBatchesFefo(tx, before.fromWarehouseId, line.itemId, line.quantity);
+
+          // 目标仓库：avgCost 要基于当前值重新计算，用带 version 条件的写回，落库失败
+          // （P2025/P2002）会被最外层 retryOnVersionConflict 捕获、整个事务重试。
+          const toStock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.toWarehouseId, itemId: line.itemId } } });
+          const oldToQuantity = toStock?.quantity ?? 0;
+          const oldToAvgCost = toStock?.avgCost ?? 0;
+          const newToQuantity = oldToQuantity + line.quantity;
+          const newToAvgCost = newToQuantity === 0 ? 0 : Math.round((oldToQuantity * oldToAvgCost + line.quantity * transferUnitCost) / newToQuantity);
+          if (toStock) {
+            await tx.warehouseStock.update({
+              where: { warehouseId_itemId: { warehouseId: before.toWarehouseId, itemId: line.itemId }, version: toStock.version },
+              data: { quantity: newToQuantity, avgCost: newToAvgCost, version: { increment: 1 } },
+            });
+          } else {
+            await tx.warehouseStock.create({
+              data: { warehouseId: before.toWarehouseId, itemId: line.itemId, quantity: newToQuantity, avgCost: newToAvgCost },
+            });
+          }
+
+          for (const consumed of consumedBatches) {
+            await tx.stockBatch.create({
+              data: {
+                tenantId: this.ctx.tenantId!,
+                warehouseId: before.toWarehouseId,
+                itemId: line.itemId,
+                batchNo: generateBusinessNo('BAT'),
+                quantity: consumed.quantity,
+                unitCost: consumed.unitCost,
+                receivedAt: now,
+                expiresAt: consumed.expiresAt,
+                sourceType: 'STOCK_TRANSFER',
+                sourceId: before.id,
+              },
+            });
+          }
         }
-        const transferUnitCost = fromStock.avgCost;
 
-        await tx.warehouseStock.update({
-          where: { warehouseId_itemId: { warehouseId: before.fromWarehouseId, itemId: line.itemId } },
-          data: { quantity: fromStock.quantity - line.quantity },
+        return tx.stockTransfer.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
+          include: includeTransfer,
         });
-        const consumedBatches = await consumeBatchesFefo(tx, before.fromWarehouseId, line.itemId, line.quantity);
-
-        const toStock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.toWarehouseId, itemId: line.itemId } } });
-        const oldToQuantity = toStock?.quantity ?? 0;
-        const oldToAvgCost = toStock?.avgCost ?? 0;
-        const newToQuantity = oldToQuantity + line.quantity;
-        const newToAvgCost = newToQuantity === 0 ? 0 : Math.round((oldToQuantity * oldToAvgCost + line.quantity * transferUnitCost) / newToQuantity);
-        await tx.warehouseStock.upsert({
-          where: { warehouseId_itemId: { warehouseId: before.toWarehouseId, itemId: line.itemId } },
-          create: { warehouseId: before.toWarehouseId, itemId: line.itemId, quantity: newToQuantity, avgCost: newToAvgCost },
-          update: { quantity: newToQuantity, avgCost: newToAvgCost },
-        });
-
-        for (const consumed of consumedBatches) {
-          await tx.stockBatch.create({
-            data: {
-              tenantId: this.ctx.tenantId!,
-              warehouseId: before.toWarehouseId,
-              itemId: line.itemId,
-              batchNo: generateBusinessNo('BAT'),
-              quantity: consumed.quantity,
-              unitCost: consumed.unitCost,
-              receivedAt: now,
-              expiresAt: consumed.expiresAt,
-              sourceType: 'STOCK_TRANSFER',
-              sourceId: before.id,
-            },
-          });
-        }
-      }
-
-      return tx.stockTransfer.update({
-        where: { id },
-        data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
-        include: includeTransfer,
-      });
-    });
+      }),
+    );
 
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',

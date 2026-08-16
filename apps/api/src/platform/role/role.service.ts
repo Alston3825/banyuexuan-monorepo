@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 
 @Injectable()
 export class RoleService {
@@ -54,10 +55,12 @@ export class RoleService {
     if (before.version !== expectedVersion) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.prisma.role.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.role.update({
+        where: { id, version: expectedVersion },
+        data: { ...data, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'Role',

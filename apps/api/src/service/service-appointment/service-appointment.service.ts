@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { ServiceAppointment } from '@prisma/client';
+import { Prisma, ServiceAppointment } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateServiceAppointmentDto } from './dto/create-service-appointment.dto';
 import { QueryServiceAppointmentDto } from './dto/query-service-appointment.dto';
 import { CancelServiceAppointmentDto } from './dto/cancel-service-appointment.dto';
@@ -168,24 +169,38 @@ export class ServiceAppointmentService {
     if (before.version !== expectedVersion) throw new ConflictException('数据已被他人修改，请刷新后重试');
     if (before.status !== 'BOOKED') throw new BadRequestException(`预约当前状态「${before.status}」不允许完成`);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       if (before.sourcePackageId) {
         const sourcePackage = await tx.customerServicePackage.findUnique({ where: { id: before.sourcePackageId } });
         if (!sourcePackage || sourcePackage.status !== 'ACTIVE' || sourcePackage.remainingSessions <= 0) {
           throw new BadRequestException('该服务包已用完或已失效，无法消项');
         }
-        const remaining = sourcePackage.remainingSessions - 1;
-        await tx.customerServicePackage.update({
-          where: { id: sourcePackage.id },
-          data: { remainingSessions: remaining, status: remaining === 0 ? 'EXHAUSTED' : 'ACTIVE', version: { increment: 1 } },
-        });
+        // 原子 decrement + where 带 remainingSessions 下限：两个并发预约同时消耗同一个只剩
+        // 1次的服务包时，字面量写法（读到1、算出0、写回0）会让两次消项都"成功"，实际上
+        // 免费多消耗了一次。这里用返回值里的最新 remainingSessions 判断要不要转 EXHAUSTED，
+        // 而不是用之前算好的 remaining——因为落库前可能已经被别的并发请求改变。
+        let updatedPackage;
+        try {
+          updatedPackage = await tx.customerServicePackage.update({
+            where: { id: sourcePackage.id, remainingSessions: { gt: 0 } },
+            data: { remainingSessions: { decrement: 1 }, version: { increment: 1 } },
+          });
+        } catch (err) {
+          if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            throw new BadRequestException('该服务包已用完或已失效，无法消项');
+          }
+          throw err;
+        }
+        if (updatedPackage.remainingSessions === 0 && updatedPackage.status !== 'EXHAUSTED') {
+          await tx.customerServicePackage.update({ where: { id: sourcePackage.id }, data: { status: 'EXHAUSTED' } });
+        }
       }
       return tx.serviceAppointment.update({
-        where: { id },
+        where: { id, version: expectedVersion },
         data: { status: 'COMPLETED', completedAt: new Date(), version: { increment: 1 } },
         include: includeAppointment,
       });
-    });
+    }));
 
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',

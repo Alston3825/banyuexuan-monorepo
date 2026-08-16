@@ -8,6 +8,7 @@ import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { addDays } from '../../common/utils/date.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { consumeBatchesFefo } from '../common/fefo-batch.util';
+import { retryOnVersionConflict, runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateStockCountDto } from './dto/create-stock-count.dto';
 import { QueryStockCountDto } from './dto/query-stock-count.dto';
 
@@ -88,7 +89,13 @@ export class StockCountService {
 
     const warehouse = await this.prisma.warehouse.findUniqueOrThrow({ where: { id: before.warehouseId } });
     if (!warehouse.requiresApproval) {
-      const updated = await this.prisma.stockCount.update({ where: { id }, data: { status: 'APPROVED', version: { increment: 1 } }, include: includeCount });
+      const updated = await runVersionedUpdate(() =>
+        this.prisma.stockCount.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'APPROVED', version: { increment: 1 } },
+          include: includeCount,
+        }),
+      );
       await this.auditLogService.record({
         action: 'STATE_TRANSITION',
         entityType: 'StockCount',
@@ -105,7 +112,13 @@ export class StockCountService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.countNo, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.stockCount.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeCount });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockCount.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeCount,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockCount',
@@ -124,11 +137,13 @@ export class StockCountService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`盘点单当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.stockCount.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeCount,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.stockCount.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeCount,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'StockCount',
@@ -149,45 +164,59 @@ export class StockCountService {
 
     const countWithItems = await this.prisma.stockCount.findUniqueOrThrow({ where: { id }, include: { items: { include: { item: true } } } });
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const now = new Date();
-      for (const line of countWithItems.items) {
-        if (line.diffQuantity === 0) continue;
-        const stock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } } });
-        const avgCost = stock?.avgCost ?? 0;
+    // 盘点执行是把库存"设成"盘点当时数出来的绝对值，跟其它单据"基于当前值加减"不是
+    // 同一种操作——version 条件这里防的是"落库时这一行已经被别的并发操作动过"，但即使
+    // 检测到冲突，重试后写入的还是同一个 countedQuantity（不会重新计算），所以本质上
+    // 防的是"盘点执行和盘点审批之间又有其他单据动过这个库存却被静默覆盖而不自知"，
+    // 让这种情况至少以整体事务重试+更新后的 version 收尾，不比之前更差；至于"盘点期间
+    // 库存被移动应不应该重新盘点"，是业务流程问题，不是这里能靠加锁解决的，留给使用流程
+    // 约束（盘点单据审批到执行应尽快完成）。
+    const updated = await retryOnVersionConflict(() =>
+      this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        for (const line of countWithItems.items) {
+          if (line.diffQuantity === 0) continue;
+          const stock = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } } });
+          const avgCost = stock?.avgCost ?? 0;
 
-        await tx.warehouseStock.upsert({
-          where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId } },
-          create: { warehouseId: before.warehouseId, itemId: line.itemId, quantity: line.countedQuantity, avgCost },
-          update: { quantity: line.countedQuantity },
-        });
+          if (stock) {
+            await tx.warehouseStock.update({
+              where: { warehouseId_itemId: { warehouseId: before.warehouseId, itemId: line.itemId }, version: stock.version },
+              data: { quantity: line.countedQuantity, version: { increment: 1 } },
+            });
+          } else {
+            await tx.warehouseStock.create({
+              data: { warehouseId: before.warehouseId, itemId: line.itemId, quantity: line.countedQuantity, avgCost },
+            });
+          }
 
-        if (line.diffQuantity > 0) {
-          await tx.stockBatch.create({
-            data: {
-              tenantId: this.ctx.tenantId!,
-              warehouseId: before.warehouseId,
-              itemId: line.itemId,
-              batchNo: generateBusinessNo('BAT'),
-              quantity: line.diffQuantity,
-              unitCost: avgCost,
-              receivedAt: now,
-              expiresAt: line.item.shelfLifeDays ? addDays(now, line.item.shelfLifeDays) : null,
-              sourceType: 'STOCK_COUNT',
-              sourceId: before.id,
-            },
-          });
-        } else {
-          await consumeBatchesFefo(tx, before.warehouseId, line.itemId, -line.diffQuantity);
+          if (line.diffQuantity > 0) {
+            await tx.stockBatch.create({
+              data: {
+                tenantId: this.ctx.tenantId!,
+                warehouseId: before.warehouseId,
+                itemId: line.itemId,
+                batchNo: generateBusinessNo('BAT'),
+                quantity: line.diffQuantity,
+                unitCost: avgCost,
+                receivedAt: now,
+                expiresAt: line.item.shelfLifeDays ? addDays(now, line.item.shelfLifeDays) : null,
+                sourceType: 'STOCK_COUNT',
+                sourceId: before.id,
+              },
+            });
+          } else {
+            await consumeBatchesFefo(tx, before.warehouseId, line.itemId, -line.diffQuantity);
+          }
         }
-      }
 
-      return tx.stockCount.update({
-        where: { id },
-        data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
-        include: includeCount,
-      });
-    });
+        return tx.stockCount.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'COMPLETED', completedAt: now, version: { increment: 1 } },
+          include: includeCount,
+        });
+      }),
+    );
 
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',

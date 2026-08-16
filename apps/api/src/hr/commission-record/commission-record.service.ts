@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCommissionRecordDto } from './dto/create-commission-record.dto';
 import { QueryCommissionRecordDto } from './dto/query-commission-record.dto';
 
@@ -46,8 +47,22 @@ export class CommissionRecordService {
     const employees = await this.prisma.employeeProfile.findMany({ where: { id: { in: employeeIds } } });
     if (employees.length !== employeeIds.length) throw new BadRequestException('存在不存在的员工档案 ID');
 
-    const allocationsWithAmount = dto.allocations.map((a) => ({ ...a, amount: Math.round((dto.totalAmount * a.basisPoints) / 10000) }));
-    const allocatedTotal = allocationsWithAmount.reduce((sum, a) => sum + a.amount, 0);
+    // 每条分配独立四舍五入再求和会有舍入误差：比如3分按50%/50%拆两条，各自round(1.5)=2，
+    // 合计4>3，明明是合法的对半拆分却会被下面"超出总金额"的校验误判拒绝。改成先算出
+    // "分配比例对应的真实合计"并整体取整一次，再让最后一条吸收前面几条的舍入残差，
+    // 保证明细合计不会因为独立取整而对不上——basisPoints合计不足10000时（有意不全额
+    // 分配的情况），最后一条吸收的也只是"这部分该分到的比例"的残差，不会多分到不该给
+    // 它的那部分总额。
+    const rawShares = dto.allocations.map((a) => (dto.totalAmount * a.basisPoints) / 10000);
+    const intendedTotal = Math.round(rawShares.reduce((sum, x) => sum + x, 0));
+    let allocatedSoFar = 0;
+    const allocationsWithAmount = dto.allocations.map((a, idx) => {
+      const isLast = idx === dto.allocations.length - 1;
+      const amount = isLast ? intendedTotal - allocatedSoFar : Math.round(rawShares[idx]);
+      allocatedSoFar += amount;
+      return { ...a, amount };
+    });
+    const allocatedTotal = allocatedSoFar;
     if (allocatedTotal > dto.totalAmount) {
       throw new BadRequestException(`分配明细合计金额（${allocatedTotal}）超出提成总金额（${dto.totalAmount}）`);
     }
@@ -90,7 +105,13 @@ export class CommissionRecordService {
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: `${before.type === 'SALES' ? '业绩提成' : '手工费'}-${id}`, storeId: before.storeId },
       this.actor(),
     );
-    const updated = await this.prisma.commissionRecord.update({ where: { id }, data: { status: 'PENDING_APPROVAL', version: { increment: 1 } }, include: includeRecord });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.commissionRecord.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'PENDING_APPROVAL', version: { increment: 1 } },
+        include: includeRecord,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'CommissionRecord',
@@ -109,11 +130,13 @@ export class CommissionRecordService {
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`提成记录当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.commissionRecord.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-      include: includeRecord,
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.commissionRecord.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+        include: includeRecord,
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'CommissionRecord',

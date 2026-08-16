@@ -3,6 +3,7 @@ import { BabyProfile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateBabyProfileDto } from './dto/create-baby-profile.dto';
 import { UpdateBabyProfileDto } from './dto/update-baby-profile.dto';
 import { QueryBabyProfileDto } from './dto/query-baby-profile.dto';
@@ -92,18 +93,20 @@ export class BabyProfileService {
     if (before.version !== dto.version) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.prisma.babyProfile.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        gender: dto.gender,
-        birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
-        birthWeightGrams: dto.birthWeightGrams,
-        apgarScore: dto.apgarScore,
-        remark: dto.remark,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.babyProfile.update({
+        where: { id, version: dto.version },
+        data: {
+          name: dto.name,
+          gender: dto.gender,
+          birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+          birthWeightGrams: dto.birthWeightGrams,
+          apgarScore: dto.apgarScore,
+          remark: dto.remark,
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'BabyProfile',

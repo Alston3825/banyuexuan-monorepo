@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CreateCareOutreachTemplateDto } from './dto/create-care-outreach-template.dto';
 import { UpdateCareOutreachTemplateDto } from './dto/update-care-outreach-template.dto';
 
@@ -74,9 +75,9 @@ export class CareOutreachTemplateService {
     if (before.version !== dto.version) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await runVersionedUpdate(() => this.prisma.$transaction(async (tx) => {
       const template = await tx.careOutreachTemplate.update({
-        where: { id },
+        where: { id, version: dto.version },
         data: { name: dto.name, status: dto.status, version: { increment: 1 } },
       });
       if (dto.items) {
@@ -91,7 +92,7 @@ export class CareOutreachTemplateService {
         });
       }
       return template;
-    });
+    }));
     const withItems = await this.findOneOrThrow(updated.id);
     await this.auditLogService.record({
       action: 'UPDATE',

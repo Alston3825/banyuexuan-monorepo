@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../customer/customer.service';
 import { QueryLeadDto } from './dto/query-lead.dto';
 
@@ -71,10 +72,12 @@ export class LeadService {
   ): Promise<Lead> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
-    const updated = await this.prisma.lead.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.lead.update({
+        where: { id, version: expectedVersion },
+        data: { ...data, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'Lead',
@@ -95,14 +98,16 @@ export class LeadService {
       throw new BadRequestException(`线索当前状态「${before.status}」不允许分配`);
     }
     const isFirstAssignment = before.status === 'NEW';
-    const updated = await this.prisma.lead.update({
-      where: { id },
-      data: {
-        assignedToId,
-        status: isFirstAssignment ? 'ASSIGNED' : before.status,
-        version: { increment: 1 },
-      },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.lead.update({
+        where: { id, version: expectedVersion },
+        data: {
+          assignedToId,
+          status: isFirstAssignment ? 'ASSIGNED' : before.status,
+          version: { increment: 1 },
+        },
+      }),
+    );
     await this.auditLogService.record({
       action: isFirstAssignment ? 'STATE_TRANSITION' : 'REASSIGN',
       entityType: 'Lead',
@@ -148,10 +153,12 @@ export class LeadService {
       primaryStoreId: before.storeId ?? undefined,
       assignedToId: before.assignedToId ?? undefined,
     });
-    const updated = await this.prisma.lead.update({
-      where: { id },
-      data: { status: 'CONVERTED', customerId: customer.id, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.lead.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CONVERTED', customerId: customer.id, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'Lead',
@@ -170,10 +177,12 @@ export class LeadService {
     if (!['NEW', 'ASSIGNED', 'FOLLOWING'].includes(before.status)) {
       throw new BadRequestException(`线索当前状态「${before.status}」不允许标记流失`);
     }
-    const updated = await this.prisma.lead.update({
-      where: { id },
-      data: { status: 'LOST', lostReason, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.lead.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'LOST', lostReason, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'Lead',

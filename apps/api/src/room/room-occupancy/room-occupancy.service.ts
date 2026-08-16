@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
+import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { CreateRoomOccupancyDto } from './dto/create-room-occupancy.dto';
 import { QueryRoomOccupancyDto } from './dto/query-room-occupancy.dto';
@@ -75,10 +76,12 @@ export class RoomOccupancyService {
     if (before.status !== 'RESERVED') {
       throw new BadRequestException(`占用记录当前状态「${before.status}」不允许入住`);
     }
-    const updated = await this.prisma.roomOccupancy.update({
-      where: { id },
-      data: { status: 'CHECKED_IN', actualCheckInAt: new Date(), version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.roomOccupancy.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CHECKED_IN', actualCheckInAt: new Date(), version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'RoomOccupancy',
@@ -98,16 +101,18 @@ export class RoomOccupancyService {
     if (before.status !== 'CHECKED_IN') {
       throw new BadRequestException(`占用记录当前状态「${before.status}」不允许离店`);
     }
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.roomOccupancy.update({
-        where: { id },
-        data: { status: 'CHECKED_OUT', actualCheckOutAt: new Date(), version: { increment: 1 } },
-      }),
-      this.prisma.room.update({
-        where: { id: before.roomId },
-        data: { needsCleaning: true },
-      }),
-    ]);
+    const [updated] = await runVersionedUpdate(() =>
+      this.prisma.$transaction([
+        this.prisma.roomOccupancy.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'CHECKED_OUT', actualCheckOutAt: new Date(), version: { increment: 1 } },
+        }),
+        this.prisma.room.update({
+          where: { id: before.roomId },
+          data: { needsCleaning: true },
+        }),
+      ]),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'RoomOccupancy',
@@ -127,10 +132,12 @@ export class RoomOccupancyService {
     if (before.status !== 'RESERVED') {
       throw new BadRequestException(`占用记录当前状态「${before.status}」不允许取消`);
     }
-    const updated = await this.prisma.roomOccupancy.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-    });
+    const updated = await runVersionedUpdate(() =>
+      this.prisma.roomOccupancy.update({
+        where: { id, version: expectedVersion },
+        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+      }),
+    );
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'RoomOccupancy',
