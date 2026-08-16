@@ -1,20 +1,64 @@
-# 生产环境编排：只包含应用本身三个服务。MySQL/Redis 用腾讯云托管的云数据库/云Redis，
-# 不在这里跑容器——这是与 docker-compose.yml（本地开发用，含 mysql/redis 容器）的关键区别。
+# 生产环境编排：应用三个服务 + 自建 MySQL/Redis（免费，跑在同一台服务器的容器里，
+# 不购买腾讯云托管的云数据库/云Redis）。这是与旧版本（依赖腾讯云托管实例）的关键区别；
+# 如果你后续想换成腾讯云托管数据库，把下面 mysql/redis 两个服务删掉、把 .env.prod 里
+# DATABASE_URL/REDIS_URL 改成腾讯云给的内网连接串即可，api/ai-service/web 三个服务不用改。
 #
-# 用法：在服务器上把仓库clone/拉到本地后：
+# 用法：在服务器上把仓库clone到本地后，直接跑 scripts/deploy.sh（推荐，一键完成下面这行
+# 之外的所有准备工作），或者手动执行：
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-# 真实的 .env.prod 不提交仓库，参考 .env.prod.example 在服务器上手工创建，
+# 真实的 .env.prod 不提交仓库，参考 .env.prod.example 在服务器上创建，
 # 详见 docs/环境与密钥管理手册.md。
+#
+# 自建数据库意味着"备份"这件事腾讯云不会替你做了，见 scripts/backup-mysql.sh
+# （scripts/deploy.sh 会自动把它注册成每天凌晨的定时任务）。
 
 name: banyuexuan-prod
 
 services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    # 官方mysql镜像直接认 MYSQL_ROOT_PASSWORD/MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWORD
+    # 这几个环境变量名，env_file里的同名行原样传进容器即可，不需要在这里重复声明。
+    env_file: .env.prod
+    # 只绑定回环地址：不对公网暴露3306端口，仅供你自己在服务器本机或SSH隧道里连进来
+    # 做备份/排查问题用，业务容器之间通过docker内部网络的服务名(mysql)互相访问，不走这个端口。
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     env_file: .env.prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000" # 只监听本机回环地址，公网访问统一走 web 容器的 nginx 反代
     healthcheck:
@@ -44,3 +88,7 @@ services:
 networks:
   default:
     name: banyuexuan-prod-net
+
+volumes:
+  mysql_data:
+  redis_data:
