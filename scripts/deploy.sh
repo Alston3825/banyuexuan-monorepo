@@ -197,11 +197,17 @@ elif [[ -n "${DOMAIN:-}" ]]; then
     apt-get update -y
     apt-get install -y nginx certbot python3-certbot-nginx
 
-    # 把 web 容器改成只监听本机8080，80/443交给宿主机nginx，nginx再反代过去
+    # 把 web 容器改成只监听本机8080，80/443交给宿主机nginx，nginx再反代过去。
+    # 注意：compose对list类型字段（ports）默认是"多个-f文件的值合并/拼接"而不是"后面
+    # 的覆盖前面的"，如果这里不加 !override，最终容器会同时监听0.0.0.0:80（继承自
+    # docker-compose.prod.yml）和127.0.0.1:8080两个端口——80还是被容器占着，宿主机
+    # nginx永远抢不到80端口，"systemctl reload nginx"会因为nginx从未真正start成功
+    # （装的时候port 80被占用，postinst跳过了自动启动）而失败。!override是compose
+    # spec的合并策略标签，显式声明"这个字段整体替换，不是拼接"。
     cat > "$REPO_ROOT/docker-compose.https.override.yml" <<EOF
 services:
   web:
-    ports:
+    ports: !override
       - "127.0.0.1:8080:80"
 EOF
     docker compose $COMPOSE_BASE --env-file .env.prod -f docker-compose.https.override.yml up -d
@@ -221,7 +227,11 @@ server {
 EOF
     ln -sf /etc/nginx/sites-available/banyuexuan.conf /etc/nginx/sites-enabled/banyuexuan.conf
     rm -f /etc/nginx/sites-enabled/default
-    nginx -t && systemctl reload nginx
+    # 用restart不用reload：nginx刚装好时80端口还被web容器占着，装包时nginx自己没能
+    # 启动成功（"port 80 is already in use"），此时nginx.service处于inactive状态，
+    # reload要求服务已经在跑，会报"not active, cannot reload"——上面已经把web容器挪到
+    # 8080腾出80端口了，restart在服务未运行时会直接启动它，未运行/已运行两种情况都适用。
+    nginx -t && systemctl restart nginx && systemctl enable nginx
 
     CERTBOT_EMAIL_ARGS="--register-unsafely-without-email"
     if [[ -n "${CERT_EMAIL:-}" ]]; then
