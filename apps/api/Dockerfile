@@ -28,6 +28,12 @@ COPY --from=builder /repo/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /repo/apps/api/dist ./apps/api/dist
 COPY --from=builder /repo/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /repo/apps/api/package.json ./apps/api/package.json
+# seed.ts是用ts-node跑源码（不是跑dist编译产物），且从src/里import了业务单号生成工具，
+# 之前只拷贝了dist/prisma/package.json，生产环境实跑`npx prisma db seed`时报
+# "Cannot find module '../src/common/utils/business-no.util'"——这里补上ts-node
+# 实际需要的src目录和tsconfig.json（ts-node按cwd找tsconfig决定编译选项）。
+COPY --from=builder /repo/apps/api/src ./apps/api/src
+COPY --from=builder /repo/apps/api/tsconfig.json ./apps/api/tsconfig.json
 
 WORKDIR /repo/apps/api
 EXPOSE 3000
