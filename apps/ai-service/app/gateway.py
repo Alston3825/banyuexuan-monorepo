@@ -4,6 +4,7 @@ from typing import Awaitable, Callable, Dict, List, Optional, TypeVar
 
 from .config import Settings
 from .providers.base import ChatMessage, ChatResult, EmbeddingResult, ModelProvider, ModelProviderError
+from .providers.deepseek import DeepSeekProvider
 from .providers.minimax import MiniMaxProvider
 from .providers.volcengine import VolcengineProvider
 
@@ -51,6 +52,13 @@ def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
             model=settings.minimax_model,
             timeout=settings.request_timeout_seconds,
             embedding_model=settings.minimax_embedding_model,
+        )
+    if settings.deepseek_api_key:
+        providers["deepseek"] = DeepSeekProvider(
+            api_key=settings.deepseek_api_key,
+            base_url=settings.deepseek_base_url,
+            model=settings.deepseek_model,
+            timeout=settings.request_timeout_seconds,
         )
     return providers
 
