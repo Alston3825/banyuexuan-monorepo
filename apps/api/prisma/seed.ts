@@ -564,6 +564,23 @@ async function main() {
     },
   });
 
+  // 普通员工/一线岗位：只做客户接待/护理/排餐/库存/审批这类日常业务操作，看不到
+  // 经营分析、设备网关、账号与权限、组织架构、基础资料、审计日志这几块"管理侧"功能——
+  // 见前端 layouts/nav-menu.ts 的导航菜单按权限动态显示逻辑。具体权限点集合是
+  // storeManagerCodes（下面定义）里刨掉 platform/audit/analytics/iot 四个前缀，
+  // 即"店长能操作的日常业务权限，一线员工也都能操作，只是看不到管理配置类页面"。
+  const storeStaffRole = await prisma.role.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'STORE_STAFF' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      code: 'STORE_STAFF',
+      name: '普通员工',
+      description: '门店一线日常业务操作，不含经营分析/设备网关/账号权限/组织架构/基础资料/审计日志',
+      createdBy: 'SEED',
+    },
+  });
+
   // SUPER_ADMIN 拥有全部权限点
   for (const permissionPointId of codeToId.values()) {
     await prisma.roleOnPermission
@@ -711,6 +728,24 @@ async function main() {
       .catch(() => undefined);
   }
 
+  // 普通员工 = 店长能操作的日常业务权限，刨掉四块"管理侧"配置（组织架构/账号权限/
+  // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
+  // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
+  const storeStaffCodes = storeManagerCodes.filter(
+    (code) => !code.startsWith('platform') && !code.startsWith('audit') && !code.startsWith('analytics') && !code.startsWith('iot'),
+  );
+  for (const code of storeStaffCodes) {
+    const permissionPointId = codeToId.get(code);
+    if (!permissionPointId) continue;
+    await prisma.roleOnPermission
+      .upsert({
+        where: { roleId_permissionPointId: { roleId: storeStaffRole.id, permissionPointId } },
+        update: {},
+        create: { roleId: storeStaffRole.id, permissionPointId, createdBy: 'SEED' },
+      })
+      .catch(() => undefined);
+  }
+
   // ---------- 账号 ----------
   // 生产环境管理员密码必须来自 SEED_ADMIN_PASSWORD（已在文件顶部校验过强度），
   // 不能沿用 SEED_DEV_PASSWORD 这个开发默认值
@@ -777,6 +812,40 @@ async function main() {
         tenantId: tenant.id,
         accountId: storeManagerAccount.id,
         roleId: storeManagerRole.id,
+        scopeType: 'STORE',
+        scopeId: store.id,
+        grantedBy: 'SEED',
+      },
+    });
+
+    // store_staff：普通员工示例账号，用来验证导航菜单/接口权限按角色正确收紧
+    // （登录后应该看不到经营分析/设备网关/账号权限/组织架构/基础资料/审计日志）。
+    const storeStaffPasswordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+    const storeStaffAccount = await prisma.account.upsert({
+      where: { tenantId_username: { tenantId: tenant.id, username: 'store_staff' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        storeId: store.id,
+        departmentId: department.id,
+        teamId: team.id,
+        positionId: position.id,
+        username: 'store_staff',
+        realName: '示例店前台',
+        phone: '13900000002',
+        passwordHash: storeStaffPasswordHash,
+        createdBy: 'SEED',
+      },
+    });
+
+    await prisma.accountRoleAssignment.upsert({
+      where: { id: `seed-storestaff-${storeStaffRole.id}` },
+      update: {},
+      create: {
+        id: `seed-storestaff-${storeStaffRole.id}`,
+        tenantId: tenant.id,
+        accountId: storeStaffAccount.id,
+        roleId: storeStaffRole.id,
         scopeType: 'STORE',
         scopeId: store.id,
         grantedBy: 'SEED',
@@ -1217,7 +1286,7 @@ async function main() {
   if (isProduction) {
     console.log(`  账号: ${ADMIN_USERNAME}（密码为 SEED_ADMIN_PASSWORD 指定的值，请勿在日志/文档中记录明文）`);
   } else {
-    console.log(`  账号: ${ADMIN_USERNAME} / store_manager（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
+    console.log(`  账号: ${ADMIN_USERNAME} / store_manager / store_staff（密码见 SEED_DEV_PASSWORD，默认 ${SEED_PASSWORD}）`);
   }
   console.log(
     `  工作流定义: DEMO_APPROVAL/HR_PAYROLL（店长初审 -> 平台管理员终审）、PAYMENT_REFUND + 库存五单据 + HR_COMMISSION（均为店长审批）`,

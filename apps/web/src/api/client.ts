@@ -48,6 +48,12 @@ http.interceptors.response.use(
     // await之后调用discrete API失败是同一类问题（AiCustomerServicePanel等组件也踩过）。
     // 用 setTimeout 把调用挪到当前微任务/错误处理流程之外的下一个宏任务里能稳定绕开。
     const showMessage = (fn: () => void) => setTimeout(fn, 200)
+    // 调用方主动传 { silent403: true }（比如给下拉框填选项的list()调用，见storeApi/accountApi）
+    // 表示"这个接口403是预期内的正常降级，不用弹提示吓用户"——跟409/422这些必须让人看到
+    // 的错误不一样，403在这类场景下只是"当前账号权限范围小，选项自然就是空的"。
+    if (status === 403 && (config as any)?.silent403) {
+      return Promise.reject(error)
+    }
     if (status === 403) {
       showMessage(() => message.warning(msg ?? '无权限执行该操作'))
     } else if (status === 409) {

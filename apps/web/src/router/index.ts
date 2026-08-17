@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { routePermissionMap, firstAccessibleRoute } from '../layouts/nav-menu'
+import { message } from '../utils/discrete-api'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -107,14 +109,35 @@ export const router = createRouter({
   routes,
 })
 
+// 详情页（如 /crm/customers/:id）不是导航菜单里的独立入口，routePermissionMap 只登记了
+// 列表页的精确路径——按"最长前缀匹配"找到它归属的列表页权限，两者共用同一个权限点。
+function resolveRequiredPermission(path: string): string | undefined {
+  if (routePermissionMap[path]) return routePermissionMap[path]
+  const prefixMatch = Object.keys(routePermissionMap)
+    .filter((key) => path.startsWith(`${key}/`))
+    .sort((a, b) => b.length - a.length)[0]
+  return prefixMatch ? routePermissionMap[prefixMatch] : undefined
+}
+
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.path === '/login') {
-    if (auth.isAuthenticated) return '/crm/customers'
+    if (auth.isAuthenticated) return firstAccessibleRoute(auth.hasAccess) ?? '/crm/customers'
     return true
   }
   if (!auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  // 前端这一层只是体验优化（不显示看不到的入口时顺带也别让直接改URL绕过去），
+  // 真正兜底的鉴权在接口层的 PermissionGuard，这里判断错了也不会导致越权访问数据。
+  const requiredPermission = resolveRequiredPermission(to.path)
+  if (requiredPermission && !auth.hasAccess(requiredPermission)) {
+    message.warning('无权限访问该页面')
+    const fallback = firstAccessibleRoute(auth.hasAccess)
+    // fallback 找不到（理论上不应该发生）就放行，避免在"哪都跳不过去"时把用户卡死在原地；
+    // 真出现这种情况，接口层的 PermissionGuard 仍然会挡住任何越权的数据请求。
+    if (!fallback || fallback === to.path) return true
+    return fallback
   }
   return true
 })
