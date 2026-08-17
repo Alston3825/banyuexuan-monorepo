@@ -118,14 +118,24 @@ async function handleCheckedKeysChange(newKeys: (string | number)[]) {
   if (added.length === 0 && removed.length === 0) return
 
   const roleId = permDrawerRole.value.id
-  await Promise.all([
-    ...added.map((id) => roleApi.grantPermission(roleId, id)),
-    ...removed.map((id) => roleApi.revokePermission(roleId, id)),
-  ])
+  // 乐观更新：先改勾选状态界面立刻响应，再打接口——n-tree的checked-keys是受控prop，
+  // 如果等接口都返回了才更新，勾选一个大模块要cascade并发十几个请求，这段等待期间
+  // 界面上checkbox看起来跟点之前一样没变化，很容易被当成"权限点不动/选不上"。
   checkedKeys.value = [...newKeySet]
-  await fetchList()
-  const refreshed = rows.value.find((r) => r.id === roleId)
-  if (refreshed) permDrawerRole.value = refreshed
+  try {
+    await Promise.all([
+      ...added.map((id) => roleApi.grantPermission(roleId, id)),
+      ...removed.map((id) => roleApi.revokePermission(roleId, id)),
+    ])
+  } catch (err) {
+    checkedKeys.value = [...oldKeySet] // 接口失败要把勾选状态退回去，不能让界面显示的跟后端实际保存的对不上
+    message.error('权限保存失败，请重试')
+    throw err
+  }
+  // 后台悄悄刷新表格缓存的角色列表，但不重新赋值 permDrawerRole——如果把它换成一个新的
+  // 对象引用，权限树会因为props整体变化被迫完整重新渲染，在勾选项很多时会有一瞬间空白，
+  // 这跟上面"没有乐观更新导致看起来点不动"是同一类问题的另一半成因，两处一起改。
+  fetchList()
 }
 
 const columns: DataTableColumns<Role> = [
