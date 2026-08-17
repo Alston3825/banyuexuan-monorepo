@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     minimax_model: str = "abab6.5s-chat"
     minimax_embedding_model: str = "embo-01"
 
+    # DeepSeek（境内合规供应商，只提供对话模型，没有embedding接口——见providers/deepseek.py）
+    deepseek_api_key: Optional[str] = None
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+
     request_timeout_seconds: float = 30.0
 
 

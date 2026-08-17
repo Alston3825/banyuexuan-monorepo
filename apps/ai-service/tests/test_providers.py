@@ -3,6 +3,7 @@ import pytest
 import respx
 
 from app.providers.base import ChatMessage, ModelProviderError
+from app.providers.deepseek import DeepSeekProvider
 from app.providers.minimax import MiniMaxProvider
 from app.providers.volcengine import VolcengineProvider
 
@@ -108,3 +109,36 @@ async def test_minimax_embed_success():
 
     assert result.embeddings == [[0.5, 0.6]]
     assert result.provider == "minimax"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_deepseek_complete_success():
+    respx.post("https://api.deepseek.com/chat/completions").mock(
+        return_value=httpx.Response(200, json={"choices": [{"message": {"content": "你好，我是DeepSeek"}}]})
+    )
+    provider = DeepSeekProvider(api_key="fake-key", base_url="https://api.deepseek.com", model="deepseek-chat", timeout=5)
+
+    result = await provider.complete([ChatMessage(role="user", content="你好")])
+
+    assert result.content == "你好，我是DeepSeek"
+    assert result.provider == "deepseek"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_deepseek_complete_raises_on_malformed_response():
+    respx.post("https://api.deepseek.com/chat/completions").mock(return_value=httpx.Response(200, json={"unexpected": "shape"}))
+    provider = DeepSeekProvider(api_key="fake-key", base_url="https://api.deepseek.com", model="deepseek-chat", timeout=5)
+
+    with pytest.raises(ModelProviderError):
+        await provider.complete([ChatMessage(role="user", content="你好")])
+
+
+@pytest.mark.asyncio
+async def test_deepseek_embed_always_raises():
+    """DeepSeek平台没有公开的embedding接口，embed()应该直接抛错走降级链路，不是漏实现。"""
+    provider = DeepSeekProvider(api_key="fake-key", base_url="https://api.deepseek.com", model="deepseek-chat", timeout=5)
+
+    with pytest.raises(ModelProviderError):
+        await provider.embed(["文本一"])
