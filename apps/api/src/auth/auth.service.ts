@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordService } from './password.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { PermissionLookupService } from '../common/context/permission-lookup.service';
 
 interface RequestMeta {
   ip?: string;
@@ -25,6 +26,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
     private readonly auditLogService: AuditLogService,
+    private readonly permissionLookupService: PermissionLookupService,
   ) {}
 
   async login(username: string, password: string, meta: RequestMeta) {
@@ -72,10 +74,16 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
+    // 权限点code列表下发给前端，用来算导航菜单该显示哪些模块（见nav-menu.ts）——
+    // 前端本身不做真正的鉴权判断，隐藏看不到的入口只是体验优化，接口层的@RequirePermission
+    // /PermissionGuard才是真正兜底的那一层，即使前端算错了也不会导致越权访问。
+    const permissions = Array.from(await this.permissionLookupService.getPermissionCodes(account.id)).sort();
+
     return {
       accessToken,
       refreshToken,
       account: { id: account.id, username: account.username, realName: account.realName },
+      permissions,
     };
   }
 
@@ -93,7 +101,10 @@ export class AuthService {
     await this.prisma.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
     const accessToken = this.signAccessToken(record.account);
     const newRefreshToken = await this.issueRefreshToken(record.accountId, meta);
-    return { accessToken, refreshToken: newRefreshToken };
+    // 每次静默刷新时都重新取一遍权限点：管理员改了这个账号的角色后，不需要等对方
+    // 主动退出重新登录，下一次刷新（access token每30分钟过期一次）就能拿到最新权限。
+    const permissions = Array.from(await this.permissionLookupService.getPermissionCodes(record.accountId)).sort();
+    return { accessToken, refreshToken: newRefreshToken, permissions };
   }
 
   async logout(rawRefreshToken: string): Promise<void> {

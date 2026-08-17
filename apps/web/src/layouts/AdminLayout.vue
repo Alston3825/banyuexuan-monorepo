@@ -6,7 +6,7 @@ import { Menu as MenuIcon, LogOutOutline, PersonCircleOutline } from '@vicons/io
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { useBreakpoint } from '../composables/useBreakpoint'
-import { navMenuOptions } from './nav-menu'
+import { buildNavMenu } from './nav-menu'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +16,8 @@ const { breakpoint } = useBreakpoint()
 
 const isDesktop = computed(() => breakpoint.value === 'desktop')
 const selectedKey = computed(() => route.path)
+// 按登录账号的权限动态算菜单，不是所有账号看到的都一样，见 layouts/nav-menu.ts
+const navMenuOptions = computed(() => buildNavMenu(auth.hasAccess))
 
 // 移动/平板端抽屉的显隐是纯临时 UI 状态，不持久化、不与桌面端的收起状态混用
 const mobileDrawerVisible = ref(false)
