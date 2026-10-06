@@ -199,10 +199,6 @@ async function openDetail(id: string) {
   detail.value = await purchaseRequestApi.get(id)
   detailVisible.value = true
 }
-async function reloadDetail() {
-  if (detail.value) detail.value = await purchaseRequestApi.get(detail.value.id)
-  await fetchList()
-}
 const isDraft = computed(() => detail.value?.status === 'DRAFT')
 const detailDeptSummary = computed(() => {
   const m = new Map<string, number>()
