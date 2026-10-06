@@ -2,6 +2,9 @@ import type { CommonStatus } from './common'
 
 export type EmploymentType = 'EMPLOYEE' | 'NON_EMPLOYEE'
 export type EmployeeProfileStatus = 'ACTIVE' | 'ON_LEAVE' | 'TERMINATED'
+export type EmployeeContractType = 'LABOR' | 'PROBATION' | 'SERVICE' | 'OVERAGE' | 'PENDING_SIGN'
+export type SocialInsuranceStatus = 'ENROLLED' | 'NOT_ENROLLED'
+export type EmployeeGender = 'MALE' | 'FEMALE'
 export type CommissionType = 'SALES' | 'LABOR'
 export type CommissionRecordStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 export type PayrollRecordStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'PAID'
@@ -13,6 +16,10 @@ export interface EmployeeProfileAccount {
   storeId: string | null
   departmentId: string | null
   positionId: string | null
+  phone: string | null
+  store: { name: string } | null
+  department: { name: string } | null
+  position: { name: string } | null
 }
 
 export interface EmployeeProfile {
@@ -26,8 +33,26 @@ export interface EmployeeProfile {
   contractExpiresAt: string | null
   probationEndsAt: string | null
   terminationDate: string | null
+  terminationReason: string | null
   status: EmployeeProfileStatus
+  contractType: EmployeeContractType | null
+  socialInsurance: SocialInsuranceStatus | null
+  idCardNo: string | null
+  gender: EmployeeGender | null
+  birthDate: string | null
+  bankAccountNo: string | null
+  bankName: string | null
+  emergencyContactName: string | null
+  emergencyContactPhone: string | null
+  emergencyContactRelation: string | null
+  address: string | null
   remark: string | null
+  /** 以下由后端附带：来自账号的手机/部门/职务/门店，以及按入职日期算出的工龄（满几年） */
+  phone: string | null
+  storeName: string | null
+  departmentName: string | null
+  positionName: string | null
+  tenureYears: number
   createdAt: string
   updatedAt: string
   version: number
@@ -38,7 +63,20 @@ export interface EmployeeProfileExpiryAlert extends EmployeeProfile {
   alerts: { type: 'HEALTH_CERT' | 'CONTRACT' | 'PROBATION'; expiresAt: string; isExpired: boolean }[]
 }
 
-export interface CreateEmployeeProfileDto {
+/** 员工信息表字段：文字类传空字符串 = 清空 */
+export interface EmployeeProfileDetailFields {
+  contractType?: EmployeeContractType
+  socialInsurance?: SocialInsuranceStatus
+  idCardNo?: string
+  bankAccountNo?: string
+  bankName?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  emergencyContactRelation?: string
+  address?: string
+}
+
+export interface CreateEmployeeProfileDto extends EmployeeProfileDetailFields {
   accountId: string
   employeeNo: string
   hireDate: string
@@ -49,11 +87,15 @@ export interface CreateEmployeeProfileDto {
   remark?: string
 }
 
-export interface UpdateEmployeeProfileDto {
+export interface UpdateEmployeeProfileDto extends EmployeeProfileDetailFields {
+  employeeNo?: string
+  hireDate?: string
+  employmentType?: EmploymentType
   healthCertExpiresAt?: string
   contractExpiresAt?: string
   probationEndsAt?: string
   terminationDate?: string
+  terminationReason?: string
   status?: EmployeeProfileStatus
   remark?: string
   version: number

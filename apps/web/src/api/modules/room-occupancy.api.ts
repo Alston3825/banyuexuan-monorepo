@@ -11,4 +11,6 @@ export const roomOccupancyApi = {
     http.post<RoomOccupancy>(`/room/occupancies/${id}/check-out`, { version }).then((r) => r.data),
   cancel: (id: string, cancelReason: string, version: number) =>
     http.post<RoomOccupancy>(`/room/occupancies/${id}/cancel`, { cancelReason, version }).then((r) => r.data),
+  reschedule: (id: string, plannedCheckIn: string, plannedCheckOut: string, version: number) =>
+    http.patch<RoomOccupancy>(`/room/occupancies/${id}/reschedule`, { plannedCheckIn, plannedCheckOut, version }).then((r) => r.data),
 }

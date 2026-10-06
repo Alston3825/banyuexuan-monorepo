@@ -95,9 +95,9 @@ storeApi.list().then((list) => (stores.value = list))
 
 <template>
   <div>
-    <n-space style="margin-bottom: 16px" :wrap="false">
-      <n-select v-model:value="storeId" :options="storeOptions" style="width: 320px" />
-      <n-date-picker v-model:value="dateRange" type="daterange" style="width: 280px" />
+    <n-space style="margin-bottom: 16px">
+      <n-select v-model:value="storeId" :options="storeOptions" style="width: min(320px, 94vw)" />
+      <n-date-picker v-model:value="dateRange" type="daterange" style="width: min(280px, 94vw)" />
       <n-button type="primary" :loading="loading" @click="fetchAll">查询</n-button>
     </n-space>
 
@@ -105,7 +105,7 @@ storeApi.list().then((list) => (stores.value = list))
 
     <template v-else>
       <n-card title="财务" style="margin-bottom: 16px">
-        <n-grid :cols="5" :x-gap="12" style="margin-bottom: 16px">
+        <n-grid cols="2 s:3 m:5" responsive="screen" :x-gap="12" style="margin-bottom: 16px">
           <n-grid-item><n-statistic label="收款总额（元）" :value="toMajorUnits(financeSummary.paymentTotalAmount) ?? 0" /></n-grid-item>
           <n-grid-item><n-statistic label="已退款（元）" :value="toMajorUnits(financeSummary.paymentRefundedAmount) ?? 0" /></n-grid-item>
           <n-grid-item><n-statistic label="会员充值（元）" :value="toMajorUnits(financeSummary.accountRechargeAmount) ?? 0" /></n-grid-item>
@@ -116,7 +116,7 @@ storeApi.list().then((list) => (stores.value = list))
       </n-card>
 
       <n-card title="房态" style="margin-bottom: 16px" v-if="occupancySummary">
-        <n-grid :cols="3" :x-gap="12" style="margin-bottom: 16px">
+        <n-grid cols="1 s:2 m:3" responsive="screen" :x-gap="12" style="margin-bottom: 16px">
           <n-grid-item><n-statistic label="房间总数" :value="occupancySummary.totalRooms" /></n-grid-item>
           <n-grid-item><n-statistic label="区间日均入住率" :value="`${(occupancySummary.averageOccupancyRate * 100).toFixed(1)}%`" /></n-grid-item>
           <n-grid-item><n-statistic label="统计范围" :value="occupancySummary.storeScope === 'ALL' ? '全租户汇总' : '本店'" /></n-grid-item>

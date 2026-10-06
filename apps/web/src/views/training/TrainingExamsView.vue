@@ -172,7 +172,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: TrainingExam) => r.id" :scroll-x="800" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑试卷' : '新建试卷'" style="width: 720px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑试卷' : '新建试卷'" style="width: min(720px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item label="试卷名称" path="title" :rule="{ required: true, message: '请输入试卷名称' }">
             <n-input v-model:value="model.title" />
@@ -195,8 +195,8 @@ onMounted(fetchAll)
                 <n-card size="small" embedded style="width: 100%; margin-bottom: 8px">
                   <n-space vertical :size="8">
                     <n-space :wrap="false" align="center">
-                      <n-select v-model:value="value.type" :options="questionTypeOptions" style="width: 140px" />
-                      <n-input-number v-model:value="value.score" :min="1" placeholder="分值" style="width: 100px" />
+                      <n-select v-model:value="value.type" :options="questionTypeOptions" style="width: min(140px, 94vw)" />
+                      <n-input-number v-model:value="value.score" :min="1" placeholder="分值" style="width: min(100px, 94vw)" />
                     </n-space>
                     <n-input v-model:value="value.content" placeholder="题干" />
                     <template v-if="value.type === 'SINGLE_CHOICE' || value.type === 'MULTIPLE_CHOICE'">

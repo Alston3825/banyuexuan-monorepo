@@ -185,7 +185,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Parameter) => r.id" :scroll-x="900" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑参数' : '新建参数'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑参数' : '新建参数'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="Key">
             <n-input v-model:value="model.key" />

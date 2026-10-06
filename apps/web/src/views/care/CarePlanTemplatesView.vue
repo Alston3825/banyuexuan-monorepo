@@ -144,7 +144,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CarePlanTemplate) => r.id" :scroll-x="800" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑护理方案' : '新建护理方案'" style="width: 640px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑护理方案' : '新建护理方案'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 mother_28d" />
@@ -176,14 +176,14 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item label="每日排期">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
-                <n-input-number v-model:value="value.dayOffset" :min="1" :max="model.totalDays" placeholder="第几天" style="width: 120px" />
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-input-number v-model:value="value.dayOffset" :min="1" :max="model.totalDays" placeholder="第几天" style="width: min(120px, 94vw)" />
                 <n-select
                   v-model:value="value.formTemplateId"
                   :options="availableFormTemplateOptions"
                   filterable
                   placeholder="选择护理项目"
-                  style="width: 260px"
+                  style="width: min(260px, 94vw)"
                 />
               </n-space>
             </n-dynamic-input>

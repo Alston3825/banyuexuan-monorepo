@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NCard,
   NSpace,
@@ -20,7 +20,10 @@ import {
   NSwitch,
   NTag,
   NEmpty,
+  NAlert,
   NDivider,
+  NTabPane,
+  NTabs,
   type DataTableColumns,
 } from 'naive-ui'
 import {
@@ -33,6 +36,7 @@ import {
   motherProfileApi,
 } from '../../api/modules/care.api'
 import { tagApi } from '../../api/modules/tag.api'
+import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import type {
   BabyProfile,
   BabyProfileInput,
@@ -55,14 +59,29 @@ import {
   DELIVERY_METHOD_LABEL_MAP,
   BABY_GENDER_LABEL_MAP,
 } from '../../utils/status-map'
-import { message } from '../../utils/discrete-api'
+import { dialog, message } from '../../utils/discrete-api'
 import CareAbnormalityFollowUps from '../../components/care/CareAbnormalityFollowUps.vue'
 import CareOutreachPanel from '../../components/care/CareOutreachPanel.vue'
+import CareAssessmentsPanel from '../../components/care/CareAssessmentsPanel.vue'
+import CareArchivePanel from '../../components/care/CareArchivePanel.vue'
+import NurseSelect from '../../components/care/NurseSelect.vue'
+import CarePlanPanel from '../../components/care/CarePlanPanel.vue'
+import ServiceLogsPanel from '../../components/care/ServiceLogsPanel.vue'
+import CareSummaryPanel from '../../components/care/CareSummaryPanel.vue'
+import MedicationPanel from '../../components/care/MedicationPanel.vue'
+import DailyRecordsPanel from '../../components/care/DailyRecordsPanel.vue'
 import AiCareAbnormalitySuggestion from '../../components/ai/AiCareAbnormalitySuggestion.vue'
 
 const route = useRoute()
 const motherProfileId = route.params.id as string
+const router = useRouter()
 
+// ---------------- 档案标签页（把护理档案的各部分归到母婴档案下） ----------------
+const TAB_NAMES = ['overview', 'admission', 'plans', 'services', 'daily', 'medication', 'discharge', 'summary', 'risk', 'orientation', 'choking', 'outreach']
+const activeTab = ref<string>(TAB_NAMES.includes(String(route.query.tab)) ? String(route.query.tab) : 'overview')
+watch(activeTab, (name) => {
+  if (route.query.tab !== name) router.replace({ query: { ...route.query, tab: name } })
+})
 const mother = ref<MotherProfile | null>(null)
 const motherRiskTags = ref<TagBinding[]>([])
 const babyRiskTags = ref<Record<string, TagBinding[]>>({})
@@ -135,20 +154,36 @@ async function fetchAll() {
 const editVisible = ref(false)
 const editSubmitting = ref(false)
 const editModel = ref({
+  occupancyId: null as string | null,
   deliveryMethod: 'UNKNOWN' as MotherProfile['deliveryMethod'],
   deliveryDate: null as number | null,
   gestationalWeeks: null as number | null,
   expectedDeliveryDate: null as number | null,
+  careNote: '',
+  primaryNurseId: null as string | null,
   remark: '',
 })
 
+// 关联入住：列出这位客户还没结束的入住/预订（含当前已关联的），选中后母婴档案就对上房号
+const occOptions = ref<{ label: string; value: string }[]>([])
+async function loadOccOptions(customerId: string, currentId: string | null) {
+  const list = await roomOccupancyApi.list({ customerId, status: undefined })
+  occOptions.value = list
+    .filter((o) => o.status === 'RESERVED' || o.status === 'CHECKED_IN' || o.id === currentId)
+    .map((o) => ({ label: `${o.occupancyNo}（${o.status === 'CHECKED_IN' ? '已入住' : o.status === 'RESERVED' ? '预订中' : o.status === 'CHECKED_OUT' ? '已离店' : '已取消'} ${o.plannedCheckIn.slice(5, 10)}~${o.plannedCheckOut.slice(5, 10)}）`, value: o.id }))
+}
+
 function openEdit() {
   if (!mother.value) return
+  void loadOccOptions(mother.value.customerId, mother.value.occupancyId)
   editModel.value = {
+    occupancyId: mother.value.occupancyId,
     deliveryMethod: mother.value.deliveryMethod,
     deliveryDate: mother.value.deliveryDate ? new Date(mother.value.deliveryDate).getTime() : null,
     gestationalWeeks: mother.value.gestationalWeeks,
     expectedDeliveryDate: mother.value.expectedDeliveryDate ? new Date(mother.value.expectedDeliveryDate).getTime() : null,
+    careNote: mother.value.careNote ?? '',
+    primaryNurseId: mother.value.primaryNurseId,
     remark: mother.value.remark ?? '',
   }
   editVisible.value = true
@@ -159,10 +194,13 @@ async function handleEditSubmit() {
   editSubmitting.value = true
   try {
     await motherProfileApi.update(mother.value.id, {
+      occupancyId: editModel.value.occupancyId ?? undefined,
       deliveryMethod: editModel.value.deliveryMethod,
       deliveryDate: editModel.value.deliveryDate ? new Date(editModel.value.deliveryDate).toISOString() : undefined,
       gestationalWeeks: editModel.value.gestationalWeeks ?? undefined,
       expectedDeliveryDate: editModel.value.expectedDeliveryDate ? new Date(editModel.value.expectedDeliveryDate).toISOString() : undefined,
+      careNote: editModel.value.careNote || undefined,
+      primaryNurseId: editModel.value.primaryNurseId, // null = 清除
       remark: editModel.value.remark || undefined,
       version: mother.value.version,
     })
@@ -243,10 +281,74 @@ const babyColumns: DataTableColumns<BabyProfile> = [
   {
     key: 'actions',
     title: '操作',
-    width: 90,
-    render: (row) => h(NButton, { size: 'small', onClick: () => openEditBaby(row) }, { default: () => '编辑' }),
+    width: 140,
+    render: (row) =>
+      h(NSpace, { size: 6 }, {
+        default: () => [
+          h(NButton, { size: 'small', onClick: () => openEditBaby(row) }, { default: () => '编辑' }),
+          h(NButton, { size: 'small', type: 'error', ghost: true, onClick: () => removeBaby(row) }, { default: () => '删除' }),
+        ],
+      }),
   },
 ]
+
+/**
+ * 删除建错/多建的宝宝档案：
+ * - 什么数据都没有 → 确认后直接删；
+ * - 名下只有评估表/纸质资料（多半是录到了错误的宝宝名下）→ 管理员输入宝宝名字确认后，连同这些数据一起删；普通账号提示联系管理员；
+ * - 已有护理记录/计划/异常 → 任何人都不能删。
+ */
+const babyDel = ref<{ baby: BabyProfile; name: string; attached: string[]; confirm: string } | null>(null)
+const babyDelSubmitting = ref(false)
+
+async function removeBaby(baby: BabyProfile) {
+  const check = await babyProfileApi.deleteCheck(baby.id)
+  if (check.blockers.length > 0) {
+    dialog.error({ title: '不能删除这个宝宝', content: `“${check.babyName}”已有${check.blockers.join('、')}，属于护理痕迹，不能删除。`, positiveText: '知道了' })
+    return
+  }
+  if (check.attached.length > 0) {
+    if (!check.canForceDelete) {
+      dialog.warning({
+        title: '需要管理员处理',
+        content: `“${check.babyName}”名下已有${check.attached.join('、')}。如果确实是录错了宝宝，需要管理员连同这些数据一起删除，请联系管理员。`,
+        positiveText: '知道了',
+      })
+      return
+    }
+    babyDel.value = { baby, name: check.babyName, attached: check.attached, confirm: '' }
+    return
+  }
+  dialog.warning({
+    title: `删除宝宝档案“${check.babyName}”？`,
+    content: '这个宝宝还没有任何护理数据；删除后不能恢复，剩下的宝宝序号会自动重排。',
+    positiveText: '确认删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      await babyProfileApi.remove(baby.id)
+      message.success('宝宝档案已删除')
+      await fetchAll()
+    },
+  })
+}
+
+async function confirmForceRemoveBaby() {
+  const d = babyDel.value
+  if (!d) return
+  if (d.confirm.trim() !== d.name) {
+    message.error(`请输入宝宝名字“${d.name}”确认`)
+    return
+  }
+  babyDelSubmitting.value = true
+  try {
+    await babyProfileApi.remove(d.baby.id, { force: true, confirmName: d.confirm.trim() })
+    message.success('已删除宝宝档案及名下的评估表、纸质资料')
+    babyDel.value = null
+    await fetchAll()
+  } finally {
+    babyDelSubmitting.value = false
+  }
+}
 
 // ---------------- 护理计划：生成 ----------------
 const planFormVisible = ref(false)
@@ -498,6 +600,8 @@ onMounted(fetchAll)
 
 <template>
   <div v-if="mother">
+    <n-tabs v-model:value="activeTab" type="line" animated display-directive="show:lazy">
+      <n-tab-pane name="overview" tab="概览">
     <n-card :title="'母婴档案'" style="margin-bottom: 16px">
       <template #header-extra>
         <n-button size="small" @click="openEdit">编辑</n-button>
@@ -513,6 +617,11 @@ onMounted(fetchAll)
             <span v-if="motherRiskTags.length === 0">-</span>
           </n-space>
         </n-descriptions-item>
+        <n-descriptions-item label="主责护理师" :span="2">
+          <b v-if="mother.primaryNurse">{{ mother.primaryNurse.realName }}</b>
+          <a v-else style="color: #d9822b; cursor: pointer; text-decoration: underline" @click="openEdit">未指派，去指派</a>
+        </n-descriptions-item>
+        <n-descriptions-item label="医嘱" :span="2">{{ mother.careNote ?? '-' }}</n-descriptions-item>
         <n-descriptions-item label="备注" :span="2">{{ mother.remark ?? '-' }}</n-descriptions-item>
       </n-descriptions>
     </n-card>
@@ -524,6 +633,17 @@ onMounted(fetchAll)
       <n-data-table :columns="babyColumns" :data="mother.babies" :row-key="(r: BabyProfile) => r.id" />
     </n-card>
 
+      </n-tab-pane>
+
+      <n-tab-pane name="admission" tab="入所评估">
+        <CareAssessmentsPanel ref="admissionPanel" :mother-profile-id="motherProfileId" stage="admission" />
+      </n-tab-pane>
+
+      <n-tab-pane name="plans" tab="护理计划">
+        <CarePlanPanel :mother-profile-id="motherProfileId" :babies="mother.babies" style="margin-bottom: 18px" />
+        <n-alert type="info" :bordered="false" style="margin-bottom: 14px">
+          上面是个人化护理计划（三级护理、护理长制定、护理主任审核、每 7 天评审）。下面是旧的“按模板生成护理任务”和护理异常，保留不变。
+        </n-alert>
     <n-card title="护理计划" style="margin-bottom: 16px">
       <template #header-extra>
         <n-space>
@@ -540,11 +660,66 @@ onMounted(fetchAll)
       <n-data-table v-else :columns="abnormalityColumns" :data="abnormalities" :row-key="(r: CareAbnormality) => r.id" />
     </n-card>
 
-    <CareOutreachPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+
+      <n-tab-pane name="services" tab="服务执行">
+        <ServiceLogsPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+
+      <n-tab-pane name="daily" tab="日常护理记录">
+        <DailyRecordsPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+
+      <n-tab-pane name="medication" tab="用药委托书">
+        <MedicationPanel :mother-profile-id="motherProfileId" :babies="mother.babies" />
+      </n-tab-pane>
+
+      <n-tab-pane name="discharge" tab="出所评估">
+        <CareAssessmentsPanel ref="dischargePanel" :mother-profile-id="motherProfileId" stage="discharge" />
+      </n-tab-pane>
+
+      <n-tab-pane name="summary" tab="出所小结">
+        <CareSummaryPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+
+      <!-- 只拍照留档的三种资料，各占一个标签，和上面的评估/记录并列，上传时一目了然 -->
+      <n-tab-pane name="risk" tab="风险告知书">
+        <CareArchivePanel :mother-profile-id="motherProfileId" doc-type="RISK_NOTICE" hint="《产妇及新生儿风险告知书》：入住时让宝妈或家属签字，签好后拍照上传归档。" />
+      </n-tab-pane>
+
+      <n-tab-pane name="orientation" tab="入所宣教">
+        <CareArchivePanel :mother-profile-id="motherProfileId" doc-type="ORIENTATION" hint="《会所入住宣教》：向宝妈宣教后，家属和责任护理师签字，签好后拍照上传归档（含签字页）。" />
+      </n-tab-pane>
+
+      <n-tab-pane name="choking" tab="呛奶应急预案">
+        <CareArchivePanel :mother-profile-id="motherProfileId" doc-type="CHOKING_PROTOCOL" hint="《新生儿呛奶应急预案及处理方法》：教会家属后，如有签字页，拍照上传归档。" />
+      </n-tab-pane>
+
+      <n-tab-pane name="outreach" tab="离店后关怀">
+        <CareOutreachPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+    </n-tabs>
+
+    <!-- 管理员：连同评估表/纸质资料一起删除宝宝档案 -->
+    <n-modal :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
+      <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+        <p style="margin: 0 0 10px; line-height: 1.7">
+          “<b>{{ babyDel.name }}</b>”名下已有：<b style="color: #c0392b">{{ babyDel.attached.join('、') }}</b>。<br />
+          继续删除会把这个宝宝档案和上面这些数据（含纸质原件照片）<b>一起永久删除</b>，不能恢复，操作会记入审计日志。
+        </p>
+        <n-input v-model:value="babyDel.confirm" :placeholder="`请输入宝宝名字“${babyDel.name}”确认`" @keyup.enter="confirmForceRemoveBaby" />
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="babyDel = null">取消</n-button>
+            <n-button type="error" :loading="babyDelSubmitting" :disabled="babyDel.confirm.trim() !== babyDel.name" @click="confirmForceRemoveBaby">永久删除</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
 
     <!-- 编辑妈妈档案 -->
     <n-modal :show="editVisible" @update:show="(v) => (editVisible = v)">
-      <n-card title="编辑妈妈档案" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="编辑妈妈档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="分娩方式">
             <n-select
@@ -556,9 +731,14 @@ onMounted(fetchAll)
               ]"
             />
           </n-form-item>
+          <n-form-item label="关联入住">
+            <n-select v-model:value="editModel.occupancyId" :options="occOptions" clearable placeholder="选择这位客户的入住/预订记录（决定房号）" />
+          </n-form-item>
           <n-form-item label="分娩日期"><n-date-picker v-model:value="editModel.deliveryDate" type="date" style="width: 100%" clearable /></n-form-item>
           <n-form-item label="孕周"><n-input-number v-model:value="editModel.gestationalWeeks" :min="1" :max="45" style="width: 100%" /></n-form-item>
           <n-form-item label="预产期"><n-date-picker v-model:value="editModel.expectedDeliveryDate" type="date" style="width: 100%" clearable /></n-form-item>
+          <n-form-item label="主责护理师"><nurse-select v-model="editModel.primaryNurseId" :store-id="mother?.storeId" /></n-form-item>
+          <n-form-item label="医嘱"><n-input v-model:value="editModel.careNote" placeholder="护理看板卡片上显示的简短提示" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="editModel.remark" type="textarea" /></n-form-item>
         </n-form>
         <template #footer>
@@ -572,7 +752,7 @@ onMounted(fetchAll)
 
     <!-- 新增/编辑宝宝 -->
     <n-modal :show="babyVisible" @update:show="(v) => (babyVisible = v)">
-      <n-card :title="editingBaby ? '编辑宝宝档案' : '新增宝宝档案'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingBaby ? '编辑宝宝档案' : '新增宝宝档案'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="姓名/编号"><n-input v-model:value="babyModel.name" /></n-form-item>
           <n-form-item label="性别">
@@ -603,7 +783,7 @@ onMounted(fetchAll)
 
     <!-- 生成护理计划 -->
     <n-modal :show="planFormVisible" @update:show="(v) => (planFormVisible = v)">
-      <n-card title="生成护理计划" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="生成护理计划" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="对象">
             <n-select v-model:value="planTargetKey" :options="targetOptions" @update:value="planTemplateId = null" />
@@ -627,7 +807,7 @@ onMounted(fetchAll)
       <n-card
         v-if="activePlan"
         :title="`护理任务：${targetLabel(activePlan)} · ${activePlan.planNo}`"
-        style="width: 720px"
+        style="width: min(720px, 94vw)"
         :bordered="false"
         role="dialog"
         aria-modal="true"
@@ -646,7 +826,7 @@ onMounted(fetchAll)
 
     <!-- 提交/更正护理记录 -->
     <n-modal :show="recordVisible" @update:show="(v) => (recordVisible = v)">
-      <n-card :title="recordMode === 'correct' ? '更正护理记录' : '提交护理记录'" style="width: 600px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="recordMode === 'correct' ? '更正护理记录' : '提交护理记录'" style="width: min(600px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="对象">
             <n-select v-model:value="recordTargetKey" :options="targetOptions" :disabled="!!recordCarePlanTaskId || recordMode === 'correct'" @update:value="recordFormTemplateId = null" />
@@ -701,7 +881,7 @@ onMounted(fetchAll)
 
     <!-- 护理记录详情 -->
     <n-modal :show="recordDetailVisible" @update:show="(v) => (recordDetailVisible = v)">
-      <n-card v-if="recordDetail" title="护理记录详情" style="width: 560px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="recordDetail" title="护理记录详情" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-descriptions :column="1" label-placement="left">
           <n-descriptions-item label="护理项目">{{ recordDetail.formTemplate.name }}</n-descriptions-item>
           <n-descriptions-item label="发生时间">{{ new Date(recordDetail.occurredAt).toLocaleString() }}</n-descriptions-item>
@@ -722,7 +902,7 @@ onMounted(fetchAll)
 
     <!-- 护理异常处理 -->
     <n-modal :show="abnormalityDrawerVisible" @update:show="(v) => (abnormalityDrawerVisible = v)">
-      <n-card v-if="activeAbnormality" title="护理异常处理" style="width: 560px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="activeAbnormality" title="护理异常处理" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-descriptions :column="1" label-placement="left" style="margin-bottom: 12px">
           <n-descriptions-item label="对象">{{ targetLabel(activeAbnormality) }}</n-descriptions-item>
           <n-descriptions-item label="异常字段">{{ activeAbnormality.field.name }}</n-descriptions-item>

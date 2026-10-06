@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { RoomOccupancyService } from './room-occupancy.service';
@@ -7,6 +7,7 @@ import { QueryRoomOccupancyDto } from './dto/query-room-occupancy.dto';
 import { CheckInRoomOccupancyDto } from './dto/check-in-room-occupancy.dto';
 import { CheckOutRoomOccupancyDto } from './dto/check-out-room-occupancy.dto';
 import { CancelRoomOccupancyDto } from './dto/cancel-room-occupancy.dto';
+import { RescheduleRoomOccupancyDto } from './dto/reschedule-room-occupancy.dto';
 
 @ApiTags('room/occupancy')
 @Controller('room/occupancies')
@@ -47,5 +48,11 @@ export class RoomOccupancyController {
   @RequirePermission('room.occupancy.cancel')
   cancel(@Param('id') id: string, @Body() dto: CancelRoomOccupancyDto) {
     return this.roomOccupancyService.cancel(id, dto.cancelReason, dto.version);
+  }
+
+  @Patch(':id/reschedule')
+  @RequirePermission('room.occupancy.reschedule')
+  reschedule(@Param('id') id: string, @Body() dto: RescheduleRoomOccupancyDto) {
+    return this.roomOccupancyService.reschedule(id, dto);
   }
 }

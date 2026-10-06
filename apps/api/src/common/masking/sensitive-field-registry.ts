@@ -8,12 +8,9 @@ export interface SensitiveFieldRule {
   mask: (value: unknown) => unknown;
 }
 
-function maskPhone(value: unknown): unknown {
-  if (typeof value !== 'string' || value.length < 7) return value ? '***' : value;
-  return `${value.slice(0, 3)}****${value.slice(-4)}`;
-}
-
-export const SENSITIVE_FIELD_REGISTRY: Record<string, SensitiveFieldRule[]> = {
-  Account: [{ field: 'phone', permissionCode: 'platform.account.field.phone.view', mask: maskPhone }],
-  Customer: [{ field: 'phone', permissionCode: 'crm.customer.field.phone.view', mask: maskPhone }],
-};
+/**
+ * 目前没有任何字段需要掩码：软件仅内部使用，已有权限体系把关，业务方明确要求
+ * 客户手机号、员工手机号、身份证号、工资卡号等一律明文显示（2026-10-06 取消了员工手机号的掩码）。
+ * 机制（MaskEntity 装饰器 + 拦截器）保留着，以后真有需要时在这里加一条注册即可。
+ */
+export const SENSITIVE_FIELD_REGISTRY: Record<string, SensitiveFieldRule[]> = {};

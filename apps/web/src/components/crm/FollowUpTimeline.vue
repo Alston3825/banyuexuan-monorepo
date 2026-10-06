@@ -85,7 +85,7 @@ onMounted(fetchList)
     </n-timeline>
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="添加跟进记录" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="添加跟进记录" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="类型">
             <n-select v-model:value="model.type" :options="typeOptions" />

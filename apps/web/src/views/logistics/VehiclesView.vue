@@ -89,7 +89,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Vehicle) => r.id" :scroll-x="800" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑车辆' : '新建车辆'" style="width: 460px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑车辆' : '新建车辆'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="车牌号" path="plateNumber" :rule="{ required: true, message: '请输入车牌号' }">
             <n-input v-model:value="model.plateNumber" />

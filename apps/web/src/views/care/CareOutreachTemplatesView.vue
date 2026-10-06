@@ -115,7 +115,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CareOutreachTemplate) => r.id" :scroll-x="700" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑关怀模板' : '新建关怀模板'" style="width: 640px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑关怀模板' : '新建关怀模板'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 default_outreach" />
@@ -135,9 +135,9 @@ onMounted(fetchAll)
           <n-form-item label="关怀节点">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow">
               <template #="{ value }: { value: ItemRow }">
-                <n-space :wrap="false" align="center" style="width: 100%">
-                  <n-input-number v-model:value="value.dayOffset" :min="0" placeholder="第几天" style="width: 110px" />
-                  <n-input v-model:value="value.title" placeholder="节点标题" style="width: 160px" />
+                <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                  <n-input-number v-model:value="value.dayOffset" :min="0" placeholder="第几天" style="width: min(110px, 94vw)" />
+                  <n-input v-model:value="value.title" placeholder="节点标题" style="width: min(160px, 94vw)" />
                   <n-input v-model:value="value.content" placeholder="提醒要点（可选）" />
                 </n-space>
               </template>

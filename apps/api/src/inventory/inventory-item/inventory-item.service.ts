@@ -32,9 +32,21 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     unit: string;
     category?: string;
     purpose?: WarehousePurpose;
+    spec?: string;
+    brand?: string;
+    referencePrice?: number;
     safetyStockThreshold?: number;
     shelfLifeDays?: number;
   }) {
-    return super.create({ ...data, tenantId: this.ctx.tenantId });
+    return super.create({ ...data, spec: data.spec?.trim() || undefined, brand: data.brand?.trim() || undefined, tenantId: this.ctx.tenantId });
+  }
+
+  /** 规格/品牌传空字符串 = 清空（存成 null） */
+  update(id: string, data: Record<string, unknown>, expectedVersion: number) {
+    const cleaned = { ...data };
+    for (const k of ['spec', 'brand', 'category'] as const) {
+      if (typeof cleaned[k] === 'string') cleaned[k] = (cleaned[k] as string).trim() || null;
+    }
+    return super.update(id, cleaned, expectedVersion);
   }
 }

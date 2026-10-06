@@ -54,14 +54,14 @@ watch([warehouseId, expiryOnly, withinDays], fetchList)
 <template>
   <div>
     <n-space style="margin-bottom: 12px" align="center">
-      <n-select v-model:value="warehouseId" :options="warehouseOptions" clearable placeholder="全部仓库" style="width: 220px" />
+      <n-select v-model:value="warehouseId" :options="warehouseOptions" clearable placeholder="全部仓库" style="width: min(220px, 94vw)" />
       <n-space align="center" :size="8">
         <n-switch v-model:value="expiryOnly" />
         <span>只看过期预警</span>
       </n-space>
       <n-space v-if="expiryOnly" align="center" :size="8">
         <span>临期天数</span>
-        <n-input-number v-model:value="withinDays" :min="1" style="width: 100px" />
+        <n-input-number v-model:value="withinDays" :min="1" style="width: min(100px, 94vw)" />
       </n-space>
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r) => r.id" :scroll-x="900" />

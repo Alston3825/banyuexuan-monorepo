@@ -59,4 +59,10 @@ export class AccountController {
   revokeRoleAssignment(@Param('assignmentId') assignmentId: string) {
     return this.accountService.revokeRoleAssignment(assignmentId);
   }
+
+  @Delete(':id')
+  @RequirePermission('platform.account.delete')
+  remove(@Param('id') id: string) {
+    return this.accountService.remove(id);
+  }
 }

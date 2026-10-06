@@ -32,4 +32,13 @@ export interface QueryRoomOccupancyParams {
   roomId?: string
   customerId?: string
   status?: RoomOccupancyStatus
+  /** 房态横排时间轴用：查跟 [from, to] 有重叠的占用记录，两个要么都传要么都不传 */
+  from?: string
+  to?: string
+}
+
+export interface RescheduleRoomOccupancyDto {
+  plannedCheckIn: string
+  plannedCheckOut: string
+  version: number
 }

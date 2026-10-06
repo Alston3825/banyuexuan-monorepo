@@ -187,7 +187,7 @@ onMounted(fetchList)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CareFieldDefinition) => r.id" :scroll-x="900" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑护理字段' : '新建护理字段'" style="width: 560px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑护理字段' : '新建护理字段'" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 mother_temperature" />
@@ -224,7 +224,7 @@ onMounted(fetchList)
               :on-create="() => ({ value: '', label: '' })"
               #="{ value }"
             >
-              <n-space :wrap="false" style="width: 100%">
+              <n-space :wrap="false" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
                 <n-input v-model:value="value.value" placeholder="选项值 value" />
                 <n-input v-model:value="value.label" placeholder="选项文案 label" />
               </n-space>

@@ -40,7 +40,16 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
+    # 火山引擎 Agent Plan 专属通道（Anthropic 格式，POST {base_url}/v1/messages，Bearer 认证）。
+    # 专属密钥只能用这个地址，不能用上面 /api/v3 那套；目前只用来做合同图片识别（读图）。
+    # 注意：Agent Plan 官方定位是编程工具套餐，正式上线前建议换成方舟"按量计费"密钥，见业务记录。
+    volcengine_plan_api_key: Optional[str] = None
+    volcengine_plan_base_url: str = "https://ark.cn-beijing.volces.com/api/plan"
+    volcengine_plan_model: Optional[str] = None
+
     request_timeout_seconds: float = 30.0
+    # 读图识别单次请求更慢（图片大、输出长），单独放宽超时
+    vision_request_timeout_seconds: float = 120.0
 
 
 settings = Settings()

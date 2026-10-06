@@ -105,15 +105,15 @@ watch([filterStoreId, filterRange], fetchList)
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px" align="center">
       <n-space align="center">
-        <n-select v-model:value="filterStoreId" :options="storeOptions" clearable placeholder="按门店筛选" style="width: 200px" />
-        <n-date-picker v-model:value="filterRange" type="daterange" clearable style="width: 260px" />
+        <n-select v-model:value="filterStoreId" :options="storeOptions" clearable placeholder="按门店筛选" style="width: min(200px, 94vw)" />
+        <n-date-picker v-model:value="filterRange" type="daterange" clearable style="width: min(260px, 94vw)" />
       </n-space>
       <n-button type="primary" @click="openCreateModal">新建排班</n-button>
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: ScheduleEntry) => r.id" :scroll-x="900" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建排班" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建排班" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="员工"><n-select v-model:value="model.employeeProfileId" :options="employeeOptions" filterable /></n-form-item>

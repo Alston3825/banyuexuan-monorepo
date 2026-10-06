@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vant/area-data": "^2.2.0",
     "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.18.1",
     "dayjs": "^1.11.21",

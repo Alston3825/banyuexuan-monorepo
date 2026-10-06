@@ -156,7 +156,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: PurchaseOrder) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建采购单" style="width: 680px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建采购单" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="入库仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" placeholder="采购单批准后，据此仓库登记入库" /></n-form-item>
@@ -164,10 +164,10 @@ onMounted(fetchAll)
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="采购明细">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: 200px" />
-                <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: 120px" />
-                <n-input-number v-model:value="value.unitPrice" :min="0" placeholder="单价(分)" style="width: 140px" />
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(200px, 94vw)" />
+                <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: min(120px, 94vw)" />
+                <n-input-number v-model:value="value.unitPrice" :min="0" placeholder="单价(分)" style="width: min(140px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>

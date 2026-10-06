@@ -17,7 +17,8 @@ import type {
 } from '../types/hr'
 
 export const employeeProfileApi = {
-  list: (params?: { storeId?: string; status?: string }) => http.get<EmployeeProfile[]>('/hr/employee-profiles', { params }).then((r) => r.data),
+  list: (params?: { storeId?: string; status?: string; departmentId?: string; keyword?: string }) =>
+    http.get<EmployeeProfile[]>('/hr/employee-profiles', { params }).then((r) => r.data),
   get: (id: string) => http.get<EmployeeProfile>(`/hr/employee-profiles/${id}`).then((r) => r.data),
   create: (body: CreateEmployeeProfileDto) => http.post<EmployeeProfile>('/hr/employee-profiles', body).then((r) => r.data),
   update: (id: string, body: UpdateEmployeeProfileDto) => http.patch<EmployeeProfile>(`/hr/employee-profiles/${id}`, body).then((r) => r.data),

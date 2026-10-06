@@ -143,7 +143,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: LeaveRequest) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建请假申请" style="width: 520px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建请假申请" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="员工"><n-select v-model:value="model.employeeProfileId" :options="employeeOptions" filterable /></n-form-item>

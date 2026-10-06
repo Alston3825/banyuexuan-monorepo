@@ -52,7 +52,6 @@ describe('P1 核心交易主线 (e2e)', () => {
   let contractVersion: number;
   let paymentId: string;
   let occupancyId: string;
-  let renewedContractId: string;
 
   function authed(token: string) {
     return { Authorization: `Bearer ${token}` };
@@ -240,96 +239,87 @@ describe('P1 核心交易主线 (e2e)', () => {
     expect(body<SalesOpportunity>(won).stage).toBe('WON');
   });
 
-  it('6. 创建合同（DRAFT）', async () => {
+  it('6. 手工新建合同：纸质合同台账，进入待核对（PENDING_REVIEW），没有电子签署/审批', async () => {
     const res = await request(server)
-      .post('/api/v1/contract/records')
+      .post('/api/v1/contract/records/manual')
       .set(authed(adminToken))
-      .send({
-        customerId,
-        opportunityId,
-        storeId,
-        title: 'E2E测试-月子套餐合同',
-        content:
-          '甲方：E2E测试客户；乙方：伴月轩·示例店；套餐：温馨复式房42天。',
-        amount: 8000000,
-        startDate: '2027-01-01T00:00:00.000Z',
-        endDate: '2027-02-12T00:00:00.000Z',
-      })
+      .send({ storeId })
       .expect(201);
-    expect(body<Contract>(res).status).toBe('DRAFT');
+    expect(body<Contract>(res).status).toBe('PENDING_REVIEW');
+    expect(body<Contract>(res).extractStatus).toBe('NONE');
     contractId = body<Contract>(res).id;
     contractVersion = body<Contract>(res).version;
   });
 
-  it('7. 客户签署合同后正文锁定，未签署前不允许提交审核', async () => {
+  it('7. 必填项没填不能确认；核对页保存后预估离店日期 = 预估入住 + 入住天数', async () => {
     await request(server)
-      .post(`/api/v1/contract/records/${contractId}/submit`)
+      .post(`/api/v1/contract/records/${contractId}/confirm`)
       .set(authed(adminToken))
       .send({ version: contractVersion })
       .expect(400);
 
-    const signed = await request(server)
-      .post(`/api/v1/contract/records/${contractId}/sign`)
+    const saved = await request(server)
+      .patch(`/api/v1/contract/records/${contractId}`)
       .set(authed(adminToken))
-      .send({ version: contractVersion })
-      .expect(201);
-    expect(body<Contract>(signed).signedByCustomerAt).toBeTruthy();
-    contractVersion = body<Contract>(signed).version;
+      .send({
+        version: contractVersion,
+        paperNo: `E2E-${Date.now()}`,
+        signedDate: '2026-12-20',
+        clientName: 'E2E测试客户',
+        clientPhone: '13800001111',
+        roomTypeText: '温馨复式房',
+        careMode: 'ONE_TO_ONE',
+        inHouseDays: 42,
+        homeServiceDays: 0,
+        amount: 8000000,
+        estimatedCheckIn: '2027-01-01',
+      })
+      .expect(200);
+    const c = body<Contract & { estimatedCheckOut: string }>(saved);
+    expect(c.estimatedCheckOut.slice(0, 10)).toBe('2027-02-12');
+    contractVersion = c.version;
   });
 
-  it('8. 提交签约审核：合同进入 PENDING_APPROVAL，生成审批实例', async () => {
+  it('8. 确认入库：关联到已有客户，合同变为 ACTIVE（待排房），不走审批流程', async () => {
     const res = await request(server)
-      .post(`/api/v1/contract/records/${contractId}/submit`)
+      .post(`/api/v1/contract/records/${contractId}/confirm`)
       .set(authed(adminToken))
-      .send({ version: contractVersion })
+      .send({ version: contractVersion, customerId })
       .expect(201);
-    expect(body<Contract>(res).status).toBe('PENDING_APPROVAL');
+    expect(body<Contract>(res).status).toBe('ACTIVE');
+    expect(body<Contract>(res).customerId).toBe(customerId);
     contractVersion = body<Contract>(res).version;
-  });
 
-  it('9. 两级审批（店长初审 -> 平台管理员终审）通过后，合同懒同步为 ACTIVE', async () => {
-    const instance = await request(server)
+    // 确认后进入"待排房"列表（还没有有效预订）
+    const unassigned = await request(server)
+      .get('/api/v1/contract/records')
+      .query({ unassigned: true })
+      .set(authed(adminToken))
+      .expect(200);
+    expect(body<Contract[]>(unassigned).some((x) => x.id === contractId)).toBe(true);
+
+    // 不会产生审批实例
+    const instances = await request(server)
       .get('/api/v1/workflow/instances')
       .query({ businessType: 'CONTRACT', businessId: contractId })
+      .set(authed(adminToken));
+    expect([200, 404]).toContain(instances.status);
+    if (instances.status === 200) expect(instances.body?.id ?? null).toBeNull();
+  });
+
+  it('9. 已确认的合同金额/日期仍可修改（行业惯例：日期是预估，常变动），已确认不能再确认', async () => {
+    await request(server)
+      .post(`/api/v1/contract/records/${contractId}/confirm`)
       .set(authed(adminToken))
+      .send({ version: contractVersion })
+      .expect(400);
+    const res = await request(server)
+      .patch(`/api/v1/contract/records/${contractId}`)
+      .set(authed(adminToken))
+      .send({ version: contractVersion, estimatedCheckIn: '2027-01-05' })
       .expect(200);
-    expect(body<WorkflowInstance>(instance).status).toBe('IN_REVIEW');
-    expect(body<WorkflowInstance>(instance).currentNodeSeq).toBe(1);
-    const instanceId = body<WorkflowInstance>(instance).id;
-
-    // 第一级：店长初审。admin 此时不是该节点待审批人，应被拒绝。
-    await request(server)
-      .post(`/api/v1/workflow/instances/${instanceId}/approve`)
-      .set(authed(adminToken))
-      .send({})
-      .expect(403);
-
-    await request(server)
-      .post(`/api/v1/workflow/instances/${instanceId}/approve`)
-      .set(authed(storeManagerToken))
-      .send({ comment: '店长初审通过' })
-      .expect(201);
-    // 同角色的另一账号（另一门店店长）也是待审批人，需一并批准节点才会推进到下一级。
-    await request(server)
-      .post(`/api/v1/workflow/instances/${instanceId}/approve`)
-      .set(authed(otherStoreManagerToken))
-      .send({ comment: '（另一门店店长）一并批准' })
-      .expect(201);
-
-    // 第二级：平台管理员终审。
-    const approved = await request(server)
-      .post(`/api/v1/workflow/instances/${instanceId}/approve`)
-      .set(authed(adminToken))
-      .send({ comment: '终审通过' })
-      .expect(201);
-    expect(body<WorkflowInstance>(approved).status).toBe('APPROVED');
-
-    const contract = await request(server)
-      .get(`/api/v1/contract/records/${contractId}`)
-      .set(authed(adminToken))
-      .expect(200);
-    expect(body<Contract>(contract).status).toBe('ACTIVE');
-    contractVersion = body<Contract>(contract).version;
+    expect(body<Contract>(res).estimatedCheckIn?.toString().slice(0, 10)).toBe('2027-01-05');
+    contractVersion = body<Contract>(res).version;
   });
 
   it('10. 登记收款：合同收款汇总（已收/余额）计算正确', async () => {
@@ -459,38 +449,14 @@ describe('P1 核心交易主线 (e2e)', () => {
     expect(body<Room>(room).needsCleaning).toBe(true);
   });
 
-  it('15. 合同续签：生成新的 DRAFT 合同并关联回原合同，续签查询可检索到', async () => {
-    const res = await request(server)
-      .post(`/api/v1/contract/records/${contractId}/renew`)
-      .set(authed(adminToken))
-      .send({
-        startDate: '2027-02-12T00:00:00.000Z',
-        endDate: '2027-02-26T00:00:00.000Z',
-        amount: 2000000,
-        version: contractVersion,
-      })
-      .expect(201);
-    expect(body<Contract>(res).status).toBe('DRAFT');
-    expect(body<Contract>(res).renewalOfContractId).toBe(contractId);
-    renewedContractId = body<Contract>(res).id;
-
-    const renewals = await request(server)
+  it('15. 已排房的合同不再出现在待排房列表；有未结束预订的合同不能作废', async () => {
+    const unassigned = await request(server)
       .get('/api/v1/contract/records')
-      .query({ isRenewal: true, customerId })
+      .query({ unassigned: true })
       .set(authed(adminToken))
       .expect(200);
-    expect(
-      body<Contract[]>(renewals).some((c) => c.id === renewedContractId),
-    ).toBe(true);
-
-    const byOriginal = await request(server)
-      .get('/api/v1/contract/records')
-      .query({ renewalOfContractId: contractId })
-      .set(authed(adminToken))
-      .expect(200);
-    expect(body<Contract[]>(byOriginal).map((c) => c.id)).toEqual([
-      renewedContractId,
-    ]);
+    // 本测试前面用 contractId 创建过预订，所以这份合同已经是"已排房"
+    expect(body<Contract[]>(unassigned).some((x) => x.id === contractId)).toBe(false);
   });
 
   it('16. 三方数据一致性核对：合同 ACTIVE、收款余额归零、占房 CHECKED_OUT 均指向同一客户/合同', async () => {

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { CareArchiveModule } from './care-archive.module';
+import { CareBoardModule } from './care-board/care-board.module';
 import { CareFieldDefinitionModule } from './care-field-definition/care-field-definition.module';
 import { CareFormTemplateModule } from './care-form-template/care-form-template.module';
 import { CarePlanTemplateModule } from './care-plan-template/care-plan-template.module';
@@ -12,6 +14,8 @@ import { CareOutreachPlanModule } from './care-outreach-plan/care-outreach-plan.
 
 @Module({
   imports: [
+    CareArchiveModule,
+    CareBoardModule,
     CareFieldDefinitionModule,
     CareFormTemplateModule,
     CarePlanTemplateModule,

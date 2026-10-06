@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { routePermissionMap, firstAccessibleRoute } from '../layouts/nav-menu'
+import { routePermissionMap, firstAccessibleRoute, canAccessPerm } from '../layouts/nav-menu'
 import { message } from '../utils/discrete-api'
 
 declare module 'vue-router' {
@@ -27,23 +27,30 @@ const routes: RouteRecordRaw[] = [
       { path: 'org/teams', name: 'teams', component: () => import('../views/org/TeamsView.vue'), meta: { title: '班组管理' } },
       { path: 'org/positions', name: 'positions', component: () => import('../views/org/PositionsView.vue'), meta: { title: '职位管理' } },
       { path: 'crm/customers', name: 'crm-customers', component: () => import('../views/crm/CustomersView.vue'), meta: { title: '客户管理' } },
+      // 新添/编辑客户是整页（不是弹窗）；/new 必须排在 /:id 前面，否则 "new" 会被当成客户 id
+      { path: 'crm/customers/new', name: 'crm-customer-new', component: () => import('../views/crm/CustomerFormView.vue'), meta: { title: '新添客户' } },
+      { path: 'crm/customers/:id/edit', name: 'crm-customer-edit', component: () => import('../views/crm/CustomerFormView.vue'), meta: { title: '编辑客户' } },
+      { path: 'crm/channels', name: 'crm-channels', component: () => import('../views/crm/CustomerChannelsView.vue'), meta: { title: '客户渠道' } },
       { path: 'crm/customers/:id', name: 'crm-customer-detail', component: () => import('../views/crm/CustomerDetailView.vue'), meta: { title: '客户详情' } },
-      { path: 'crm/leads', name: 'crm-leads', component: () => import('../views/crm/LeadsView.vue'), meta: { title: '线索管理' } },
+      { path: 'crm/leads', name: 'crm-leads', component: () => import('../views/crm/LeadsView.vue'), meta: { title: '客户线索' } },
       { path: 'crm/leads/:id', name: 'crm-lead-detail', component: () => import('../views/crm/LeadDetailView.vue'), meta: { title: '线索详情' } },
       { path: 'crm/opportunities', name: 'crm-opportunities', component: () => import('../views/crm/OpportunitiesView.vue'), meta: { title: '销售机会' } },
       { path: 'crm/opportunities/:id', name: 'crm-opportunity-detail', component: () => import('../views/crm/OpportunityDetailView.vue'), meta: { title: '销售机会详情' } },
-      { path: 'contract/templates', name: 'contract-templates', component: () => import('../views/contract/ContractTemplatesView.vue'), meta: { title: '合同模板' } },
       { path: 'contract/records', name: 'contract-records', component: () => import('../views/contract/ContractsView.vue'), meta: { title: '合同管理' } },
       { path: 'contract/records/:id', name: 'contract-record-detail', component: () => import('../views/contract/ContractDetailView.vue'), meta: { title: '合同详情' } },
-      { path: 'contract/renewals', name: 'contract-renewals', component: () => import('../views/contract/ContractRenewalsView.vue'), meta: { title: '续签查询' } },
       { path: 'room/types', name: 'room-types', component: () => import('../views/room/RoomTypesView.vue'), meta: { title: '房型管理' } },
       { path: 'room/rooms', name: 'room-rooms', component: () => import('../views/room/RoomsView.vue'), meta: { title: '房间管理' } },
       { path: 'room/board', name: 'room-board', component: () => import('../views/room/RoomBoardView.vue'), meta: { title: '房态看板' } },
+      { path: 'room/board-horizontal', name: 'room-board-horizontal', component: () => import('../views/room/RoomHorizontalBoardView.vue'), meta: { title: '房态横排' } },
       { path: 'room/occupancies', name: 'room-occupancies', component: () => import('../views/room/RoomOccupanciesView.vue'), meta: { title: '预订记录' } },
-      { path: 'care/fields', name: 'care-fields', component: () => import('../views/care/CareFieldsView.vue'), meta: { title: '护理字段管理' } },
-      { path: 'care/form-templates', name: 'care-form-templates', component: () => import('../views/care/CareFormTemplatesView.vue'), meta: { title: '护理项目管理' } },
-      { path: 'care/plan-templates', name: 'care-plan-templates', component: () => import('../views/care/CarePlanTemplatesView.vue'), meta: { title: '护理方案管理' } },
-      { path: 'care/outreach-templates', name: 'care-outreach-templates', component: () => import('../views/care/CareOutreachTemplatesView.vue'), meta: { title: '关怀模板管理' } },
+      { path: 'care/board', name: 'care-board', component: () => import('../views/care/CareBoardView.vue'), meta: { title: '护理看板' } },
+      { path: 'care/stats', name: 'care-stats', component: () => import('../views/care/CareStatsView.vue'), meta: { title: '护理统计' } },
+      // 后台设置类页面合并成一个"护理设置"（标签页）；旧地址保留为跳转，老书签不会失效
+      { path: 'care/settings', name: 'care-settings', component: () => import('../views/care/CareSettingsView.vue'), meta: { title: '护理设置' } },
+      { path: 'care/fields', redirect: '/care/settings?tab=fields' },
+      { path: 'care/form-templates', redirect: '/care/settings?tab=forms' },
+      { path: 'care/plan-templates', redirect: '/care/settings?tab=plans' },
+      { path: 'care/outreach-templates', redirect: '/care/settings?tab=outreach' },
       { path: 'care/outreach-tasks', name: 'care-outreach-tasks', component: () => import('../views/care/CareOutreachTasksView.vue'), meta: { title: '待跟进关怀' } },
       { path: 'care/profiles', name: 'care-profiles', component: () => import('../views/care/CareProfilesView.vue'), meta: { title: '母婴档案' } },
       { path: 'care/profiles/:id', name: 'care-profile-detail', component: () => import('../views/care/CareProfileDetailView.vue'), meta: { title: '母婴档案详情' } },
@@ -64,6 +71,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'inventory/items', name: 'inventory-items', component: () => import('../views/inventory/InventoryItemsView.vue'), meta: { title: '物品管理' } },
       { path: 'inventory/warehouse-stocks', name: 'inventory-warehouse-stocks', component: () => import('../views/inventory/WarehouseStocksView.vue'), meta: { title: '库存查询' } },
       { path: 'inventory/stock-batches', name: 'inventory-stock-batches', component: () => import('../views/inventory/StockBatchesView.vue'), meta: { title: '批次与效期' } },
+      { path: 'inventory/purchase-requests', name: 'inventory-purchase-requests', component: () => import('../views/inventory/PurchaseRequestsView.vue'), meta: { title: '申购单' } },
       { path: 'inventory/purchase-orders', name: 'inventory-purchase-orders', component: () => import('../views/inventory/PurchaseOrdersView.vue'), meta: { title: '采购单' } },
       { path: 'inventory/goods-receipts', name: 'inventory-goods-receipts', component: () => import('../views/inventory/GoodsReceiptsView.vue'), meta: { title: '入库单' } },
       { path: 'inventory/stock-issues', name: 'inventory-stock-issues', component: () => import('../views/inventory/StockIssuesView.vue'), meta: { title: '出库/领用单' } },
@@ -111,7 +119,7 @@ export const router = createRouter({
 
 // 详情页（如 /crm/customers/:id）不是导航菜单里的独立入口，routePermissionMap 只登记了
 // 列表页的精确路径——按"最长前缀匹配"找到它归属的列表页权限，两者共用同一个权限点。
-function resolveRequiredPermission(path: string): string | undefined {
+function resolveRequiredPermission(path: string): string | string[] | undefined {
   if (routePermissionMap[path]) return routePermissionMap[path]
   const prefixMatch = Object.keys(routePermissionMap)
     .filter((key) => path.startsWith(`${key}/`))
@@ -131,7 +139,7 @@ router.beforeEach((to) => {
   // 前端这一层只是体验优化（不显示看不到的入口时顺带也别让直接改URL绕过去），
   // 真正兜底的鉴权在接口层的 PermissionGuard，这里判断错了也不会导致越权访问数据。
   const requiredPermission = resolveRequiredPermission(to.path)
-  if (requiredPermission && !auth.hasAccess(requiredPermission)) {
+  if (requiredPermission && !canAccessPerm(auth.hasAccess, requiredPermission)) {
     message.warning('无权限访问该页面')
     const fallback = firstAccessibleRoute(auth.hasAccess)
     // fallback 找不到（理论上不应该发生）就放行，避免在"哪都跳不过去"时把用户卡死在原地；

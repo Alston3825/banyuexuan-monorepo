@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, ref, type VNode } from 'vue'
+import { computed, h, onMounted, ref, type VNode } from 'vue'
 import {
   NButton,
   NSpace,
@@ -38,10 +38,27 @@ const roomNoById = ref<Record<string, string>>({})
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const customerNameById = ref<Record<string, string>>({})
 
+// 搜索 + 状态筛选（纯前端过滤：一个门店全部预订量级在几千条以内，接口一次拉全量够用）
+const keyword = ref('')
+const statusFilter = ref<string | null>(null)
+const statusOptions = Object.entries(ROOM_OCCUPANCY_STATUS_MAP).map(([value, meta]) => ({ label: meta.label, value }))
+const filteredRows = computed(() => {
+  const kw = keyword.value.trim()
+  return rows.value.filter(
+    (r) =>
+      (!statusFilter.value || r.status === statusFilter.value) &&
+      (!kw ||
+        (customerNameById.value[r.customerId] ?? '').includes(kw) ||
+        (roomNoById.value[r.roomId] ?? '').includes(kw) ||
+        r.occupancyNo.includes(kw)),
+  )
+})
+
 async function fetchList() {
   loading.value = true
   try {
-    rows.value = await roomOccupancyApi.list()
+    // 按入住日期倒序（最近的排最前）：数据量上千条以后，接口默认的"创建时间倒序"对前台没意义
+    rows.value = (await roomOccupancyApi.list()).sort((a, b) => b.plannedCheckIn.localeCompare(a.plannedCheckIn))
   } finally {
     loading.value = false
   }
@@ -341,13 +358,23 @@ onMounted(async () => {
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px">
-      <span />
+      <n-space>
+        <n-input v-model:value="keyword" placeholder="搜索客户姓名/房号/占用编号" clearable style="width: min(260px, 94vw)" />
+        <n-select v-model:value="statusFilter" :options="statusOptions" placeholder="全部状态" clearable style="width: min(140px, 94vw)" />
+      </n-space>
       <n-button type="primary" @click="openCreateModal">新建预订</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: RoomOccupancy) => r.id" :scroll-x="900" />
+    <n-data-table
+      :columns="columns"
+      :data="filteredRows"
+      :loading="loading"
+      :row-key="(r: RoomOccupancy) => r.id"
+      :pagination="{ pageSize: 20, showSizePicker: true, pageSizes: [20, 50, 100] }"
+      :scroll-x="900"
+    />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建预订" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建预订" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" @update:value="onStoreChange" /></n-form-item>
           <n-form-item label="房间"><n-select v-model:value="model.roomId" :options="roomOptionsByStore" /></n-form-item>
@@ -364,7 +391,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :show="cancelVisible" @update:show="(v) => (cancelVisible = v)">
-      <n-card title="取消预订" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="取消预订" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="取消原因"><n-input v-model:value="cancelReason" type="textarea" /></n-form-item>
         </n-form>
@@ -381,7 +408,7 @@ onMounted(async () => {
       <n-card
         v-if="opsOccupancy"
         :title="`客房动态：${opsOccupancy.occupancyNo}`"
-        style="width: 720px"
+        style="width: min(720px, 94vw)"
         :bordered="false"
         role="dialog"
         aria-modal="true"
@@ -389,16 +416,16 @@ onMounted(async () => {
         <n-tabs type="line" default-value="call">
           <n-tab-pane name="call" tab="呼叫记录">
             <n-space style="margin-bottom: 12px">
-              <n-input v-model:value="callReason" placeholder="呼叫事由，如：需要热水" style="width: 320px" />
+              <n-input v-model:value="callReason" placeholder="呼叫事由，如：需要热水" style="width: min(320px, 94vw)" />
               <n-button type="primary" @click="submitCall">发起呼叫</n-button>
             </n-space>
             <n-empty v-if="calls.length === 0" description="暂无呼叫记录" />
             <n-data-table v-else :columns="callColumns" :data="calls" :loading="opsLoading" :row-key="(r: RoomCall) => r.id" />
           </n-tab-pane>
           <n-tab-pane name="outing" tab="外出管理">
-            <n-space style="margin-bottom: 12px" :wrap="false">
-              <n-date-picker v-model:value="outingRange" type="datetimerange" style="width: 360px" />
-              <n-input v-model:value="outingRiskNote" placeholder="风险提示（可选）" style="width: 160px" />
+            <n-space style="margin-bottom: 12px">
+              <n-date-picker v-model:value="outingRange" type="datetimerange" style="width: min(360px, 94vw)" />
+              <n-input v-model:value="outingRiskNote" placeholder="风险提示（可选）" style="width: min(160px, 94vw)" />
               <n-button type="primary" @click="submitOuting">登记外出计划</n-button>
             </n-space>
             <n-empty v-if="outings.length === 0" description="暂无外出记录" />
@@ -406,8 +433,8 @@ onMounted(async () => {
           </n-tab-pane>
           <n-tab-pane name="requisition" tab="客房服务领用">
             <n-space style="margin-bottom: 12px">
-              <n-input v-model:value="requisitionItemName" placeholder="领用物品，如：婴儿纸尿裤" style="width: 220px" />
-              <n-input-number v-model:value="requisitionQuantity" :min="1" style="width: 100px" />
+              <n-input v-model:value="requisitionItemName" placeholder="领用物品，如：婴儿纸尿裤" style="width: min(220px, 94vw)" />
+              <n-input-number v-model:value="requisitionQuantity" :min="1" style="width: min(100px, 94vw)" />
               <n-button type="primary" @click="submitRequisition">提交领用</n-button>
             </n-space>
             <n-empty v-if="requisitions.length === 0" description="暂无领用记录" />

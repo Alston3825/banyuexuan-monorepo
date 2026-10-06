@@ -7,6 +7,7 @@ from .providers.base import ChatMessage, ChatResult, EmbeddingResult, ModelProvi
 from .providers.deepseek import DeepSeekProvider
 from .providers.minimax import MiniMaxProvider
 from .providers.volcengine import VolcengineProvider
+from .providers.volcengine_plan import VolcenginePlanProvider
 
 T = TypeVar("T")
 
@@ -43,6 +44,13 @@ def build_providers(settings: Settings) -> Dict[str, ModelProvider]:
             endpoint_id=settings.volcengine_endpoint_id,
             timeout=settings.request_timeout_seconds,
             embedding_endpoint_id=settings.volcengine_embedding_endpoint_id,
+        )
+    if settings.volcengine_plan_api_key and settings.volcengine_plan_model:
+        providers["volcengine_plan"] = VolcenginePlanProvider(
+            api_key=settings.volcengine_plan_api_key,
+            base_url=settings.volcengine_plan_base_url,
+            model=settings.volcengine_plan_model,
+            timeout=settings.vision_request_timeout_seconds,
         )
     if settings.minimax_api_key:
         providers["minimax"] = MiniMaxProvider(

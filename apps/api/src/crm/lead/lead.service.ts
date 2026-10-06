@@ -45,10 +45,16 @@ export class LeadService {
     source: Lead['source'];
     storeId?: string;
     remark?: string;
+    customerId?: string;
+    appointmentType?: Lead['appointmentType'];
+    appointmentTime?: string;
+    appointmentNote?: string;
   }): Promise<Lead> {
+    const { appointmentTime, ...rest } = data;
     const created = await this.prisma.lead.create({
       data: {
-        ...data,
+        ...rest,
+        appointmentTime: appointmentTime ? new Date(appointmentTime) : undefined,
         leadNo: generateBusinessNo('L'),
         status: 'NEW',
         tenantId: this.ctx.tenantId!,
@@ -67,15 +73,32 @@ export class LeadService {
 
   async update(
     id: string,
-    data: { name?: string; phone?: string; remark?: string },
+    data: {
+      name?: string;
+      phone?: string;
+      remark?: string;
+      customerId?: string;
+      appointmentType?: Lead['appointmentType'];
+      appointmentTime?: string;
+      appointmentNote?: string;
+      processed?: boolean;
+      processResults?: string[];
+      handleRemark?: string;
+    },
     expectedVersion: number,
   ): Promise<Lead> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
+    const { appointmentTime, processResults, ...rest } = data;
     const updated = await runVersionedUpdate(() =>
       this.prisma.lead.update({
         where: { id, version: expectedVersion },
-        data: { ...data, version: { increment: 1 } },
+        data: {
+          ...rest,
+          ...(appointmentTime !== undefined ? { appointmentTime: appointmentTime ? new Date(appointmentTime) : null } : {}),
+          ...(processResults !== undefined ? { processResults } : {}),
+          version: { increment: 1 },
+        },
       }),
     );
     await this.auditLogService.record({

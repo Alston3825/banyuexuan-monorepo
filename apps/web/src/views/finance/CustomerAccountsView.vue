@@ -166,7 +166,7 @@ const columns: DataTableColumns<CustomerAccountTransaction> = [
 <template>
   <div>
     <n-space align="center" style="margin-bottom: 16px">
-      <n-select v-model:value="customerId" :options="customerOptions" filterable placeholder="选择客户查看会员账户" style="width: 320px" />
+      <n-select v-model:value="customerId" :options="customerOptions" filterable placeholder="选择客户查看会员账户" style="width: min(320px, 94vw)" />
     </n-space>
 
     <n-empty v-if="!customerId" description="请先选择一位客户" />
@@ -186,7 +186,7 @@ const columns: DataTableColumns<CustomerAccountTransaction> = [
     </template>
 
     <n-modal :show="rechargeVisible" @update:show="(v) => (rechargeVisible = v)">
-      <n-card title="充值" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="充值" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="本金(元)"><n-input-number v-model:value="rechargeModel.principalYuan" :min="0" style="width: 100%" /></n-form-item>
           <n-form-item label="赠送(元)"><n-input-number v-model:value="rechargeModel.giftYuan" :min="0" style="width: 100%" /></n-form-item>
@@ -202,7 +202,7 @@ const columns: DataTableColumns<CustomerAccountTransaction> = [
     </n-modal>
 
     <n-modal :show="consumeVisible" @update:show="(v) => (consumeVisible = v)">
-      <n-card title="登记消费" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="登记消费" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="消费金额(元)"><n-input-number v-model:value="consumeModel.amountYuan" :min="0.01" style="width: 100%" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="consumeModel.remark" type="textarea" placeholder="消费用途说明" /></n-form-item>
@@ -217,7 +217,7 @@ const columns: DataTableColumns<CustomerAccountTransaction> = [
     </n-modal>
 
     <n-modal :show="refundVisible" @update:show="(v) => (refundVisible = v)">
-      <n-card title="退款" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="退款" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="120">
           <n-form-item label="退回本金(元)"><n-input-number v-model:value="refundModel.principalYuan" :min="0" style="width: 100%" /></n-form-item>
           <n-form-item label="退回赠送(元)"><n-input-number v-model:value="refundModel.giftYuan" :min="0" style="width: 100%" /></n-form-item>
@@ -233,7 +233,7 @@ const columns: DataTableColumns<CustomerAccountTransaction> = [
     </n-modal>
 
     <n-modal :show="adjustVisible" @update:show="(v) => (adjustVisible = v)">
-      <n-card title="人工调整（纠错）" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="人工调整（纠错）" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="120">
           <n-form-item label="本金调整(元)"><n-input-number v-model:value="adjustModel.principalDeltaYuan" style="width: 100%" placeholder="可正可负" /></n-form-item>
           <n-form-item label="赠送调整(元)"><n-input-number v-model:value="adjustModel.giftDeltaYuan" style="width: 100%" placeholder="可正可负" /></n-form-item>

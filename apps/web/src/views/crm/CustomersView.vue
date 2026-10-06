@@ -1,37 +1,21 @@
 <script setup lang="ts">
 import { h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  NButton,
-  NSpace,
-  NDataTable,
-  NModal,
-  NCard,
-  NForm,
-  NFormItem,
-  NInput,
-  NSelect,
-  type DataTableColumns,
-  type FormInst,
-} from 'naive-ui'
+import { NButton, NSpace, NDataTable, NInput, type DataTableColumns } from 'naive-ui'
 import { customerApi } from '../../api/modules/customer.api'
+import { customerChannelApi } from '../../api/modules/customer-channel.api'
 import { storeApi } from '../../api/modules/store.api'
-import { accountApi } from '../../api/modules/account.api'
-import type { Customer } from '../../api/types/customer'
-import { CUSTOMER_SOURCE_LABEL_MAP } from '../../utils/status-map'
-import { message } from '../../utils/discrete-api'
+import type { Customer, StaffOption } from '../../api/types/customer'
 
 const router = useRouter()
 const rows = ref<Customer[]>([])
 const loading = ref(false)
 const keyword = ref('')
 
-const storeOptions = ref<{ label: string; value: string }[]>([])
 const storeNameById = ref<Record<string, string>>({})
-const accountOptions = ref<{ label: string; value: string }[]>([])
-const accountNameById = ref<Record<string, string>>({})
-
-const sourceOptions = Object.entries(CUSTOMER_SOURCE_LABEL_MAP).map(([value, label]) => ({ label, value }))
+const staffNameById = ref<Record<string, string>>({})
+const channelNameById = ref<Record<string, string>>({})
+const typeNameById = ref<Record<string, string>>({})
 
 async function fetchList() {
   loading.value = true
@@ -43,91 +27,48 @@ async function fetchList() {
 }
 
 async function fetchPickerOptions() {
-  const [stores, accounts] = await Promise.all([storeApi.list(), accountApi.list()])
-  storeOptions.value = stores.map((s) => ({ label: s.name, value: s.id }))
+  // 员工名字用 staff-options（不要求账号管理权限），店员也能看到销售员姓名
+  const [stores, staff, channels, types] = await Promise.all([
+    storeApi.list(),
+    customerApi.staffOptions().catch(() => [] as StaffOption[]),
+    customerChannelApi.list().catch(() => []),
+    customerChannelApi.listTypes().catch(() => []),
+  ])
   storeNameById.value = Object.fromEntries(stores.map((s) => [s.id, s.name]))
-  accountOptions.value = accounts.map((a) => ({ label: `${a.realName}（${a.username}）`, value: a.id }))
-  accountNameById.value = Object.fromEntries(accounts.map((a) => [a.id, a.realName]))
+  staffNameById.value = Object.fromEntries(staff.map((a) => [a.id, a.realName]))
+  channelNameById.value = Object.fromEntries(channels.map((c) => [c.id, c.name]))
+  typeNameById.value = Object.fromEntries(types.map((t) => [t.id, t.name]))
 }
 
-const formVisible = ref(false)
-const editingRow = ref<Customer | null>(null)
-const submitting = ref(false)
-const formRef = ref<FormInst | null>(null)
-const model = ref({
-  name: '',
-  phone: '',
-  source: 'WALK_IN' as Customer['source'],
-  primaryStoreId: undefined as string | undefined,
-  assignedToId: undefined as string | undefined,
-  remark: '',
-})
+const name = (map: Record<string, string>, id: string | null) => (id ? map[id] ?? id : '-')
 
-function openCreateModal() {
-  editingRow.value = null
-  model.value = { name: '', phone: '', source: 'WALK_IN', primaryStoreId: undefined, assignedToId: undefined, remark: '' }
-  formVisible.value = true
-}
-
-function openEditModal(row: Customer) {
-  editingRow.value = row
-  model.value = {
-    name: row.name,
-    phone: row.phone,
-    source: row.source,
-    primaryStoreId: row.primaryStoreId ?? undefined,
-    assignedToId: row.assignedToId ?? undefined,
-    remark: row.remark ?? '',
-  }
-  formVisible.value = true
-}
-
-async function handleSubmit() {
-  await formRef.value?.validate()
-  submitting.value = true
-  try {
-    if (editingRow.value) {
-      await customerApi.update(editingRow.value.id, {
-        name: model.value.name,
-        phone: model.value.phone,
-        assignedToId: model.value.assignedToId,
-        remark: model.value.remark || undefined,
-        version: editingRow.value.version,
-      })
-      message.success('客户已更新')
-    } else {
-      await customerApi.create({
-        name: model.value.name,
-        phone: model.value.phone,
-        source: model.value.source,
-        primaryStoreId: model.value.primaryStoreId,
-        assignedToId: model.value.assignedToId,
-        remark: model.value.remark || undefined,
-      })
-      message.success('客户已创建')
-    }
-    formVisible.value = false
-    await fetchList()
-  } finally {
-    submitting.value = false
-  }
-}
-
+// 新建/编辑都是整页（见 CustomerFormView），这里只负责跳转
 const columns: DataTableColumns<Customer> = [
-  { key: 'customerNo', title: '客户编号' },
-  { key: 'name', title: '姓名' },
-  { key: 'phone', title: '手机号' },
-  { key: 'source', title: '来源', render: (row) => CUSTOMER_SOURCE_LABEL_MAP[row.source] ?? row.source },
-  { key: 'assignedToId', title: '归属销售', render: (row) => (row.assignedToId ? accountNameById.value[row.assignedToId] ?? row.assignedToId : '-') },
-  { key: 'primaryStoreId', title: '建档门店', render: (row) => (row.primaryStoreId ? storeNameById.value[row.primaryStoreId] ?? row.primaryStoreId : '-') },
+  { key: 'customerNo', title: '客户编号', width: 160 },
+  { key: 'name', title: '姓名', width: 100 },
+  { key: 'phone', title: '手机号', width: 130 },
+  {
+    key: 'source',
+    title: '渠道',
+    width: 170,
+    render: (row) => {
+      const type = name(typeNameById.value, row.channelTypeId)
+      return row.channelId ? `${type} · ${name(channelNameById.value, row.channelId)}` : type
+    },
+  },
+  { key: 'phoneSalesId', title: '电话销售员', width: 100, render: (row) => name(staffNameById.value, row.phoneSalesId) },
+  { key: 'assignedToId', title: '门店销售员', width: 100, render: (row) => name(staffNameById.value, row.assignedToId) },
+  { key: 'primaryStoreId', title: '建档门店', width: 130, render: (row) => name(storeNameById.value, row.primaryStoreId) },
+  { key: 'registeredAt', title: '添加时间', width: 110, render: (row) => row.registeredAt.slice(0, 10) },
   {
     key: 'actions',
     title: '操作',
     width: 160,
+    fixed: 'right',
     render: (row) =>
       h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', onClick: () => openEditModal(row) }, { default: () => '编辑' }),
+          h(NButton, { size: 'small', onClick: () => router.push(`/crm/customers/${row.id}/edit`) }, { default: () => '编辑' }),
           h(NButton, { size: 'small', onClick: () => router.push(`/crm/customers/${row.id}`) }, { default: () => '查看详情' }),
         ],
       }),
@@ -142,40 +83,9 @@ onMounted(async () => {
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px">
-      <n-input v-model:value="keyword" placeholder="按姓名/手机号搜索" style="width: 240px" clearable @keyup.enter="fetchList" @clear="fetchList" />
-      <n-button type="primary" @click="openCreateModal">新建客户</n-button>
+      <n-input v-model:value="keyword" placeholder="按姓名/手机号/客户编号搜索" style="width: min(260px, 94vw)" clearable @keyup.enter="fetchList" @clear="fetchList" />
+      <n-button type="primary" @click="router.push('/crm/customers/new')">新建客户</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Customer) => r.id" :scroll-x="960" />
-
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑客户' : '新建客户'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
-        <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
-          <n-form-item label="姓名" path="name" :rule="{ required: true, message: '请输入姓名' }">
-            <n-input v-model:value="model.name" />
-          </n-form-item>
-          <n-form-item label="手机号" path="phone" :rule="{ required: true, message: '请输入手机号' }">
-            <n-input v-model:value="model.phone" />
-          </n-form-item>
-          <n-form-item v-if="!editingRow" label="来源" path="source">
-            <n-select v-model:value="model.source" :options="sourceOptions" />
-          </n-form-item>
-          <n-form-item v-if="!editingRow" label="建档门店" path="primaryStoreId">
-            <n-select v-model:value="model.primaryStoreId" :options="storeOptions" clearable />
-          </n-form-item>
-          <n-form-item label="归属销售" path="assignedToId">
-            <n-select v-model:value="model.assignedToId" :options="accountOptions" clearable />
-          </n-form-item>
-          <n-form-item label="备注" path="remark">
-            <n-input v-model:value="model.remark" type="textarea" />
-          </n-form-item>
-        </n-form>
-        <template #footer>
-          <n-space justify="end">
-            <n-button @click="formVisible = false">取消</n-button>
-            <n-button type="primary" :loading="submitting" @click="handleSubmit">提交</n-button>
-          </n-space>
-        </template>
-      </n-card>
-    </n-modal>
+    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Customer) => r.id" :scroll-x="1250" />
   </div>
 </template>

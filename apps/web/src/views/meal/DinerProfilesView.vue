@@ -101,7 +101,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: DinerProfile) => r.id" :scroll-x="900" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="建立用膳人" style="width: 520px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="建立用膳人" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="客户">
             <n-select v-model:value="model.customerId" :options="customerOptions" filterable placeholder="搜索客户姓名/手机号" />

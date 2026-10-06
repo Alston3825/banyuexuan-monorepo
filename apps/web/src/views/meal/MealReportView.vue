@@ -50,13 +50,13 @@ onMounted(async () => {
 
 <template>
   <div>
-    <n-space style="margin-bottom: 16px" :wrap="false">
-      <n-select v-model:value="storeId" :options="storeOptions" clearable placeholder="全部门店" style="width: 180px" />
-      <n-date-picker v-model:value="dateRange" type="daterange" clearable style="width: 280px" />
+    <n-space style="margin-bottom: 16px">
+      <n-select v-model:value="storeId" :options="storeOptions" clearable placeholder="全部门店" style="width: min(180px, 94vw)" />
+      <n-date-picker v-model:value="dateRange" type="daterange" clearable style="width: min(280px, 94vw)" />
       <n-button type="primary" :loading="loading" @click="fetchReport">查询</n-button>
     </n-space>
 
-    <n-grid v-if="report" :cols="5" :x-gap="12" style="margin-bottom: 16px">
+    <n-grid v-if="report" cols="2 s:3 m:5" responsive="screen" :x-gap="12" style="margin-bottom: 16px">
       <n-grid-item><n-card><n-statistic label="排餐总数" :value="report.totalRecords" /></n-card></n-grid-item>
       <n-grid-item><n-card><n-statistic label="已供餐" :value="report.servedCount" /></n-card></n-grid-item>
       <n-grid-item><n-card><n-statistic label="待供餐" :value="report.plannedCount" /></n-card></n-grid-item>
@@ -64,7 +64,7 @@ onMounted(async () => {
       <n-grid-item><n-card><n-statistic label="平均评分" :value="report.avgRating ?? '-'" /></n-card></n-grid-item>
     </n-grid>
 
-    <n-grid v-if="report" :cols="2" :x-gap="16">
+    <n-grid v-if="report" cols="1 s:2" responsive="screen" :x-gap="16">
       <n-grid-item>
         <n-card title="各餐次记录数">
           <n-data-table :columns="bySlotColumns" :data="bySlotRows" :row-key="(r) => r.slot" />

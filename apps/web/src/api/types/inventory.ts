@@ -55,6 +55,11 @@ export interface InventoryItem extends ScopedEntityBase {
   name: string
   unit: string
   category: string | null
+  /** 规格/型号/尺寸 */
+  spec: string | null
+  brand: string | null
+  /** 参考单价（接口里是字符串形式的小数） */
+  referencePrice: string | number | null
   purpose: WarehousePurpose
   safetyStockThreshold: number | null
   shelfLifeDays: number | null
@@ -65,6 +70,9 @@ export interface CreateInventoryItemDto {
   name: string
   unit: string
   category?: string
+  spec?: string
+  brand?: string
+  referencePrice?: number
   purpose?: WarehousePurpose
   safetyStockThreshold?: number
   shelfLifeDays?: number
@@ -72,6 +80,11 @@ export interface CreateInventoryItemDto {
 export interface UpdateInventoryItemDto {
   name?: string
   category?: string
+  /** 空字符串 = 清空 */
+  spec?: string
+  brand?: string
+  /** null = 清空 */
+  referencePrice?: number | null
   safetyStockThreshold?: number
   shelfLifeDays?: number
   status?: CommonStatus
@@ -304,4 +317,121 @@ export interface CreateStockCountDto {
   warehouseId: string
   remark?: string
   items: StockCountItemInput[]
+}
+
+/** Excel 导入：表里每一行整理出来的物品 */
+export interface ItemImportRow {
+  rowNo: number
+  name: string
+  spec: string | null
+  brand: string | null
+  unit: string | null
+  referencePrice: number | null
+}
+export type ItemImportStatus = 'NEW' | 'EXISTS' | 'DUP_IN_FILE' | 'MISSING_UNIT'
+export interface ItemImportPreviewRow extends ItemImportRow {
+  status: ItemImportStatus
+  message: string
+  existingId: string | null
+}
+export interface ItemImportPreview {
+  sheetName: string
+  headerRow: number
+  ignoredColumns: string[]
+  rows: ItemImportPreviewRow[]
+}
+export interface ItemImportResult {
+  created: number
+  updated: number
+  skipped: number
+  skippedDetail: { rowNo: number; name: string; reason: string }[]
+}
+
+// ---------------- 申购单 ----------------
+export type PurchaseRequestStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'ORDERED'
+
+export interface PurchaseRequestItem {
+  id: string
+  sortNo: number
+  itemId: string | null
+  name: string
+  spec: string | null
+  brand: string | null
+  unit: string | null
+  quantity: number
+  unitPrice: string | number | null
+  subtotal: string | number
+  department: string | null
+  requester: string | null
+  purpose: string | null
+  remark: string | null
+}
+
+export interface PurchaseRequest {
+  id: string
+  storeId: string
+  requestNo: string
+  requestDate: string
+  status: PurchaseRequestStatus
+  totalAmount: string | number
+  sourceFileName: string | null
+  remark: string | null
+  cancelReason: string | null
+  purchaseOrderId: string | null
+  version: number
+  createdAt: string
+  store: { id: string; name: string }
+  purchaseOrder: { id: string; orderNo: string; status?: string } | null
+  /** 列表接口带；详情接口带 items */
+  _count?: { items: number }
+  items: PurchaseRequestItem[]
+}
+
+export interface RequestImportRow {
+  rowNo: number
+  department: string | null
+  requester: string | null
+  name: string
+  spec: string | null
+  brand: string | null
+  unit: string | null
+  quantity: number | null
+  unitPrice: number | null
+  purpose: string | null
+}
+export interface RequestImportPreviewRow extends RequestImportRow {
+  sheetSubtotal: number | null
+  itemId: string | null
+  issues: string[]
+}
+export interface RequestImportPreview {
+  sheetName: string
+  headerRow: number
+  titleText: string | null
+  storeGuess: { id: string; name: string } | null
+  requestDate: string | null
+  sheetTotal: number | null
+  rows: RequestImportPreviewRow[]
+  duplicate: { id: string; requestNo: string; totalAmount: string } | null
+}
+export interface RequestImportResult {
+  id: string
+  requestNo: string
+  lines: number
+  totalAmount: number
+  linkedItems: number
+  unlinked: string[]
+}
+export interface PurchaseRequestLineBody {
+  name?: string
+  spec?: string | null
+  brand?: string | null
+  unit?: string | null
+  quantity?: number
+  unitPrice?: number | null
+  department?: string | null
+  requester?: string | null
+  purpose?: string | null
+  remark?: string | null
+  itemId?: string | null
 }

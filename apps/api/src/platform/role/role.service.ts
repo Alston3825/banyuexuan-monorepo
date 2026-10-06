@@ -72,9 +72,26 @@ export class RoleService {
     return updated;
   }
 
+  /**
+   * 角色一旦设置过权限（RoleOnPermission）或被分配给过账号（AccountRoleAssignment），
+   * 直接 delete() 会撞外键约束——之前没处理，Prisma抛出的P2003原样冒泡成一个没有实际
+   * 信息的500"服务器错误"。这里区分两种情况：还有账号在用这个角色，属于真实的数据完整性
+   * 风险，拒绝删除并给出清楚的原因（不能静默把账号的角色关联删掉，那样对应账号会在不知情
+   * 的情况下丢失权限）；只是角色自己配过权限点、没有账号在用，这种是安全的，先清掉
+   * RoleOnPermission 再删角色本身，两步放在一个事务里。
+   */
   async delete(id: string): Promise<void> {
     const before = await this.assertMutable(id);
-    await this.prisma.role.delete({ where: { id } });
+    const activeAssignmentCount = await this.prisma.accountRoleAssignment.count({
+      where: { roleId: id, revokedAt: null },
+    });
+    if (activeAssignmentCount > 0) {
+      throw new ConflictException(`该角色仍有 ${activeAssignmentCount} 个账号在使用，请先解除这些账号的角色关联后再删除`);
+    }
+    await this.prisma.$transaction([
+      this.prisma.roleOnPermission.deleteMany({ where: { roleId: id } }),
+      this.prisma.role.delete({ where: { id } }),
+    ]);
     await this.auditLogService.record({
       action: 'DELETE',
       entityType: 'Role',
@@ -84,10 +101,19 @@ export class RoleService {
     });
   }
 
+  /**
+   * 用 upsert 不用 create：这个权限点已经被授予过时应该是无操作，不是报错——
+   * 权限树是cascade勾选，勾一个大模块要并发打十几个请求，前端乐观更新+快速连续操作
+   * (勾了又取消又勾回来、或者不小心双击)都可能让同一个permissionPointId被重复提交，
+   * 之前用create()撞到 @@unique([roleId, permissionPointId]) 会抛P2002，没有被专门
+   * 捕获，最终表现成一个没有实际信息的500"服务器错误"，把"其实已经生效了"的操作误报成失败。
+   */
   async grantPermission(roleId: string, permissionPointId: string) {
     await this.assertMutable(roleId);
-    const grant = await this.prisma.roleOnPermission.create({
-      data: { roleId, permissionPointId, createdBy: this.ctx.accountId! },
+    const grant = await this.prisma.roleOnPermission.upsert({
+      where: { roleId_permissionPointId: { roleId, permissionPointId } },
+      update: {},
+      create: { roleId, permissionPointId, createdBy: this.ctx.accountId! },
     });
     await this.auditLogService.record({
       action: 'CREATE',

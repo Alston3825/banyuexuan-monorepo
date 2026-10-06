@@ -111,7 +111,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: ShiftDefinition) => r.id" :scroll-x="800" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑班次' : '新建班次'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑班次' : '新建班次'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="所属门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
@@ -121,7 +121,7 @@ onMounted(fetchAll)
             <n-input v-model:value="model.name" placeholder="如 白班/夜班/护士早班" />
           </n-form-item>
           <n-form-item label="时段">
-            <n-space :wrap="false" align="center" style="width: 100%">
+            <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
               <n-time-picker v-model:value="model.startTimeMs" format="HH:mm" style="width: 100%" placeholder="开始时间" />
               <n-text>至</n-text>
               <n-time-picker v-model:value="model.endTimeMs" format="HH:mm" style="width: 100%" placeholder="结束时间（跨零点班次可小于开始时间）" />

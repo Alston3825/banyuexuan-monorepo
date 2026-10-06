@@ -34,10 +34,13 @@ async function fetchPickerOptions() {
   const [contracts, customers] = await Promise.all([contractApi.list(), customerApi.list()])
   customerNameById.value = Object.fromEntries(customers.map((c) => [c.id, c.name]))
   contractById.value = Object.fromEntries(contracts.map((c) => [c.id, c]))
-  contractOptions.value = contracts.map((c) => ({
-    label: `${c.title}（${customerNameById.value[c.customerId] ?? c.customerId}）`,
-    value: c.id,
-  }))
+  // 只有已确认、已关联客户的合同才能登记收款
+  contractOptions.value = contracts
+    .filter((c) => c.status === 'ACTIVE' && c.customerId)
+    .map((c) => ({
+      label: `${c.paperNo || c.contractNo}（${customerNameById.value[c.customerId!] ?? c.clientName ?? c.customerId}）`,
+      value: c.id,
+    }))
 }
 
 // ---------------- 新建收款 ----------------
@@ -52,7 +55,7 @@ function openCreateModal() {
 
 async function handleSubmit() {
   const contract = model.value.contractId ? contractById.value[model.value.contractId] : null
-  if (!contract || !model.value.amountYuan) {
+  if (!contract || !contract.customerId || !model.value.amountYuan) {
     message.error('请选择合同并填写金额')
     return
   }
@@ -117,7 +120,7 @@ const columns: DataTableColumns<Payment> = [
   {
     key: 'contractId',
     title: '关联合同',
-    render: (row) => h(RouterLink, { to: `/contract/records/${row.contractId}` }, { default: () => contractById.value[row.contractId]?.title ?? row.contractId }),
+    render: (row) => h(RouterLink, { to: `/contract/records/${row.contractId}` }, { default: () => (contractById.value[row.contractId]?.paperNo || contractById.value[row.contractId]?.contractNo) ?? row.contractId }),
   },
   { key: 'customerId', title: '客户', render: (row) => customerNameById.value[row.customerId] ?? row.customerId },
   { key: 'amount', title: '金额（元）', render: (row) => toMajorUnits(row.amount) },
@@ -153,7 +156,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Payment) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="登记收款" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="登记收款" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="合同"><n-select v-model:value="model.contractId" :options="contractOptions" filterable /></n-form-item>
           <n-form-item label="金额（元）"><n-input-number v-model:value="model.amountYuan" style="width: 100%" /></n-form-item>
@@ -182,7 +185,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :show="refundVisible" @update:show="(v) => (refundVisible = v)">
-      <n-card title="申请退款" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="申请退款" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="退款原因"><n-input v-model:value="refundReason" type="textarea" /></n-form-item>
         </n-form>

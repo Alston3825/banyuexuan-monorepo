@@ -19,6 +19,8 @@ export class CreateMotherProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() deliveryDate?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() gestationalWeeks?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() expectedDeliveryDate?: string;
+  @ApiProperty({ required: false, description: '护理要点/医嘱：护理看板卡片上展示的简短提示' }) @IsOptional() @IsString() careNote?: string;
+  @ApiProperty({ required: false, description: '主责护理师（员工账号 ID）' }) @IsOptional() @IsString() primaryNurseId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() remark?: string;
 
   @ApiProperty({ required: false, description: '风险标签 ID 列表（早产/传染病/高敏/妈咪住院等）' })

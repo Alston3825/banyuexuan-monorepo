@@ -21,4 +21,5 @@ export const accountApi = {
     http.post(`/platform/accounts/${id}/role-assignments`, body).then((r) => r.data),
   revokeRoleAssignment: (id: string, assignmentId: string) =>
     http.delete(`/platform/accounts/${id}/role-assignments/${assignmentId}`).then((r) => r.data),
+  remove: (id: string) => http.delete(`/platform/accounts/${id}`).then((r) => r.data),
 }

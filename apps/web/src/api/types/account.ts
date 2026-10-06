@@ -45,12 +45,21 @@ export interface CreateAccountDto {
   departmentId?: string
   teamId?: string
   positionId?: string
+  status?: 'ACTIVE' | 'DISABLED'
+  /** 跟 hireDate 一起填才会同步建立员工档案，见 stores/RolesView 同款说明 */
+  employeeNo?: string
+  hireDate?: string
 }
 
 export interface UpdateAccountDto {
   realName?: string
   phone?: string
   email?: string
+  /** 传 null 表示清空 */
+  storeId?: string | null
+  departmentId?: string | null
+  teamId?: string | null
+  positionId?: string | null
   status?: AccountStatus
   version: number
 }

@@ -11,6 +11,7 @@ import { QueryMotherProfileDto } from './dto/query-mother-profile.dto';
 
 const includeProfile = {
   babies: { orderBy: { sequenceNo: 'asc' as const } },
+  primaryNurse: { select: { id: true, realName: true } },
 };
 
 /**
@@ -31,7 +32,12 @@ export class MotherProfileService {
   findMany(query: QueryMotherProfileDto = {}) {
     return this.prisma.motherProfile.findMany({
       where: { tenantId: this.ctx.tenantId, customerId: query.customerId, storeId: query.storeId },
-      include: includeProfile,
+      include: {
+        ...includeProfile,
+        // 列表要显示"房号 + 客户姓名"，工作人员一眼认出要找的人
+        customer: { select: { name: true, phone: true } },
+        occupancy: { select: { occupancyNo: true, status: true, room: { select: { roomNo: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -40,6 +46,38 @@ export class MotherProfileService {
     const profile = await this.prisma.motherProfile.findUnique({ where: { id }, include: includeProfile });
     if (!profile) throw new NotFoundException(`MotherProfile ${id} 不存在`);
     return profile;
+  }
+
+  /** 指派护理师时的候选人：本门店（或不限门店）的在职账号；职位/角色/部门里带“护理”的排前面。 */
+  async nurseOptions(storeId?: string) {
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        tenantId: this.ctx.tenantId,
+        status: 'ACTIVE',
+        ...(storeId ? { OR: [{ storeId }, { storeId: null }] } : {}),
+      },
+      select: {
+        id: true,
+        realName: true,
+        position: { select: { name: true } },
+        department: { select: { name: true } },
+        roleAssignments: { select: { role: { select: { name: true } } } },
+      },
+      orderBy: { realName: 'asc' },
+    });
+    return accounts
+      .map((a) => {
+        const labels = [a.position?.name, ...a.roleAssignments.map((r) => r.role.name)].filter((x): x is string => !!x);
+        const isNurse = [...labels, a.department?.name ?? ''].some((x) => x.includes('护理') || x.includes('护士') || x.includes('月嫂'));
+        return { id: a.id, name: a.realName, roles: [...new Set(labels)], isNurse };
+      })
+      .sort((x, y) => Number(y.isNurse) - Number(x.isNurse));
+  }
+
+  private async assertNurse(id: string | null | undefined) {
+    if (!id) return;
+    const acc = await this.prisma.account.findFirst({ where: { id, tenantId: this.ctx.tenantId, status: 'ACTIVE' }, select: { id: true } });
+    if (!acc) throw new BadRequestException('所选护理师不存在或已停用');
   }
 
   async getRiskTags(entityType: 'MOTHER_PROFILE' | 'BABY_PROFILE', entityId: string) {
@@ -71,18 +109,36 @@ export class MotherProfileService {
     for (const baby of dto.babies ?? []) {
       await this.assertTagsExist(baby.riskTagIds ?? []);
     }
+    await this.assertNurse(dto.primaryNurseId);
 
+    // 没手动选入住记录时，自动关联这位客户当前的入住（已入住优先，其次预订中，且还没被别的档案占用）
+    let occupancyId = dto.occupancyId;
+    if (!occupancyId) {
+      const candidates = await this.prisma.roomOccupancy.findMany({
+        where: { tenantId: this.ctx.tenantId, customerId: dto.customerId, status: { in: ['CHECKED_IN', 'RESERVED'] } },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], // CHECKED_IN 排在 RESERVED 前
+      });
+      for (const c of candidates) {
+        if ((await this.prisma.motherProfile.count({ where: { occupancyId: c.id } })) === 0) {
+          occupancyId = c.id;
+          storeId = c.storeId;
+          break;
+        }
+      }
+    }
     const created = await this.prisma.$transaction(async (tx) => {
       const profile = await tx.motherProfile.create({
         data: {
           tenantId: this.ctx.tenantId!,
           storeId,
           customerId: dto.customerId,
-          occupancyId: dto.occupancyId,
+          occupancyId,
           deliveryMethod: dto.deliveryMethod,
           deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : undefined,
           gestationalWeeks: dto.gestationalWeeks,
           expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : undefined,
+          careNote: dto.careNote,
+          primaryNurseId: dto.primaryNurseId,
           remark: dto.remark,
           createdBy: this.ctx.accountId!,
         },
@@ -134,6 +190,7 @@ export class MotherProfileService {
     if (before.version !== dto.version) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');
     }
+    await this.assertNurse(dto.primaryNurseId);
     const updated = await runVersionedUpdate(() =>
       this.prisma.motherProfile.update({
         where: { id, version: dto.version },
@@ -143,6 +200,8 @@ export class MotherProfileService {
           deliveryDate: dto.deliveryDate ? new Date(dto.deliveryDate) : undefined,
           gestationalWeeks: dto.gestationalWeeks,
           expectedDeliveryDate: dto.expectedDeliveryDate ? new Date(dto.expectedDeliveryDate) : undefined,
+          careNote: dto.careNote,
+          primaryNurseId: dto.primaryNurseId,
           remark: dto.remark,
           version: { increment: 1 },
         },

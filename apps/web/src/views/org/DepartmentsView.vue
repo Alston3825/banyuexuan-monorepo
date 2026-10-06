@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import GenericListView from '../../components/generic-crud/GenericListView.vue'
 import GenericFormModal from '../../components/generic-crud/GenericFormModal.vue'
 import { useCrudResource } from '../../composables/useCrudResource'
@@ -11,8 +11,17 @@ import { renderStatusBadge, COMMON_STATUS_MAP } from '../../utils/status-map'
 
 const crud = useCrudResource(departmentApi, '部门', (row) => row.name)
 
+// 同一个部门名称（比如"销售部"）在不同门店各建一个是正常业务场景，列表里必须能看出
+// 每一行属于哪个门店，否则完全没法区分——之前列表只有名称+状态两列，看不出来。
+const storeNameById = ref<Record<string, string>>({})
+async function loadStoreNames() {
+  const stores = await storeApi.list()
+  storeNameById.value = Object.fromEntries(stores.map((s) => [s.id, s.name]))
+}
+
 const columns: CrudColumn<Department>[] = [
   { key: 'name', title: '名称' },
+  { key: 'storeId', title: '所属门店', render: (row) => (row.storeId ? (storeNameById.value[row.storeId] ?? row.storeId) : '总部/跨店') },
   { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, COMMON_STATUS_MAP) },
 ]
 
@@ -41,7 +50,9 @@ const fields: CrudFormField[] = [
   },
 ]
 
-onMounted(crud.fetchList)
+onMounted(async () => {
+  await Promise.all([crud.fetchList(), loadStoreNames()])
+})
 </script>
 
 <template>

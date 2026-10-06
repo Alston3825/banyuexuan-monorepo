@@ -96,18 +96,27 @@ describe('P5 经营分析看板 (e2e)', () => {
       .expect(201);
     customerId = body<Customer>(customer).id;
 
-    const contract = await request(server)
-      .post('/api/v1/contract/records')
+    // 合同是纸质合同台账：手工新建 -> 填必填项 -> 确认入库（仅用于生成收款记录，不测试合同流程本身）
+    const draft = await request(server).post('/api/v1/contract/records/manual').set(authed(adminToken)).send({ storeId }).expect(201);
+    const saved = await request(server)
+      .patch(`/api/v1/contract/records/${body<Contract>(draft).id}`)
       .set(authed(adminToken))
       .send({
-        customerId,
-        storeId,
-        title: 'E2E经营分析测试合同',
-        content: '仅用于生成收款记录，不测试合同状态机本身',
+        version: body<Contract>(draft).version,
+        paperNo: `E2E-P5-${runTag}`,
+        signedDate: '2026-12-20',
+        clientName: 'E2E经营分析测试客户',
+        clientPhone: `136${runTag}`,
+        roomTypeText: '标准',
+        careMode: 'ONE_TO_ONE',
+        inHouseDays: 28,
         amount: 500000,
-        startDate: '2027-01-01T00:00:00.000Z',
-        endDate: '2027-02-12T00:00:00.000Z',
       })
+      .expect(200);
+    const contract = await request(server)
+      .post(`/api/v1/contract/records/${body<Contract>(saved).id}/confirm`)
+      .set(authed(adminToken))
+      .send({ version: body<Contract>(saved).version, customerId })
       .expect(201);
     contractId = body<Contract>(contract).id;
   });

@@ -44,7 +44,7 @@
   vertical-align: middle;
 }
 .gongan-icon {
-  width: 14px;
+  width: min(14px, 94vw);
   height: 14px;
   margin-right: 4px;
 }

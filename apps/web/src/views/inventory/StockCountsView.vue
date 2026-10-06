@@ -167,16 +167,16 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: StockCount) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建盘点单" style="width: 680px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建盘点单" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="盘点明细">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: 240px" />
-                <n-input-number v-model:value="value.countedQuantity" :min="0" placeholder="实际盘点数量" style="width: 160px" />
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(240px, 94vw)" />
+                <n-input-number v-model:value="value.countedQuantity" :min="0" placeholder="实际盘点数量" style="width: min(160px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>
@@ -191,7 +191,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card v-if="detailRow" :title="`盘点明细：${detailRow.countNo}`" style="width: 560px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detailRow" :title="`盘点明细：${detailRow.countNo}`" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-data-table
           :columns="[
             { key: 'item', title: '物品', render: (r: any) => r.item.name },

@@ -144,7 +144,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Device) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑设备' : '新建设备'" style="width: 480px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑设备' : '新建设备'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="所属门店" path="storeId" :rule="{ required: true, message: '请选择门店' }">
             <n-select v-model:value="model.storeId" :options="storeOptions" />

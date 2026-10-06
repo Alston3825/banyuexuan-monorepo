@@ -94,10 +94,10 @@ onMounted(fetchList)
 <template>
   <n-card title="审计日志">
     <n-space style="margin-bottom: 12px" :wrap="true">
-      <n-input v-model:value="filters.entityType" placeholder="实体类型" style="width: 160px" @keyup.enter="handleSearch" />
-      <n-input v-model:value="filters.entityId" placeholder="实体 ID" style="width: 200px" @keyup.enter="handleSearch" />
-      <n-input v-model:value="filters.accountId" placeholder="操作人 ID" style="width: 200px" @keyup.enter="handleSearch" />
-      <n-select v-model:value="filters.action" :options="actionOptions" clearable placeholder="动作类型" style="width: 180px" />
+      <n-input v-model:value="filters.entityType" placeholder="实体类型" style="width: min(160px, 94vw)" @keyup.enter="handleSearch" />
+      <n-input v-model:value="filters.entityId" placeholder="实体 ID" style="width: min(200px, 94vw)" @keyup.enter="handleSearch" />
+      <n-input v-model:value="filters.accountId" placeholder="操作人 ID" style="width: min(200px, 94vw)" @keyup.enter="handleSearch" />
+      <n-select v-model:value="filters.action" :options="actionOptions" clearable placeholder="动作类型" style="width: min(180px, 94vw)" />
       <n-button type="primary" @click="handleSearch">查询</n-button>
     </n-space>
 
@@ -110,7 +110,7 @@ onMounted(fetchList)
     </n-space>
 
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card title="审计详情" style="width: 640px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="审计详情" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <template v-if="detailRow">
           <p>IP：{{ detailRow.ip ?? '-' }}　User-Agent：{{ detailRow.userAgent ?? '-' }}</p>
           <p>备注：{{ detailRow.remark ?? '-' }}</p>

@@ -66,6 +66,8 @@ export const motherProfileApi = {
   update: (id: string, body: UpdateMotherProfileDto) =>
     http.patch<MotherProfile>(`/care/mother-profiles/${id}`, body).then((r) => r.data),
   riskTags: (id: string) => http.get<TagBinding[]>(`/care/mother-profiles/${id}/risk-tags`).then((r) => r.data),
+  nurseOptions: (storeId?: string) =>
+    http.get<{ id: string; name: string; roles: string[]; isNurse: boolean }[]>('/care/mother-profiles/nurse-options', { params: { storeId } }).then((r) => r.data),
 }
 
 export const babyProfileApi = {
@@ -76,6 +78,12 @@ export const babyProfileApi = {
   update: (id: string, body: UpdateBabyProfileDto) =>
     http.patch<BabyProfile>(`/care/baby-profiles/${id}`, body).then((r) => r.data),
   riskTags: (id: string) => http.get<TagBinding[]>(`/care/baby-profiles/${id}/risk-tags`).then((r) => r.data),
+  /** 删除前检查：名下有哪些数据、能不能删、当前账号能不能连数据一起删 */
+  deleteCheck: (id: string) =>
+    http.get<{ babyId: string; babyName: string; blockers: string[]; attached: string[]; canForceDelete: boolean }>(`/care/baby-profiles/${id}/delete-check`).then((r) => r.data),
+  /** 删除建错的宝宝档案；名下有评估表/纸质资料时需 force + 输入宝宝名字确认（管理员） */
+  remove: (id: string, opts?: { force?: boolean; confirmName?: string }) =>
+    http.delete(`/care/baby-profiles/${id}`, { params: opts?.force ? { force: true, confirmName: opts.confirmName } : undefined }).then(() => undefined),
 }
 
 export const carePlanApi = {

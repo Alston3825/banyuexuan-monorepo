@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { RoomService } from './room.service';
@@ -24,6 +24,12 @@ export class RoomController {
   @RequirePermission('room.room.view')
   findAll(@Query() query: QueryRoomDto) {
     return this.roomService.findMany(query);
+  }
+
+  @Get(':id/delete-check')
+  @RequirePermission('room.room.delete')
+  deleteCheck(@Param('id') id: string) {
+    return this.roomService.getDeleteCheck(id);
   }
 
   @Get(':id')
@@ -55,5 +61,12 @@ export class RoomController {
   @RequirePermission('room.room.clean')
   markCleaned(@Param('id') id: string, @Body() dto: CleanRoomDto) {
     return this.roomService.markCleaned(id, dto.version);
+  }
+
+  @Delete(':id')
+  @RequirePermission('room.room.delete')
+  async remove(@Param('id') id: string, @Query('confirmRoomNo') confirmRoomNo?: string) {
+    await this.roomService.remove(id, confirmRoomNo);
+    return { success: true };
   }
 }

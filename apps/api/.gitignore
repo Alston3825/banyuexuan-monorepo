@@ -3,3 +3,6 @@ node_modules
 .env
 
 /generated/prisma
+
+# 合同原件/页面图片的磁盘存储（含身份证号等个人信息，绝不提交；生产环境要纳入备份）
+/storage

@@ -150,7 +150,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CommissionRecord) => r.id" :scroll-x="1100" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建提成记录" style="width: 680px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建提成记录" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="110">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="类型">
@@ -168,10 +168,10 @@ onMounted(async () => {
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="分配明细">
             <n-dynamic-input v-model:value="model.allocations" :on-create="createAllocRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
-                <n-select v-model:value="value.employeeProfileId" :options="employeeOptions" filterable placeholder="员工" style="width: 200px" />
-                <n-input v-model:value="value.roleLabel" placeholder="角色说明，如 主护/助理" style="width: 160px" />
-                <n-input-number v-model:value="value.basisPoints" :min="0" :max="10000" placeholder="分配比例(万分比)" style="width: 160px" />
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-select v-model:value="value.employeeProfileId" :options="employeeOptions" filterable placeholder="员工" style="width: min(200px, 94vw)" />
+                <n-input v-model:value="value.roleLabel" placeholder="角色说明，如 主护/助理" style="width: min(160px, 94vw)" />
+                <n-input-number v-model:value="value.basisPoints" :min="0" :max="10000" placeholder="分配比例(万分比)" style="width: min(160px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>

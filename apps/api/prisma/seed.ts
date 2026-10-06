@@ -66,6 +66,23 @@ async function main() {
     create: { tenantId: tenant.id, code: 'HQ', name: '总部区域', createdBy: 'SEED' },
   });
 
+  // 内置 6 个渠道类型（用户可以改名、停用、另加自己的类型）；已存在就不动，免得覆盖用户改过的名字
+  const builtinChannelTypes = [
+    { legacySource: 'WALK_IN', name: '自然到店' },
+    { legacySource: 'REFERRAL', name: '转介绍' },
+    { legacySource: 'ONLINE_AD', name: '线上广告' },
+    { legacySource: 'SOCIAL_MEDIA', name: '社交媒体/私域' },
+    { legacySource: 'PARTNER', name: '渠道合作' },
+    { legacySource: 'OTHER', name: '其他' },
+  ] as const;
+  for (const [i, t] of builtinChannelTypes.entries()) {
+    await prisma.customerChannelType.upsert({
+      where: { tenantId_legacySource: { tenantId: tenant.id, legacySource: t.legacySource } },
+      update: {},
+      create: { tenantId: tenant.id, legacySource: t.legacySource, name: t.name, sortOrder: i + 1, createdBy: 'SEED' },
+    });
+  }
+
   const store = await prisma.store.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: STORE_CODE } },
     update: {},
@@ -143,12 +160,12 @@ async function main() {
 
     { code: 'crm', name: '客户与线索管理', type: 'MODULE' },
     { code: 'crm.customer', name: 'CRM-客户', type: 'PAGE', parentCode: 'crm' },
+    { code: 'crm.channel', name: 'CRM-客户渠道', type: 'PAGE', parentCode: 'crm' },
     { code: 'crm.lead', name: 'CRM-线索', type: 'PAGE', parentCode: 'crm' },
     { code: 'crm.opportunity', name: 'CRM-销售机会', type: 'PAGE', parentCode: 'crm' },
     { code: 'crm.follow-up', name: 'CRM-跟进记录', type: 'PAGE', parentCode: 'crm' },
 
     { code: 'contract', name: '合同管理', type: 'MODULE' },
-    { code: 'contract.template', name: '合同管理-合同模板', type: 'PAGE', parentCode: 'contract' },
     { code: 'contract.record', name: '合同管理-合同', type: 'PAGE', parentCode: 'contract' },
 
     { code: 'room', name: '房态预订', type: 'MODULE' },
@@ -166,6 +183,7 @@ async function main() {
     { code: 'care.field', name: '护理-护理字段管理', type: 'PAGE', parentCode: 'care' },
     { code: 'care.form-template', name: '护理-护理项目管理', type: 'PAGE', parentCode: 'care' },
     { code: 'care.plan-template', name: '护理-护理方案管理', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.board', name: '护理-护理看板', type: 'PAGE', parentCode: 'care' },
     { code: 'care.profile', name: '护理-母婴档案', type: 'PAGE', parentCode: 'care' },
     { code: 'care.plan', name: '护理-护理计划', type: 'PAGE', parentCode: 'care' },
     { code: 'care.record', name: '护理-护理记录', type: 'PAGE', parentCode: 'care' },
@@ -193,6 +211,7 @@ async function main() {
     { code: 'inventory.item', name: '库存-物品', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.warehouse-stock', name: '库存-库存查询', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.stock-batch', name: '库存-批次与效期', type: 'PAGE', parentCode: 'inventory' },
+    { code: 'inventory.purchase-request', name: '库存-申购单', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.purchase-order', name: '库存-采购单', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.goods-receipt', name: '库存-入库单', type: 'PAGE', parentCode: 'inventory' },
     { code: 'inventory.stock-issue', name: '库存-出库/领用单', type: 'PAGE', parentCode: 'inventory' },
@@ -238,8 +257,8 @@ async function main() {
     { code: 'training.exam', name: '培训与考核-试卷管理', type: 'PAGE', parentCode: 'training' },
     { code: 'training.exam-attempt', name: '培训与考核-我的考试', type: 'PAGE', parentCode: 'training' },
 
-    { code: 'platform.account.field.phone.view', name: '账号-手机号字段', type: 'FIELD', parentCode: 'platform.account', isSensitive: true },
-    { code: 'crm.customer.field.phone.view', name: 'CRM-客户-手机号字段', type: 'FIELD', parentCode: 'crm.customer', isSensitive: true },
+    // 注意：客户手机号(crm.customer.field.phone.view)和员工手机号(platform.account.field.phone.view)
+    // 都曾是字段级掩码权限点，业务方明确要求手机号一律明文显示后已撤掉，不再有这两个权限点。
   ];
 
   for (const sub of [
@@ -286,6 +305,10 @@ async function main() {
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `crm.customer.${action}`, name: `CRM-客户-${action}`, type: 'BUTTON', parentCode: 'crm.customer' });
   }
+  // 具体渠道资料：所有人可查看（新建客户要选），新增/改名/停用只给 SUPER_ADMIN（见下方 storeManagerExcluded）
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `crm.channel.${action}`, name: `CRM-客户渠道-${action}`, type: 'BUTTON', parentCode: 'crm.channel' });
+  }
   for (const action of ['view', 'create', 'update', 'assign', 'convert', 'lose']) {
     permSpecs.push({ code: `crm.lead.${action}`, name: `CRM-线索-${action}`, type: 'BUTTON', parentCode: 'crm.lead' });
   }
@@ -296,20 +319,19 @@ async function main() {
     permSpecs.push({ code: `crm.follow-up.${action}`, name: `CRM-跟进记录-${action}`, type: 'BUTTON', parentCode: 'crm.follow-up' });
   }
 
-  for (const action of ['view', 'create', 'update']) {
-    permSpecs.push({ code: `contract.template.${action}`, name: `合同管理-合同模板-${action}`, type: 'BUTTON', parentCode: 'contract.template' });
-  }
-  for (const action of ['view', 'create', 'update', 'sign', 'submit', 'void', 'renew']) {
+  // 合同 = 纸质合同台账：上传(含手工新建/重新识别)、核对编辑、确认入库、作废、删除(仅未确认的)。
+  // 没有模板、电子签署、审批、续签。
+  for (const action of ['view', 'upload', 'update', 'confirm', 'void', 'delete']) {
     permSpecs.push({ code: `contract.record.${action}`, name: `合同管理-合同-${action}`, type: 'BUTTON', parentCode: 'contract.record' });
   }
 
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `room.type.${action}`, name: `房态预订-房型-${action}`, type: 'BUTTON', parentCode: 'room.type' });
   }
-  for (const action of ['view', 'create', 'update', 'maintenance', 'clean']) {
+  for (const action of ['view', 'create', 'update', 'maintenance', 'clean', 'delete', 'force-delete']) {
     permSpecs.push({ code: `room.room.${action}`, name: `房态预订-房间-${action}`, type: 'BUTTON', parentCode: 'room.room' });
   }
-  for (const action of ['view', 'create', 'checkin', 'checkout', 'cancel']) {
+  for (const action of ['view', 'create', 'checkin', 'checkout', 'cancel', 'reschedule']) {
     permSpecs.push({ code: `room.occupancy.${action}`, name: `房态预订-占用记录-${action}`, type: 'BUTTON', parentCode: 'room.occupancy' });
   }
   for (const action of ['view', 'create', 'handle']) {
@@ -339,7 +361,10 @@ async function main() {
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `care.plan-template.${action}`, name: `护理-护理方案管理-${action}`, type: 'BUTTON', parentCode: 'care.plan-template' });
   }
-  for (const action of ['view', 'create', 'update']) {
+  for (const action of ['view']) {
+    permSpecs.push({ code: `care.board.${action}`, name: `护理-护理看板-${action}`, type: 'BUTTON', parentCode: 'care.board' });
+  }
+  for (const action of ['view', 'create', 'update', 'force-delete', 'approve']) {
     permSpecs.push({ code: `care.profile.${action}`, name: `护理-母婴档案-${action}`, type: 'BUTTON', parentCode: 'care.profile' });
   }
   for (const action of ['view', 'create', 'terminate']) {
@@ -411,6 +436,9 @@ async function main() {
   }
   permSpecs.push({ code: 'inventory.warehouse-stock.view', name: '库存-库存查询-view', type: 'BUTTON', parentCode: 'inventory.warehouse-stock' });
   permSpecs.push({ code: 'inventory.stock-batch.view', name: '库存-批次与效期-view', type: 'BUTTON', parentCode: 'inventory.stock-batch' });
+  for (const action of ['view', 'create', 'update', 'submit', 'cancel', 'convert']) {
+    permSpecs.push({ code: `inventory.purchase-request.${action}`, name: `库存-申购单-${action}`, type: 'BUTTON', parentCode: 'inventory.purchase-request' });
+  }
   for (const action of ['view', 'create', 'submit', 'cancel']) {
     permSpecs.push({ code: `inventory.purchase-order.${action}`, name: `库存-采购单-${action}`, type: 'BUTTON', parentCode: 'inventory.purchase-order' });
   }
@@ -592,11 +620,12 @@ async function main() {
       .catch(() => undefined);
   }
 
-  // STORE_MANAGER：有意缺 platform.store.delete 与 platform.account.field.phone.view，用于验证 403 与字段掩码；
+  // STORE_MANAGER：有意缺 platform.store.delete，用于验证 403；
   // CRM 的 lose（线索/机会标记流失）、合同的 void（作废）同理有意缺失——影响统计口径/具有终局性的
   // 操作先只给 SUPER_ADMIN。合同模板（法律文本主数据）也不开放给 STORE_MANAGER，与 Parameter/Tag/Region
   // 这类主数据现在的处理口径一致。房型（room.type）同理是平台级主数据，不开放给 STORE_MANAGER；
-  // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除。
+  // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除；
+  // 唯一例外是 room.room.force-delete（删除已有预订/入住记录的房间），会连带清掉历史占用记录，只留给 SUPER_ADMIN。
   // 收款（payment.record）同理——退款的"提交申请"是前台日常操作，真正的审批权由通用工作流
   // 引擎的审批人角色把关，不在这一层额外收紧，全部动作开放。
   // 护理表单引擎配置（care.field / care.form-template / care.plan-template）是总部制定的
@@ -644,9 +673,11 @@ async function main() {
   // (care.outreach-plan，含complete-task)是店长/护理人员日常跟进自己门店客户的操作，
   // 全部动作开放。
   const storeManagerExcluded = new Set([
+    'crm.channel.create',
+    'crm.channel.update',
     'platform.store.delete',
-    'platform.account.field.phone.view',
-    'crm.customer.field.phone.view',
+    'room.room.force-delete',
+    'care.profile.force-delete',
     'crm.lead.lose',
     'crm.opportunity.lose',
     'contract.record.void',
@@ -678,6 +709,7 @@ async function main() {
           code.startsWith('room.outing') ||
           code.startsWith('room.service-requisition') ||
           code.startsWith('payment.record') ||
+          code.startsWith('care.board') ||
           code.startsWith('care.profile') ||
           code === 'care.plan' ||
           code.startsWith('care.plan.') ||
@@ -689,6 +721,7 @@ async function main() {
           code.startsWith('service.appointment') ||
           code.startsWith('inventory.warehouse') ||
           code.startsWith('inventory.stock-batch') ||
+          code.startsWith('inventory.purchase-request') ||
           code.startsWith('inventory.purchase-order') ||
           code.startsWith('inventory.goods-receipt') ||
           code.startsWith('inventory.stock-issue') ||
@@ -731,8 +764,15 @@ async function main() {
   // 普通员工 = 店长能操作的日常业务权限，刨掉四块"管理侧"配置（组织架构/账号权限/
   // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
   // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
+  // 另外"删除房间"(room.room.delete)是不可逆操作，只给店长/管理员，普通员工不开放。
+  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve']); // 审核护理计划只给店长/护理主任
   const storeStaffCodes = storeManagerCodes.filter(
-    (code) => !code.startsWith('platform') && !code.startsWith('audit') && !code.startsWith('analytics') && !code.startsWith('iot'),
+    (code) =>
+      !storeStaffExcluded.has(code) &&
+      !code.startsWith('platform') &&
+      !code.startsWith('audit') &&
+      !code.startsWith('analytics') &&
+      !code.startsWith('iot'),
   );
   for (const code of storeStaffCodes) {
     const permissionPointId = codeToId.get(code);
@@ -780,6 +820,39 @@ async function main() {
       grantedBy: 'SEED',
     },
   });
+
+  // ---------- 客户分类/客户类型标签的默认选项 ----------
+  // 结构性配置：任何环境都需要（生产环境也不例外），不属于"示例业务数据"，所以放在
+  // 下面 `!isProduction` 门槛之外——道理跟RBAC权限目录/角色一致，见
+  // docs/生产数据库迁移与种子数据策略.md"结构性配置vs示例业务数据"一节。管理员后续
+  // 可以在"基础资料->标签管理"里增删改，这里只是给一套开箱可用的默认值，不是写死不能改。
+  const customerClassificationTags = ['A', 'B', 'C', 'D', 'E'];
+  const customerTypeTags = ['鹰派', '萌派', '洋派', '狐派', '驴派', '变色龙'];
+  for (const name of customerClassificationTags) {
+    await prisma.tag.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: `客户分类-${name}` } },
+      update: {},
+      create: { tenantId: tenant.id, name: `客户分类-${name}`, category: 'CUSTOMER_CLASSIFICATION', createdBy: 'SEED' },
+    });
+  }
+  for (const name of customerTypeTags) {
+    await prisma.tag.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name } },
+      update: {},
+      create: { tenantId: tenant.id, name, category: 'CUSTOMER_TYPE', createdBy: 'SEED' },
+    });
+  }
+
+  // 母婴档案风险标签（复用 Tag/TagBinding，entityType='MOTHER_PROFILE'/'BABY_PROFILE'，
+  // 见 MotherProfile 模型注释）。护理看板卡片上的"敏"标记读的就是这里的"高敏"标签。
+  const careRiskTags = ['早产', '传染病', '高敏', '妈咪住院'];
+  for (const name of careRiskTags) {
+    await prisma.tag.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name } },
+      update: {},
+      create: { tenantId: tenant.id, name, category: 'CARE_RISK', createdBy: 'SEED' },
+    });
+  }
 
   // 示例店长账号只在非生产环境创建（生产环境的真实店长账号由超管登录后台手动创建）。
   // 声明在if外面是因为后面CRM示例数据(demoCustomer.assignedToId等)也要引用这个账号，
@@ -1002,6 +1075,7 @@ async function main() {
 
   // ---------- 工作流定义：库存域五种单据审批，均只给一个店长审批节点 ----------
   const inventoryWorkflowDefs: { code: string; name: string }[] = [
+    { code: 'INVENTORY_PURCHASE_REQUEST', name: '申购单审批' },
     { code: 'INVENTORY_PURCHASE', name: '采购单审批' },
     { code: 'INVENTORY_GOODS_RECEIPT', name: '入库单审批' },
     { code: 'INVENTORY_STOCK_ISSUE', name: '出库/领用单审批' },
@@ -1100,11 +1174,17 @@ async function main() {
     update: {},
     create: { tenantId: tenant.id, name: '示例标签', color: '#1f3a5f', createdBy: 'SEED' },
   });
-  await prisma.tagBinding.upsert({
-    where: { tagId_entityType_entityId: { tagId: tag.id, entityType: 'Store', entityId: store.id } },
-    update: {},
-    create: { tenantId: tenant.id, tagId: tag.id, entityType: 'Store', entityId: store.id, createdBy: 'SEED' },
+  // TagBinding不再有(tagId,entityType,entityId)唯一约束（改成允许保留历史记录，
+  // 见schema.prisma里TagBinding.revokedAt的注释），upsert用不了了，改成手动查一次
+  // 再决定建不建，保持种子脚本本身的幂等性不变。
+  const existingStoreTagBinding = await prisma.tagBinding.findFirst({
+    where: { tagId: tag.id, entityType: 'Store', entityId: store.id, revokedAt: null },
   });
+  if (!existingStoreTagBinding) {
+    await prisma.tagBinding.create({
+      data: { tenantId: tenant.id, tagId: tag.id, entityType: 'Store', entityId: store.id, createdBy: 'SEED' },
+    });
+  }
 
   // ---------- CRM 示例数据 ----------
   const demoLead = await prisma.lead.findFirst({
@@ -1160,18 +1240,7 @@ async function main() {
   }
 
   // ---------- 合同示例数据 ----------
-  const contractTemplate = await prisma.contractTemplate.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: 'STANDARD_V1' } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      code: 'STANDARD_V1',
-      name: '标准月子套餐合同模板',
-      content: '甲方（客户）与乙方（伴月轩月子中心）就月子套餐服务达成以下约定：服务内容、金额、起止日期以合同正文为准。',
-      createdBy: 'SEED',
-    },
-  });
-
+  // 合同是纸质合同的数据台账（无模板/无电子签署/无审批），示例合同直接是"已确认"状态
   let demoContract = await prisma.contract.findFirst({
     where: { tenantId: tenant.id, customerId: demoCustomer.id },
   });
@@ -1181,14 +1250,17 @@ async function main() {
         tenantId: tenant.id,
         contractNo: generateBusinessNo('CT'),
         customerId: demoCustomer.id,
-        templateId: contractTemplate.id,
         storeId: store.id,
         title: '示例客户-李女士 月子套餐合同',
-        content: contractTemplate.content,
+        paperNo: 'DEMO-0001',
+        signedDate: new Date(),
+        clientName: '示例客户-李女士',
+        clientPhone: '13800000001',
+        careMode: 'ONE_TO_ONE',
+        inHouseDays: 28,
         amount: 8800000,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        status: 'DRAFT',
+        status: 'ACTIVE',
+        confirmedAt: new Date(),
         createdBy: 'SEED',
       },
     });

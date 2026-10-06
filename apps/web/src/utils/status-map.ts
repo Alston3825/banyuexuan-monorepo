@@ -82,9 +82,10 @@ export const OPPORTUNITY_STAGE_MAP: Record<string, StatusMeta> = {
 }
 
 export const CONTRACT_STATUS_MAP: Record<string, StatusMeta> = {
+  PENDING_REVIEW: { label: '待核对', type: 'warning' },
   DRAFT: { label: '草稿', type: 'default' },
   PENDING_APPROVAL: { label: '审核中', type: 'warning' },
-  ACTIVE: { label: '已生效', type: 'success' },
+  ACTIVE: { label: '已确认', type: 'success' },
   REJECTED: { label: '已驳回', type: 'error' },
   VOIDED: { label: '已作废', type: 'default' },
 }
@@ -96,6 +97,36 @@ export const CUSTOMER_SOURCE_LABEL_MAP: Record<string, string> = {
   SOCIAL_MEDIA: '社交媒体/私域',
   PARTNER: '渠道合作',
   OTHER: '其他',
+}
+
+/** 客户类型（多选），code跟后端 customer-service-type.const.ts 保持一致 */
+export const CUSTOMER_SERVICE_TYPE_LABEL_MAP: Record<string, string> = {
+  MATERNITY_ROOM: '月子房客户',
+  CONFINEMENT_NANNY: '月嫂上户客户',
+  MEAL_DELIVERY: '月子餐外送',
+  POSTPARTUM_RECOVERY: '产康客户',
+  BABY_CARE: '宝宝托管',
+}
+
+/** 预约类型，code跟后端 Prisma LeadAppointmentType 保持一致 */
+export const LEAD_APPOINTMENT_TYPE_LABEL_MAP: Record<string, string> = {
+  VISIT: '预约参观',
+  TRIAL_MEAL: '预约试餐',
+}
+
+/** 处理结果（多选），code跟后端 lead-process-result.const.ts 保持一致 */
+export const LEAD_PROCESS_RESULT_LABEL_MAP: Record<string, string> = {
+  PHONE_VALID: '电话有效',
+  PHONE_INVALID: '电话无效',
+  WECHAT_ADDED: '已加微信',
+  PHONE_UNREACHABLE: '电话无法接通',
+  NOT_CONTACTED: '未联系上',
+}
+
+/** 处理状态：未处理(红)/已处理(绿) */
+export const LEAD_PROCESSED_MAP: Record<string, StatusMeta> = {
+  false: { label: '未处理', type: 'error' },
+  true: { label: '已处理', type: 'success' },
 }
 
 export const FOLLOW_UP_TYPE_LABEL_MAP: Record<string, string> = {
@@ -272,6 +303,15 @@ export const INVENTORY_DOC_STATUS_MAP: Record<string, StatusMeta> = {
   COMPLETED: { label: '已完成', type: 'success' },
 }
 
+export const PURCHASE_REQUEST_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '已批准(待生成采购单)', type: 'info' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+  ORDERED: { label: '已生成采购单', type: 'success' },
+}
+
 export const STOCK_ISSUE_TYPE_LABEL_MAP: Record<string, string> = {
   ISSUE: '一般出库',
   REQUISITION: '部门领用',
@@ -292,6 +332,24 @@ export const EMPLOYEE_PROFILE_STATUS_MAP: Record<string, StatusMeta> = {
 export const EMPLOYMENT_TYPE_LABEL_MAP: Record<string, string> = {
   EMPLOYEE: '员工制',
   NON_EMPLOYEE: '非员工制',
+}
+
+export const CONTRACT_TYPE_LABEL_MAP: Record<string, string> = {
+  LABOR: '劳动合同',
+  PROBATION: '试用期合同',
+  SERVICE: '劳务合同',
+  OVERAGE: '用工协议（超龄）',
+  PENDING_SIGN: '待签',
+}
+
+export const SOCIAL_INSURANCE_LABEL_MAP: Record<string, string> = {
+  ENROLLED: '参保',
+  NOT_ENROLLED: '未参保',
+}
+
+export const EMPLOYEE_GENDER_LABEL_MAP: Record<string, string> = {
+  MALE: '男',
+  FEMALE: '女',
 }
 
 export const COMMISSION_TYPE_LABEL_MAP: Record<string, string> = {

@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { ContractRecordController } from './contract-record.controller';
 import { ContractRecordService } from './contract-record.service';
 import { CustomerModule } from '../../crm/customer/customer.module';
-import { WorkflowEngineModule } from '../../workflow/workflow-engine/workflow-engine.module';
+import { AiGatewayModule } from '../../ai/ai-gateway/ai-gateway.module';
+import { ContractStorageService } from '../contract-storage/contract-storage.service';
+import { ContractExtractionService } from '../contract-extraction/contract-extraction.service';
 
 @Module({
-  imports: [CustomerModule, WorkflowEngineModule],
+  imports: [CustomerModule, AiGatewayModule],
   controllers: [ContractRecordController],
-  providers: [ContractRecordService],
+  providers: [ContractRecordService, ContractStorageService, ContractExtractionService],
   exports: [ContractRecordService],
 })
 export class ContractRecordModule {}

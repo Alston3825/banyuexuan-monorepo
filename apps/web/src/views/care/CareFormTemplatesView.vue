@@ -164,7 +164,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CareFormTemplate) => r.id" :scroll-x="1000" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑护理项目' : '新建护理项目'" style="width: 640px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑护理项目' : '新建护理项目'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 mother_daily_general" />
@@ -199,13 +199,13 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item label="包含字段">
             <n-dynamic-input v-model:value="model.fields" :on-create="createFieldRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
                 <n-select
                   v-model:value="value.fieldId"
                   :options="availableFieldOptions"
                   filterable
                   placeholder="选择护理字段"
-                  style="width: 260px"
+                  style="width: min(260px, 94vw)"
                 />
                 <n-checkbox v-model:checked="value.required">必填</n-checkbox>
               </n-space>

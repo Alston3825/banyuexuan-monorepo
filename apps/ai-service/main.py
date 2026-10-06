@@ -4,6 +4,8 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.routes.chat import router as chat_router
+from app.routes.care_form import router as care_form_router
+from app.routes.contract import router as contract_router
 from app.routes.embeddings import router as embeddings_router
 
 if settings.environment == "production" and not settings.internal_api_key:
@@ -14,6 +16,8 @@ if settings.environment == "production" and not settings.internal_api_key:
 app = FastAPI(title="伴月轩 AI / Agent 微服务", version="0.2.0")
 app.include_router(chat_router)
 app.include_router(embeddings_router)
+app.include_router(contract_router)
+app.include_router(care_form_router)
 
 
 @app.get("/health")

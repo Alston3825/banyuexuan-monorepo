@@ -186,8 +186,16 @@ export interface MotherProfile extends ScopedEntityBase {
   deliveryDate: string | null
   gestationalWeeks: number | null
   expectedDeliveryDate: string | null
+  /** 护理要点/医嘱：护理看板卡片上展示的简短提示，与 remark（建档备注）分开维护 */
+  careNote: string | null
+  /** 主责护理师（员工账号） */
+  primaryNurseId: string | null
+  primaryNurse?: { id: string; realName: string } | null
   remark: string | null
   babies: BabyProfile[]
+  /** 列表接口附带：客户姓名/手机、关联入住的房号 */
+  customer?: { name: string; phone: string }
+  occupancy?: { occupancyNo: string; status: string; room: { roomNo: string } } | null
 }
 
 export interface CreateMotherProfileDto {
@@ -197,6 +205,8 @@ export interface CreateMotherProfileDto {
   deliveryDate?: string
   gestationalWeeks?: number
   expectedDeliveryDate?: string
+  careNote?: string
+  primaryNurseId?: string
   remark?: string
   riskTagIds?: string[]
   babies?: BabyProfileInput[]
@@ -208,6 +218,9 @@ export interface UpdateMotherProfileDto {
   deliveryDate?: string
   gestationalWeeks?: number
   expectedDeliveryDate?: string
+  careNote?: string
+  /** 传 null 表示清除护理师 */
+  primaryNurseId?: string | null
   remark?: string
   version: number
 }

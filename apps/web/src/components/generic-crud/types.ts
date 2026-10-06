@@ -8,7 +8,7 @@ export interface CrudColumn<T> {
   width?: number
 }
 
-export type CrudSelectOption = { label: string; value: string }
+export type CrudSelectOption = { label: string; value: string | number }
 
 export interface CrudFormField {
   key: string

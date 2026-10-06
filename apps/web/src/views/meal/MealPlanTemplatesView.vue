@@ -136,7 +136,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: MealPlanTemplate) => r.id" :scroll-x="800" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑膳食计划' : '新建膳食计划'" style="width: 680px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑膳食计划' : '新建膳食计划'" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 month_meal_28d" />
@@ -161,18 +161,18 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item v-if="!editingRow" label="阶段划分">
             <n-dynamic-input v-model:value="model.phases" :on-create="createPhaseRow" #="{ value }">
-              <n-space :wrap="false" style="width: 100%">
-                <n-input v-model:value="value.name" placeholder="阶段名称，如 第1阶段" style="width: 220px" />
-                <n-input-number v-model:value="value.days" :min="1" placeholder="天数" style="width: 120px" />
+              <n-space :wrap="false" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-input v-model:value="value.name" placeholder="阶段名称，如 第1阶段" style="width: min(220px, 94vw)" />
+                <n-input-number v-model:value="value.days" :min="1" placeholder="天数" style="width: min(120px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>
           <n-form-item label="每日排餐">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%">
-                <n-input-number v-model:value="value.dayOffset" :min="1" :max="model.totalDays" placeholder="第几天" style="width: 100px" />
-                <n-select v-model:value="value.slot" :options="SLOT_OPTIONS" style="width: 110px" />
-                <n-select v-model:value="value.mealItemId" :options="mealItemOptions" filterable placeholder="选择菜品" style="width: 220px" />
+              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
+                <n-input-number v-model:value="value.dayOffset" :min="1" :max="model.totalDays" placeholder="第几天" style="width: min(100px, 94vw)" />
+                <n-select v-model:value="value.slot" :options="SLOT_OPTIONS" style="width: min(110px, 94vw)" />
+                <n-select v-model:value="value.mealItemId" :options="mealItemOptions" filterable placeholder="选择菜品" style="width: min(220px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>

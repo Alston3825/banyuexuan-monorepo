@@ -21,6 +21,17 @@ describe('P3 人事域：员工档案+排班+提成+薪资单 (e2e)', () => {
 
   const SEED_PASSWORD = 'Passw0rd!23';
   const runTag = Date.now().toString().slice(-8);
+  /** 按本次运行生成两个有效的身份证号（校验位算对），避免重复跑测试时撞上上次留在库里的号码 */
+  const makeIdCard = (offset: number, male: boolean) => {
+    const n = Number(runTag) + offset;
+    const birth = `${1950 + (n % 50)}${String(1 + (n % 12)).padStart(2, '0')}${String(1 + (n % 28)).padStart(2, '0')}`;
+    const base = `110105${birth}${String(n % 100).padStart(2, '0')}${male ? 1 : 2}`;
+    const w = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+    const check = '10X98765432'[base.split('').reduce((a, c, i) => a + Number(c) * w[i], 0) % 11];
+    return { no: base + check, birth: `${birth.slice(0, 4)}-${birth.slice(4, 6)}-${birth.slice(6, 8)}`, wrong: base + (check === '0' ? '1' : '0') };
+  };
+  const idMale = makeIdCard(0, true);
+  const idFemale = makeIdCard(7, false);
   const currentPeriod = new Date().toISOString().slice(0, 7); // YYYY-MM
 
   let adminToken: string;
@@ -137,6 +148,95 @@ describe('P3 人事域：员工档案+排班+提成+薪资单 (e2e)', () => {
       .send({ accountId, employeeNo: `DUP_${runTag}`, hireDate: '2025-01-01' })
       .expect(400);
     expect(body<{ message: string }>(res).message).toContain('已建立员工档案');
+  });
+
+  it('2b. 员工信息表字段：合同类型/社保/身份证（自动识别性别生日）/工资卡/紧急联系人，明文返回；身份证和工号不可重复；工龄自动算', async () => {
+    const url = '/api/v1/hr/employee-profiles';
+    const get = async (id: string) => body<EmployeeProfile & Record<string, unknown>>(await request(server).get(`${url}/${id}`).set(authed(adminToken)).expect(200));
+    const before = await get(emp1ProfileId);
+    const patch = (id: string, data: Record<string, unknown>, version: number) => request(server).patch(`${url}/${id}`).set(authed(adminToken)).send({ ...data, version });
+
+    await patch(emp1ProfileId, { idCardNo: idMale.wrong }, before.version).expect(400); // 校验位不对
+    await patch(emp1ProfileId, { bankAccountNo: '12ab' }, before.version).expect(400);
+    const upd = body<EmployeeProfile>(
+      await patch(
+        emp1ProfileId,
+        {
+          contractType: 'LABOR',
+          socialInsurance: 'ENROLLED',
+          idCardNo: idMale.no,
+          bankAccountNo: '6214 8329 4513 5551',
+          bankName: '招商银行西安分行雁展路支行',
+          emergencyContactName: '紧急联系人甲',
+          emergencyContactPhone: '13800000000',
+          emergencyContactRelation: '配偶',
+          address: '测试地址',
+          hireDate: '2024-01-15',
+        },
+        before.version,
+      ).expect(200),
+    );
+    const after = await get(emp1ProfileId);
+    expect(after).toMatchObject({
+      contractType: 'LABOR',
+      socialInsurance: 'ENROLLED',
+      idCardNo: idMale.no, // 明文，不做掩码
+      bankAccountNo: '6214832945135551', // 去掉空格
+      bankName: '招商银行西安分行雁展路支行',
+      gender: 'MALE',
+      emergencyContactRelation: '配偶',
+      address: '测试地址',
+    });
+    expect(String(after.birthDate).slice(0, 10)).toBe(idMale.birth);
+    expect(after.tenureYears).toBe(new Date().getFullYear() - 2024 - (new Date() < new Date(new Date().getFullYear(), 0, 15) ? 1 : 0));
+    expect(after.departmentName).toBeNull();
+    expect(upd.version).toBe(before.version + 1);
+
+    // 身份证号、工号不能和别的员工重复
+    const other = await get(emp2ProfileId);
+    const dup = await patch(emp2ProfileId, { idCardNo: idMale.no }, other.version).expect(409);
+    expect(body<{ message: string }>(dup).message).toContain('E2E员工甲');
+    await patch(emp2ProfileId, { employeeNo: after.employeeNo }, other.version).expect(409);
+    // 换另一个有效号码 → 性别识别为女；传空字符串 = 清空（性别/出生日期一起清）
+    await patch(emp2ProfileId, { idCardNo: idFemale.no }, other.version).expect(200);
+    expect((await get(emp2ProfileId)).gender).toBe('FEMALE');
+    const cur = await get(emp2ProfileId);
+    await patch(emp2ProfileId, { idCardNo: '' }, cur.version).expect(200);
+    expect(await get(emp2ProfileId)).toMatchObject({ idCardNo: null, gender: null, birthDate: null });
+    // 按姓名搜索
+    const found = body<EmployeeProfile[]>(await request(server).get(url).query({ keyword: 'E2E员工甲' }).set(authed(adminToken)).expect(200));
+    expect(found.map((p) => p.id)).toContain(emp1ProfileId);
+    expect(found.map((p) => p.id)).not.toContain(emp2ProfileId);
+  });
+
+  it('2c. 账号编辑和新建是同一套字段：编辑时也能改门店/部门/班组/职位/状态，员工档案里的部门名跟着变；新建可直接选状态', async () => {
+    const profile = body<EmployeeProfile>(await request(server).get(`/api/v1/hr/employee-profiles/${emp1ProfileId}`).set(authed(adminToken)).expect(200));
+    const accUrl = `/api/v1/platform/accounts/${profile.accountId}`;
+    const acc = body<{ version: number }>(await request(server).get(accUrl).set(authed(adminToken)).expect(200));
+    const dept = body<{ id: string }>(await request(server).post('/api/v1/platform/departments').set(authed(adminToken)).send({ name: `E2E部门${runTag}`, storeId }).expect(201));
+    const upd = body<{ departmentId: string; storeId: string; version: number }>(
+      await request(server).patch(accUrl).set(authed(adminToken)).send({ departmentId: dept.id, storeId, version: acc.version }).expect(200),
+    );
+    expect(upd).toMatchObject({ departmentId: dept.id, storeId });
+    const withDept = body<EmployeeProfile & { departmentName: string | null }>(await request(server).get(`/api/v1/hr/employee-profiles/${emp1ProfileId}`).set(authed(adminToken)).expect(200));
+    expect(withDept.departmentName).toBe(`E2E部门${runTag}`);
+    // 传 null 清空；不传的字段不动
+    const cleared = body<{ departmentId: string | null; storeId: string | null }>(await request(server).patch(accUrl).set(authed(adminToken)).send({ departmentId: null, version: upd.version }).expect(200));
+    expect(cleared).toMatchObject({ departmentId: null, storeId });
+    // 新建时可以直接选状态
+    const created = body<{ status: string }>(
+      await request(server).post('/api/v1/platform/accounts').set(authed(adminToken)).send({ username: `dis_${runTag}`, realName: 'E2E停用账号', password: 'Passw0rd!23', storeId, status: 'DISABLED' }).expect(201),
+    );
+    expect(created.status).toBe('DISABLED');
+
+    // 员工手机号不做掩码：连没有任何特殊权限的店长账号，在列表和详情里看到的也是完整号码
+    const phone = `139${runTag}0`.slice(0, 11);
+    const withPhone = body<{ id: string }>(
+      await request(server).post('/api/v1/platform/accounts').set(authed(adminToken)).send({ username: `ph_${runTag}`, realName: 'E2E有手机号', password: 'Passw0rd!23', storeId, phone }).expect(201),
+    );
+    const list = body<{ id: string; phone: string | null }[]>(await request(server).get('/api/v1/platform/accounts').set(authed(storeManagerToken)).expect(200));
+    expect(list.find((a) => a.id === withPhone.id)?.phone).toBe(phone);
+    expect(body<{ phone: string }>(await request(server).get(`/api/v1/platform/accounts/${withPhone.id}`).set(authed(storeManagerToken)).expect(200)).phone).toBe(phone);
   });
 
   // ==================== 排班 ====================

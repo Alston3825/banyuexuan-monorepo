@@ -41,7 +41,7 @@ watch([warehouseId, lowStockOnly], fetchList)
 <template>
   <div>
     <n-space style="margin-bottom: 12px">
-      <n-select v-model:value="warehouseId" :options="warehouseOptions" clearable placeholder="全部仓库" style="width: 220px" />
+      <n-select v-model:value="warehouseId" :options="warehouseOptions" clearable placeholder="全部仓库" style="width: min(220px, 94vw)" />
       <n-space align="center" :size="8">
         <n-switch v-model:value="lowStockOnly" />
         <span>只看低库存预警</span>

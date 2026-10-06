@@ -17,7 +17,6 @@ import {
   Clipboard,
   PersonAdd,
   TrendingUp,
-  Reader,
   Document,
   Grid,
   Bed,
@@ -25,9 +24,7 @@ import {
   Calendar,
   Cash,
   Woman,
-  ListOutline,
   ClipboardOutline,
-  JournalOutline,
   Restaurant,
   NutritionOutline,
   FastFood,
@@ -68,8 +65,19 @@ interface NavLeaf {
   icon: Component
   /** 该菜单项对应的权限点code（见 apps/api/prisma/seed.ts 的 permSpecs），账号必须
    *  拥有这个code本身或它下面的任意子权限才会显示这一项——不是简单的"角色叫什么"，
-   *  是真的按后端授予的权限点算，跟接口层 @RequirePermission 的判断口径完全一致。 */
-  perm: string
+   *  是真的按后端授予的权限点算，跟接口层 @RequirePermission 的判断口径完全一致。
+   *  传数组表示"拥有其中任意一个就显示"（用于把几个后台设置页合并成一个入口）。 */
+  perm: string | string[]
+}
+
+/** perm 可以是单个权限点或"任意一个"的数组 */
+function hasAny(hasAccess: (perm: string) => boolean, perm: string | string[]): boolean {
+  return Array.isArray(perm) ? perm.some((p) => hasAccess(p)) : hasAccess(perm)
+}
+
+/** 路由守卫用：账号是否满足该菜单项的权限要求 */
+export function canAccessPerm(hasAccess: (perm: string) => boolean, perm: string | string[]): boolean {
+  return hasAny(hasAccess, perm)
 }
 
 interface NavGroup {
@@ -91,21 +99,22 @@ const navGroups: NavGroup[] = [
     items: [{ label: '经营分析看板', to: '/analytics/dashboard', icon: StatsChartOutline, perm: 'analytics.dashboard' }],
   },
   {
-    label: '客户与线索',
+    label: '客户档案',
     key: 'group-crm',
     items: [
       { label: '客户管理', to: '/crm/customers', icon: PersonAdd, perm: 'crm.customer' },
-      { label: '线索管理', to: '/crm/leads', icon: People, perm: 'crm.lead' },
-      { label: '销售机会', to: '/crm/opportunities', icon: TrendingUp, perm: 'crm.opportunity' },
+      { label: '客户线索', to: '/crm/leads', icon: People, perm: 'crm.lead' },
+      { label: '客户渠道', to: '/crm/channels', icon: Pricetags, perm: 'crm.channel' },
+      // 销售机会：只从导航隐藏，代码/路由/数据表都还在，以后需要随时能加回来，
+      // 见 docs/业务规则确认记录.md"导航菜单/CRM模块调整"这一节的决定记录。
+      // { label: '销售机会', to: '/crm/opportunities', icon: TrendingUp, perm: 'crm.opportunity' },
     ],
   },
   {
     label: '合同管理',
     key: 'group-contract',
     items: [
-      { label: '合同模板', to: '/contract/templates', icon: Reader, perm: 'contract.template' },
       { label: '合同管理', to: '/contract/records', icon: Document, perm: 'contract.record' },
-      { label: '续签查询', to: '/contract/renewals', icon: Reader, perm: 'contract.record' },
     ],
   },
   {
@@ -113,21 +122,28 @@ const navGroups: NavGroup[] = [
     key: 'group-room',
     items: [
       { label: '房态看板', to: '/room/board', icon: Grid, perm: 'room.room' },
+      { label: '房态横排', to: '/room/board-horizontal', icon: List, perm: 'room.occupancy' },
       { label: '房间管理', to: '/room/rooms', icon: Bed, perm: 'room.room' },
       { label: '房型管理', to: '/room/types', icon: Layers, perm: 'room.type' },
       { label: '预订记录', to: '/room/occupancies', icon: Calendar, perm: 'room.occupancy' },
     ],
   },
   {
+    // 日常最常用的放前面（看板 → 档案 → 待跟进关怀）；后台设置类（护理字段/项目/方案/关怀模板）
+    // 合并成最后一个入口"护理设置"，里面用标签页切换。其他模块以后也按这个思路整理。
     label: '母婴护理',
     key: 'group-care',
     items: [
+      { label: '护理看板', to: '/care/board', icon: Woman, perm: 'care.board' },
       { label: '母婴档案', to: '/care/profiles', icon: Woman, perm: 'care.profile' },
-      { label: '护理字段管理', to: '/care/fields', icon: ListOutline, perm: 'care.field' },
-      { label: '护理项目管理', to: '/care/form-templates', icon: ClipboardOutline, perm: 'care.form-template' },
-      { label: '护理方案管理', to: '/care/plan-templates', icon: JournalOutline, perm: 'care.plan-template' },
       { label: '待跟进关怀', to: '/care/outreach-tasks', icon: HeartOutline, perm: 'care.outreach-plan' },
-      { label: '关怀模板管理', to: '/care/outreach-templates', icon: HeartOutline, perm: 'care.outreach-template' },
+      { label: '护理统计', to: '/care/stats', icon: StatsChartOutline, perm: 'care.profile' },
+      {
+        label: '护理设置',
+        to: '/care/settings',
+        icon: ClipboardOutline,
+        perm: ['care.field', 'care.form-template', 'care.plan-template', 'care.outreach-template'],
+      },
     ],
   },
   {
@@ -157,6 +173,7 @@ const navGroups: NavGroup[] = [
     label: '库存',
     key: 'group-inventory',
     items: [
+      { label: '申购单', to: '/inventory/purchase-requests', icon: FileTrayFullOutline, perm: 'inventory.purchase-request' },
       { label: '采购单', to: '/inventory/purchase-orders', icon: FileTrayFullOutline, perm: 'inventory.purchase-order' },
       { label: '入库单', to: '/inventory/goods-receipts', icon: ArrowRedoOutline, perm: 'inventory.goods-receipt' },
       { label: '出库/领用单', to: '/inventory/stock-issues', icon: ArrowRedoOutline, perm: 'inventory.stock-issue' },
@@ -275,7 +292,7 @@ const standaloneItems: NavLeaf[] = [{ label: '审计日志', to: '/audit-logs', 
 
 /** 全部菜单项的 (路由path -> 所需权限code) 映射，供路由守卫复用，跟这里的菜单显示逻辑
  *  保持完全一致——避免"菜单里看不到，但直接输URL还是能进"这种两套判断口径不一致的情况。 */
-export const routePermissionMap: Record<string, string> = Object.fromEntries(
+export const routePermissionMap: Record<string, string | string[]> = Object.fromEntries(
   [...navGroups.flatMap((g) => g.items), ...standaloneItems].map((item) => [item.to, item.perm]),
 )
 
@@ -289,10 +306,10 @@ function toMenuOption(item: NavLeaf): MenuOption {
  *  （理论上不应该发生——正常账号至少会挂一个角色）返回undefined，由调用方决定兜底行为。 */
 export function firstAccessibleRoute(hasAccess: (perm: string) => boolean): string | undefined {
   for (const group of navGroups) {
-    const item = group.items.find((i) => hasAccess(i.perm))
+    const item = group.items.find((i) => hasAny(hasAccess, i.perm))
     if (item) return item.to
   }
-  return standaloneItems.find((i) => hasAccess(i.perm))?.to
+  return standaloneItems.find((i) => hasAny(hasAccess, i.perm))?.to
 }
 
 /** 按登录账号实际拥有的权限点动态生成导航菜单——整组都没权限的分组直接不显示，
@@ -302,12 +319,12 @@ export function firstAccessibleRoute(hasAccess: (perm: string) => boolean): stri
 export function buildNavMenu(hasAccess: (perm: string) => boolean): MenuOption[] {
   const options: MenuOption[] = []
   for (const group of navGroups) {
-    const visibleItems = group.items.filter((item) => hasAccess(item.perm))
+    const visibleItems = group.items.filter((item) => hasAny(hasAccess, item.perm))
     if (visibleItems.length === 0) continue
     options.push({ type: 'group', label: group.label, key: group.key, children: visibleItems.map(toMenuOption) })
   }
   for (const item of standaloneItems) {
-    if (hasAccess(item.perm)) options.push(toMenuOption(item))
+    if (hasAny(hasAccess, item.perm)) options.push(toMenuOption(item))
   }
   return options
 }

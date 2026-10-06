@@ -55,21 +55,21 @@ onMounted(async () => {
 
 <template>
   <div>
-    <n-space style="margin-bottom: 16px" :wrap="false">
-      <n-select v-model:value="storeId" :options="storeOptions" clearable placeholder="全部门店" style="width: 180px" />
-      <n-date-picker v-model:value="dateRange" type="daterange" clearable style="width: 280px" placeholder="预约按预约时间/服务包按购买时间过滤" />
+    <n-space style="margin-bottom: 16px">
+      <n-select v-model:value="storeId" :options="storeOptions" clearable placeholder="全部门店" style="width: min(180px, 94vw)" />
+      <n-date-picker v-model:value="dateRange" type="daterange" clearable style="width: min(280px, 94vw)" placeholder="预约按预约时间/服务包按购买时间过滤" />
       <n-button type="primary" :loading="loading" @click="fetchReport">查询</n-button>
     </n-space>
 
     <n-card title="预约执行情况" style="margin-bottom: 16px">
-      <n-grid v-if="appointmentReport" :cols="5" :x-gap="12" style="margin-bottom: 16px">
+      <n-grid v-if="appointmentReport" cols="2 s:3 m:5" responsive="screen" :x-gap="12" style="margin-bottom: 16px">
         <n-grid-item><n-statistic label="预约总数" :value="appointmentReport.totalAppointments" /></n-grid-item>
         <n-grid-item><n-statistic label="已预约" :value="appointmentReport.bookedCount" /></n-grid-item>
         <n-grid-item><n-statistic label="已完成" :value="appointmentReport.completedCount" /></n-grid-item>
         <n-grid-item><n-statistic label="爽约" :value="appointmentReport.noShowCount" /></n-grid-item>
         <n-grid-item><n-statistic label="平均评分" :value="appointmentReport.avgRating ?? '-'" /></n-grid-item>
       </n-grid>
-      <n-grid v-if="appointmentReport" :cols="2" :x-gap="16">
+      <n-grid v-if="appointmentReport" cols="1 s:2" responsive="screen" :x-gap="16">
         <n-grid-item>
           <n-card title="按项目完成数" size="small">
             <n-data-table :columns="byProductColumns" :data="appointmentReport.byProduct" :row-key="(r) => r.productId" />
@@ -84,7 +84,7 @@ onMounted(async () => {
     </n-card>
 
     <n-card title="服务包销售汇总">
-      <n-grid v-if="packageReport" :cols="5" :x-gap="12" style="margin-bottom: 16px">
+      <n-grid v-if="packageReport" cols="2 s:3 m:5" responsive="screen" :x-gap="12" style="margin-bottom: 16px">
         <n-grid-item><n-statistic label="售出份数" :value="packageReport.totalSold" /></n-grid-item>
         <n-grid-item><n-statistic label="成交总金额(分)" :value="packageReport.totalAmount" /></n-grid-item>
         <n-grid-item><n-statistic label="可用" :value="packageReport.activeCount" /></n-grid-item>

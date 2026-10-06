@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { NSpace, NSelect, NDatePicker, NCard, NGrid, NGi, NModal, NForm, NFormItem, NInput, NButton, NDescriptions, NDescriptionsItem, NEmpty } from 'naive-ui'
 import { roomApi } from '../../api/modules/room.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { RoomBoardEntry, ComputedRoomStatus } from '../../api/types/room'
+import { CARE_MODE_LABEL, ORIENTATION_LABEL } from '../../api/types/contract'
 import { message } from '../../utils/discrete-api'
 
+const router = useRouter()
 const storeOptions = ref<{ label: string; value: string }[]>([])
 const selectedStoreId = ref<string | null>(null)
 const selectedDate = ref<number>(Date.now())
@@ -15,6 +18,7 @@ const selectedDate = ref<number>(Date.now())
 const boardEntries = ref<RoomBoardEntry[]>([])
 const loading = ref(false)
 
+const CARE_LEVEL_SHORT: Record<string, string> = { LEVEL1: '一级', LEVEL2: '二级', LEVEL3: '三级' }
 const customerOptions = ref<{ label: string; value: string }[]>([])
 
 const statusColor: Record<ComputedRoomStatus, string> = {
@@ -32,6 +36,15 @@ const statusLabel: Record<ComputedRoomStatus, string> = {
   MAINTENANCE: '维修中',
 }
 
+// 卡片右上角的状态小标签配色（卡片底色仍按 statusColor，标签用同色系更深一档）
+const statusPill: Record<ComputedRoomStatus, { background: string; color: string }> = {
+  VACANT: { background: '#b9e9d0', color: '#085041' },
+  RESERVED: { background: '#bcdcf7', color: '#0c447c' },
+  OCCUPIED: { background: '#f6d9a0', color: '#633806' },
+  PENDING_CLEANING: { background: '#f7c1c1', color: '#791f1f' },
+  MAINTENANCE: { background: '#d3d1c7', color: '#444441' },
+}
+
 const groupedByFloor = computed(() => {
   const groups = new Map<string, RoomBoardEntry[]>()
   for (const entry of boardEntries.value) {
@@ -41,6 +54,40 @@ const groupedByFloor = computed(() => {
   }
   return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]))
 })
+
+function formatDay(iso: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 卡片上入住/离店日期用 月-日，省宽度；预产期用完整年月日 */
+function formatMonthDay(iso: string | null): string {
+  return iso ? formatDay(iso).slice(5) : '-'
+}
+
+/** 预产期是今天或未来 6 天内（距今 0~6 天，即"不足7天"）→ 整行变红提醒。已过预产期的不提醒。 */
+function isDueSoon(iso: string | null): boolean {
+  if (!iso) return false
+  const due = new Date(iso)
+  const today = new Date()
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const diffDays = Math.round((dueDay - todayDay) / 86400000)
+  return diffDays >= 0 && diffDays < 7
+}
+
+/** 套餐：朝向 + 入住天数（N+N 只显示第一个 N，房态只关心所内入住天数） */
+function packageText(entry: RoomBoardEntry): string {
+  const c = entry.contract
+  if (!c || (!c.orientation && !c.inHouseDays)) return '-'
+  return [c.orientation ? ORIENTATION_LABEL[c.orientation] : '', c.inHouseDays ? `${c.inHouseDays}天` : ''].filter(Boolean).join(' · ')
+}
+
+// 卡片本身点击是打开操作弹窗，客户姓名的点击要单独跳转到客户详情，所以这里不能冒泡。
+function openCustomer(entry: RoomBoardEntry) {
+  if (entry.customerId) router.push(`/crm/customers/${entry.customerId}`)
+}
 
 async function fetchStores() {
   const stores = await storeApi.list()
@@ -211,7 +258,7 @@ onMounted(async () => {
 <template>
   <div>
     <n-space style="margin-bottom: 16px">
-      <n-select v-model:value="selectedStoreId" :options="storeOptions" style="width: 200px" @update:value="fetchBoard" />
+      <n-select v-model:value="selectedStoreId" :options="storeOptions" style="width: min(200px, 94vw)" @update:value="fetchBoard" />
       <n-date-picker v-model:value="selectedDate" type="date" @update:value="fetchBoard" />
     </n-space>
 
@@ -225,12 +272,40 @@ onMounted(async () => {
             hoverable
             :style="{ background: statusColor[entry.status], cursor: 'pointer' }"
             size="small"
+            content-style="padding: 8px 10px"
             @click="openAction(entry)"
           >
-            <div style="font-weight: 600; font-size: 16px">{{ entry.room.roomNo }}</div>
-            <div style="font-size: 12px; color: #666">{{ entry.room.roomType?.name }}</div>
-            <div style="margin-top: 8px; font-weight: 500">{{ statusLabel[entry.status] }}</div>
-            <div v-if="entry.customerName" style="font-size: 12px; color: #666">{{ entry.customerName }}</div>
+            <div class="occ-head">
+              <span class="occ-no">{{ entry.room.roomNo }}</span>
+              <span class="occ-type">{{ entry.room.roomType?.name }}</span>
+              <span class="occ-pill" :style="statusPill[entry.status]">{{ statusLabel[entry.status] }}</span>
+            </div>
+            <div v-if="entry.status === 'MAINTENANCE' && entry.room.maintenanceNote" class="occ-row">
+              <span class="occ-label">备注：</span>{{ entry.room.maintenanceNote }}
+            </div>
+            <template v-if="entry.occupancyId">
+              <a v-if="entry.customerName" class="occ-customer" @click.stop="openCustomer(entry)">{{ entry.customerName }}</a>
+              <!-- 预订中的日期是销售预估的（客户实际入住当天才确定），标"预计"；已入住的显示实际入住日期 -->
+              <div class="occ-row">
+                <span class="occ-label">{{ entry.status === 'OCCUPIED' ? '入住日期：' : '预计入住：' }}</span>{{ formatMonthDay(entry.status === 'OCCUPIED' ? entry.actualCheckInAt ?? entry.plannedCheckIn : entry.plannedCheckIn) }}
+                <span class="occ-label occ-gap">{{ entry.status === 'OCCUPIED' ? '出所日期：' : '预计出所：' }}</span>{{ formatMonthDay(entry.plannedCheckOut) }}
+              </div>
+              <div class="occ-row occ-due" :class="{ 'occ-due-warn': isDueSoon(entry.expectedDueDate) }">
+                <span class="occ-label">预产期：</span>{{ formatDay(entry.expectedDueDate) }}
+              </div>
+              <!-- 套餐（朝向 · 入住天数）、护理模式来自关联的合同；没有合同（直接建的预订）显示 - -->
+              <div class="occ-row">
+                <span class="occ-label">套餐：</span>{{ packageText(entry) }}
+                <span class="occ-label occ-gap">护理模式：</span>{{ entry.contract?.careMode ? CARE_MODE_LABEL[entry.contract.careMode] : '-' }}
+              </div>
+              <!-- 护理等级、护理师来自这次入住的母婴档案（护理模块里维护），没建档显示 - -->
+              <div class="occ-row">
+                <span class="occ-label">护理等级：</span>{{ entry.careBrief?.level ? CARE_LEVEL_SHORT[entry.careBrief.level] ?? entry.careBrief.level : '-' }}
+                <span class="occ-label occ-gap">护理师：</span>{{ entry.careBrief?.nurseName ?? '-' }}
+              </div>
+              <!-- 签单人 = 客户的归属销售（系统暂无合同级别的签单人字段） -->
+              <div class="occ-row"><span class="occ-label">签单人：</span>{{ entry.signerName ?? '-' }}</div>
+            </template>
           </n-card>
         </n-gi>
       </n-grid>
@@ -239,7 +314,7 @@ onMounted(async () => {
     <n-modal :show="actionVisible" @update:show="(v) => (actionVisible = v)">
       <n-card
         :title="selectedEntry ? `${selectedEntry.room.roomNo}（${statusLabel[selectedEntry.status]}）` : ''"
-        style="width: 480px"
+        style="width: min(480px, 94vw)"
         :bordered="false"
         role="dialog"
         aria-modal="true"
@@ -311,3 +386,64 @@ onMounted(async () => {
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+.occ-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.occ-no {
+  font-size: 17px;
+  font-weight: 600;
+  color: #222;
+}
+.occ-type {
+  font-size: 12px;
+  color: #666;
+}
+.occ-pill {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+.occ-row {
+  font-size: 12px;
+  line-height: 19px;
+  color: #555;
+}
+.occ-label {
+  color: #999;
+}
+.occ-gap {
+  margin-left: 8px;
+}
+/* 预产期整行加粗；距今不足7天整行（含说明文字）变红 */
+.occ-due {
+  font-weight: 600;
+  color: #222;
+}
+.occ-due .occ-label {
+  color: #555;
+}
+.occ-due-warn,
+.occ-due-warn .occ-label {
+  color: #d03050;
+}
+/* 客户姓名：比其余文字大一号，主题蓝加下划线，提示可点击 */
+.occ-customer {
+  display: inline-block;
+  margin: 3px 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2080f0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.occ-customer:hover {
+  color: #0c62c9;
+}
+</style>

@@ -205,7 +205,7 @@ onMounted(async () => {
     </n-card>
 
     <n-modal :show="actionVisible" @update:show="(v) => (actionVisible = v)">
-      <n-card :title="actionTitleMap[actionKind]" style="width: 420px" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="actionTitleMap[actionKind]" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item v-if="actionKind === 'reassign'" label="转交给">
             <n-select v-model:value="actionModel.toAccountId" :options="accountOptions" />
