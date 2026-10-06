@@ -227,7 +227,11 @@ EOF
 server {
     listen 80;
     server_name ${SERVER_NAMES};
+    # 手机照片/合同 PDF 上传 + AI 识别耗时较长：放宽上传大小和读超时（默认 1MB / 60 秒会失败）
+    client_max_body_size 50m;
     location / {
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

@@ -61,6 +61,10 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000" # 只监听本机回环地址，公网访问统一走 web 容器的 nginx 反代
+    # 合同原件、护理档案照片（评估表/日常记录/用药委托书等）存在 /repo/apps/api/storage 下：
+    # 必须放进持久卷，否则每次重新构建/重建容器，客户的照片就丢了。备份见 scripts/backup-mysql.sh。
+    volumes:
+      - api_storage:/repo/apps/api/storage
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
       interval: 15s
@@ -92,3 +96,4 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  api_storage:

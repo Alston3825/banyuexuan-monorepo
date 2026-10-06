@@ -35,5 +35,15 @@ docker compose -f docker-compose.prod.yml exec -T mysql \
 
 echo "$(date '+%F %T') 备份完成：$OUT_FILE（$(du -h "$OUT_FILE" | cut -f1)）"
 
+# 合同原件、护理档案照片（持久卷 api_storage）一起打包。目录为空/容器没起时不影响数据库备份。
+FILES_OUT="$BACKUP_DIR/files-${STAMP}.tar.gz"
+if docker compose -f docker-compose.prod.yml exec -T api sh -c 'test -d /repo/apps/api/storage && tar czf - -C /repo/apps/api storage' > "$FILES_OUT" 2>/dev/null && [[ -s "$FILES_OUT" ]]; then
+  echo "$(date '+%F %T') 文件备份完成：$FILES_OUT（$(du -h "$FILES_OUT" | cut -f1)）"
+else
+  rm -f "$FILES_OUT"
+  echo "$(date '+%F %T') 暂无需要备份的上传文件（或 api 容器未运行），跳过文件备份。"
+fi
+
 # 只保留最近 KEEP_DAYS 天，避免备份文件把磁盘占满
 find "$BACKUP_DIR" -name "${MYSQL_DATABASE}-*.sql.gz" -mtime "+${KEEP_DAYS}" -delete
+find "$BACKUP_DIR" -name "files-*.tar.gz" -mtime "+${KEEP_DAYS}" -delete
