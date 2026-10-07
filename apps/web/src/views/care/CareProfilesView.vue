@@ -46,7 +46,8 @@ const keyword = ref('')
 
 const customerNameById = computed(() => new Map(customers.value.map((c) => [c.id, c.name])))
 const customerOptions = computed(() => customers.value.map((c) => ({ label: `${c.name}（${c.phone}）`, value: c.id })))
-const tagOptions = computed(() => tags.value.map((t) => ({ label: t.name, value: t.id })))
+// 风险标签只能选“母婴风险”分类的标签（早产/传染病/高敏…），不能混进销售用的客户分类、客户类型
+const tagOptions = computed(() => tags.value.filter((t) => t.category === 'CARE_RISK').map((t) => ({ label: t.name, value: t.id })))
 
 const formVisible = ref(false)
 const submitting = ref(false)

@@ -118,7 +118,8 @@ const plans = ref<CarePlan[]>([])
 const abnormalities = ref<CareAbnormality[]>([])
 const loading = ref(false)
 
-const tagOptions = computed(() => allTags.value.map((t) => ({ label: t.name, value: t.id })))
+// 风险标签只能选“母婴风险”分类的标签（早产/传染病/高敏…），不能混进销售用的客户分类、客户类型
+const tagOptions = computed(() => allTags.value.filter((t) => t.category === 'CARE_RISK').map((t) => ({ label: t.name, value: t.id })))
 
 /** "对象"选择器统一选项：妈妈本人 + 每个宝宝，value 用 "MOTHER:<id>" / "BABY:<id>" 编码，避免维护两套并行状态。 */
 const targetOptions = computed(() => {
