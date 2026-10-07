@@ -666,7 +666,25 @@ onMounted(fetchAll)
       <template #header-extra>
         <n-button size="small" type="primary" @click="openAddBaby">新增宝宝</n-button>
       </template>
-      <n-data-table :columns="babyColumns" :data="mother.babies" :row-key="(r: BabyProfile) => r.id" />
+      <!-- 手机上用一宝宝一张卡片（表格列太窄会被挤成竖排） -->
+      <template v-if="isMobile">
+        <div v-if="mother.babies.length === 0" class="cp-baby-empty">还没有宝宝档案，点右上角“新增宝宝”</div>
+        <div v-for="b in mother.babies" :key="b.id" class="cp-baby">
+          <div class="cp-baby-top">
+            <b>{{ b.sequenceNo }} 号宝宝 · {{ b.name ?? '未取名' }}</b>
+            <span class="cp-baby-sub">{{ BABY_GENDER_LABEL_MAP[b.gender] }}</span>
+          </div>
+          <div class="cp-baby-line">出生体重 {{ b.birthWeightGrams ?? '-' }} g · Apgar 评分 {{ b.apgarScore ?? '-' }}</div>
+          <n-space v-if="(babyRiskTags[b.id] ?? []).length" :size="4" style="margin-top: 6px">
+            <n-tag v-for="t in babyRiskTags[b.id]" :key="t.id" size="small" :color="{ color: t.tag.color ?? undefined }">{{ t.tag.name }}</n-tag>
+          </n-space>
+          <n-space style="margin-top: 8px" :size="8">
+            <n-button size="small" @click="openEditBaby(b)">编辑</n-button>
+            <n-button size="small" type="error" ghost @click="removeBaby(b)">删除</n-button>
+          </n-space>
+        </div>
+      </template>
+      <n-data-table v-else :columns="babyColumns" :data="mother.babies" :row-key="(r: BabyProfile) => r.id" />
     </n-card>
 
       </n-tab-pane>
@@ -998,6 +1016,31 @@ onMounted(fetchAll)
   background: #eef7f0;
   color: #18a058;
   font-weight: 600;
+}
+.cp-baby {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+.cp-baby-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cp-baby-sub {
+  color: #888;
+  font-size: 13px;
+}
+.cp-baby-line {
+  margin-top: 4px;
+  color: #555;
+  font-size: 13px;
+}
+.cp-baby-empty {
+  padding: 12px 0;
+  color: #999;
+  font-size: 13px;
 }
 /* 手机上用自己的竖排列表，隐藏 naive 自带的标签栏 */
 .cp-nonav :deep(.n-tabs-nav) {
