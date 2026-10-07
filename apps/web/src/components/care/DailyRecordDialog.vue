@@ -13,6 +13,7 @@ import { message } from '../../utils/discrete-api'
 import CareDocImages from './CareDocImages.vue'
 import FeedingTable from './FeedingTable.vue'
 import SpecForm from './SpecForm.vue'
+import DailySignPanel from './DailySignPanel.vue'
 
 const props = defineProps<{ show: boolean; motherProfileId: string; date: string }>()
 const emit = defineEmits<{ 'update:show': [value: boolean]; saved: [] }>()
@@ -246,6 +247,9 @@ const close = () => emit('update:show', false)
             <SpecForm v-model="motherValues" :spec="{ groups: specs.mother }" :warnings="warnings" />
           </n-tab-pane>
         </n-tabs>
+
+        <!-- 护理师签字 + 客户确认：记录保存后才出现；记录一保存（版本号变了）就重新载入，签字是否过期立刻可见 -->
+        <DailySignPanel v-if="day" :key="`${props.date}-${day.record?.version ?? 'new'}`" :mother-profile-id="motherProfileId" :date="date" :can-sign="!!day.record" @changed="emit('saved')" />
       </n-spin>
 
       <template #footer>

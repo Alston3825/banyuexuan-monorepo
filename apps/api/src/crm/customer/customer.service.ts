@@ -229,9 +229,10 @@ export class CustomerService {
   }
 
   /** 员工下拉（电话销售员/门店销售员/抄送人/推荐人）。不依赖 platform.account 权限，店员也能选。 */
-  async staffOptions(keyword?: string) {
+  /** salesOnly：只要销售部的员工（电话销售员/门店销售员的指定名单用，不让全体员工都出现在里面）。 */
+  async staffOptions(keyword?: string, salesOnly = false) {
     const accounts = await this.prisma.account.findMany({
-      where: { tenantId: this.ctx.tenantId, status: 'ACTIVE' },
+      where: { tenantId: this.ctx.tenantId, status: 'ACTIVE', ...(salesOnly ? { department: { name: { contains: '销售' } } } : {}) },
       select: { id: true, realName: true, username: true },
       orderBy: { realName: 'asc' },
       take: 500,

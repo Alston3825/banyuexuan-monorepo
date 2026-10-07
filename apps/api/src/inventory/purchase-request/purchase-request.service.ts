@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, PurchaseRequest } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
@@ -9,10 +9,12 @@ import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { PurchaseOrderService } from '../purchase-order/purchase-order.service';
 import { keyOf, norm } from '../inventory-item/inventory-item-import.service';
+import { generateBusinessNo } from '../../common/utils/business-no.util';
 
 const DEFINITION_CODE = 'INVENTORY_PURCHASE_REQUEST';
 const BUSINESS_TYPE = 'PURCHASE_REQUEST';
 const include = {
+  summaryRequest: { select: { id: true, requestNo: true, status: true } },
   store: { select: { id: true, name: true } },
   purchaseOrder: { select: { id: true, orderNo: true, status: true } },
   items: { orderBy: { sortNo: 'asc' as const }, include: { item: { select: { id: true, code: true } } } },
@@ -34,9 +36,14 @@ export interface RequestLineBody {
 }
 
 /**
- * 申购单(SG)：DRAFT -(提交)-> PENDING_APPROVAL -(通用工作流，店长审批)-> APPROVED/REJECTED；
- * APPROVED 后选供应商和仓库“生成采购单”→ ORDERED（采购单本身还要再走采购审批）。
- * 只有 DRAFT 能改明细。PENDING_APPROVAL 的后续推进与采购单一样，读取时懒同步自 WorkflowInstance。
+ * 采购流程：
+ *   ① 部门负责人填“部门申购单”（kind=DEPARTMENT）：DRAFT → 提交 → SUBMITTED（本身不审批），自动出现在客服的“待汇总”里；
+ *   ② 客服选若干张 SUBMITTED 的部门申购单“汇总”，生成一张“汇总申购单”（kind=SUMMARY，DRAFT，可补单价/改数量），
+ *      被汇总的部门申购单变 COLLECTED；
+ *   ③ 汇总申购单 DRAFT -(提交)-> PENDING_APPROVAL -(通用工作流，店长审批)-> APPROVED/REJECTED；
+ *   ④ APPROVED 后生成采购单（选供应商和仓库）→ ORDERED：采购单直接是“待采购”，不再审批，交给采购员（见 PurchaseOrderService）。
+ * 老的 Excel 导入申购表也是汇总申购单。只有 DRAFT 能改明细。PENDING_APPROVAL 的后续推进与采购单一样，读取时懒同步自 WorkflowInstance。
+ * 可见范围：没有“汇总/生成采购单”权限的人（如部门负责人）只能看到自己提交的部门申购单。
  */
 @Injectable()
 export class PurchaseRequestService {
@@ -49,25 +56,152 @@ export class PurchaseRequestService {
     private readonly ctx: RequestContextService,
   ) {}
 
-  async findMany(query: { storeId?: string; status?: PurchaseRequest['status'] } = {}) {
+  /** 采购岗（客服/采购员/店长…）能看到整个门店的申购单；其他人（部门负责人）只能看自己提交的部门申购单。 */
+  private async isProcurementStaff() {
+    return (await this.ctx.hasPermission('inventory.purchase-request.collect')) || (await this.ctx.hasPermission('inventory.purchase-request.convert'));
+  }
+
+  private async withCreatorNames<T extends { createdBy: string }>(rows: T[]): Promise<(T & { creatorName: string })[]> {
+    const ids = [...new Set(rows.map((r) => r.createdBy))];
+    const accs = ids.length ? await this.prisma.account.findMany({ where: { id: { in: ids } }, select: { id: true, realName: true } }) : [];
+    const name = new Map(accs.map((a) => [a.id, a.realName]));
+    return rows.map((r) => ({ ...r, creatorName: name.get(r.createdBy) ?? '' }));
+  }
+
+  async findMany(query: { storeId?: string; status?: PurchaseRequest['status']; kind?: PurchaseRequest['kind'] } = {}) {
     const allowed = await this.dataScope.resolveAllowedStoreIds(this.ctx);
+    const staff = await this.isProcurementStaff();
     const rows = await this.prisma.purchaseRequest.findMany({
       where: {
         tenantId: this.ctx.tenantId,
         storeId: query.storeId ?? (allowed === 'ALL' ? undefined : { in: allowed }),
         status: query.status,
+        kind: staff ? query.kind : 'DEPARTMENT',
+        // 非采购岗：只能看自己提交的部门申购单
+        ...(staff ? {} : { createdBy: this.ctx.accountId }),
+        // 采购岗看别人的部门申购单时，不看对方还没提交的草稿
+        ...(staff ? { NOT: { kind: 'DEPARTMENT', status: 'DRAFT', createdBy: { not: this.ctx.accountId } } } : {}),
       },
-      include: { store: { select: { id: true, name: true } }, purchaseOrder: { select: { id: true, orderNo: true } }, _count: { select: { items: true } } },
+      include: {
+        store: { select: { id: true, name: true } },
+        purchaseOrder: { select: { id: true, orderNo: true } },
+        summaryRequest: { select: { id: true, requestNo: true } },
+        _count: { select: { items: true } },
+      },
       orderBy: [{ requestDate: 'desc' }, { createdAt: 'desc' }],
     });
-    return Promise.all(rows.map((r) => this.reconcileStatus(r)));
+    return this.withCreatorNames(await Promise.all(rows.map((r) => this.reconcileStatus(r))));
   }
 
   async findOneOrThrow(id: string) {
     const row = await this.prisma.purchaseRequest.findFirst({ where: { id, tenantId: this.ctx.tenantId }, include });
     if (!row) throw new NotFoundException(`PurchaseRequest ${id} 不存在`);
     await this.dataScope.assertStoreAccessible(this.ctx, row.storeId);
+    if (!(await this.isProcurementStaff()) && (row.kind !== 'DEPARTMENT' || row.createdBy !== this.ctx.accountId)) {
+      throw new ForbiddenException('只能查看自己提交的部门申购单');
+    }
     return this.reconcileStatus(row);
+  }
+
+  // ---------------- 部门申购单 / 汇总 ----------------
+  /** 部门负责人新建部门申购单：申请部门取自本人所在部门，申请人=本人；可直接“保存并提交”。 */
+  async createDepartment(body: { storeId?: string; requestDate?: string; remark?: string; items: RequestLineBody[]; submit?: boolean }) {
+    const me = await this.prisma.account.findUniqueOrThrow({ where: { id: this.ctx.accountId! }, include: { department: { select: { name: true } } } });
+    const storeId = body.storeId ?? me.storeId ?? this.ctx.homeStoreId ?? undefined;
+    if (!storeId) throw new BadRequestException('请选择门店');
+    await this.dataScope.assertStoreAccessible(this.ctx, storeId);
+    const departmentName = me.department?.name ?? '（未设置部门）';
+    if (!body.items?.length) throw new BadRequestException('请至少填写一项要申购的物品');
+    const lines: Prisma.PurchaseRequestItemUncheckedCreateWithoutPurchaseRequestInput[] = [];
+    for (const [i, raw] of body.items.entries()) {
+      if (!raw.name?.trim()) throw new BadRequestException(`第 ${i + 1} 行请填写物品名称`);
+      if (raw.quantity === undefined) throw new BadRequestException(`第 ${i + 1} 行（${raw.name}）请填写数量`);
+      const data = this.normalize({ ...raw, department: departmentName, requester: me.realName });
+      const price = (data.unitPrice as number | null | undefined) ?? null;
+      const itemId = raw.itemId ?? (await this.resolveItem(norm(raw.name), norm(raw.spec) || null));
+      lines.push({ ...(data as object), sortNo: i + 1, itemId: itemId ?? null, subtotal: price === null ? 0 : round2((data.quantity as number) * price) } as Prisma.PurchaseRequestItemUncheckedCreateWithoutPurchaseRequestInput);
+    }
+    const created = await this.prisma.purchaseRequest.create({
+      data: {
+        tenantId: this.ctx.tenantId!,
+        storeId,
+        requestNo: generateBusinessNo('SG'),
+        requestDate: body.requestDate ? new Date(body.requestDate) : new Date(),
+        kind: 'DEPARTMENT',
+        departmentName,
+        status: body.submit ? 'SUBMITTED' : 'DRAFT',
+        totalAmount: round2(lines.reduce((s, l) => s + Number(l.subtotal ?? 0), 0)),
+        remark: body.remark?.trim() || null,
+        createdBy: this.ctx.accountId!,
+        items: { create: lines },
+      },
+      include,
+    });
+    await this.audit('STATE_TRANSITION', created.id, null, created, `创建部门申购单（${departmentName}）${body.submit ? '并提交，等客服汇总' : ''}`, storeId);
+    return created;
+  }
+
+  /** 部门申购单提交后、被汇总前，发起人可以撤回成草稿重新修改。 */
+  async recall(id: string, expectedVersion: number) {
+    const before = await this.findOneOrThrow(id);
+    this.assertVersion(before, expectedVersion);
+    if (before.kind !== 'DEPARTMENT' || before.status !== 'SUBMITTED') throw new BadRequestException('只有已提交、还没被客服汇总的部门申购单可以撤回');
+    if (before.createdBy !== this.ctx.accountId && !(await this.isProcurementStaff())) throw new ForbiddenException('只能撤回自己的申购单');
+    const updated = await runVersionedUpdate(() => this.prisma.purchaseRequest.update({ where: { id, version: expectedVersion }, data: { status: 'DRAFT', version: { increment: 1 } }, include }));
+    await this.audit('STATE_TRANSITION', id, before, updated, 'SUBMITTED -> DRAFT（撤回修改）', before.storeId);
+    return updated;
+  }
+
+  /** 客服汇总：把选中的“已提交”部门申购单合并成一张汇总申购单草稿（保留每行的申请部门/申请人），原部门申购单变“已汇总”。 */
+  async collect(ids: string[], remark?: string) {
+    if (!ids?.length) throw new BadRequestException('请先勾选要汇总的部门申购单');
+    const rows = await this.prisma.purchaseRequest.findMany({ where: { id: { in: ids }, tenantId: this.ctx.tenantId }, include: { items: { orderBy: { sortNo: 'asc' } } }, orderBy: { createdAt: 'asc' } });
+    if (rows.length !== new Set(ids).size) throw new NotFoundException('有部门申购单不存在');
+    const storeIds = new Set(rows.map((r) => r.storeId));
+    if (storeIds.size > 1) throw new BadRequestException('一次只能汇总同一个门店的申购单');
+    const bad = rows.find((r) => r.kind !== 'DEPARTMENT' || r.status !== 'SUBMITTED');
+    if (bad) throw new BadRequestException(`申购单 ${bad.requestNo} 不是“已提交”的部门申购单（可能已被汇总或已撤回），请刷新后重新勾选`);
+    const storeId = rows[0].storeId;
+    await this.dataScope.assertStoreAccessible(this.ctx, storeId);
+
+    const lines = rows.flatMap((r) => r.items);
+    const summary = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.purchaseRequest.create({
+        data: {
+          tenantId: this.ctx.tenantId!,
+          storeId,
+          requestNo: generateBusinessNo('SG'),
+          requestDate: new Date(),
+          kind: 'SUMMARY',
+          status: 'DRAFT',
+          totalAmount: round2(lines.reduce((s, l) => s + Number(l.subtotal), 0)),
+          remark: remark?.trim() || `汇总自：${rows.map((r) => `${r.departmentName ?? ''}${r.requestNo}`).join('、')}`,
+          createdBy: this.ctx.accountId!,
+          items: {
+            create: lines.map((l, i) => ({
+              sortNo: i + 1,
+              itemId: l.itemId,
+              name: l.name,
+              spec: l.spec,
+              brand: l.brand,
+              unit: l.unit,
+              quantity: l.quantity,
+              unitPrice: l.unitPrice,
+              subtotal: l.subtotal,
+              department: l.department,
+              requester: l.requester,
+              purpose: l.purpose,
+              remark: l.remark,
+            })),
+          },
+        },
+        include,
+      });
+      await tx.purchaseRequest.updateMany({ where: { id: { in: rows.map((r) => r.id) } }, data: { status: 'COLLECTED', summaryRequestId: created.id } });
+      return created;
+    });
+    await this.audit('STATE_TRANSITION', summary.id, null, summary, `汇总 ${rows.length} 张部门申购单：${rows.map((r) => r.requestNo).join('、')}`, storeId);
+    return summary;
   }
 
   // ---------------- 明细（只有草稿能改） ----------------
@@ -164,6 +298,13 @@ export class PurchaseRequestService {
     this.assertVersion(before, expectedVersion);
     if (before.status !== 'DRAFT') throw new BadRequestException(`申购单当前状态「${before.status}」不允许提交`);
     if (before.items.length === 0) throw new BadRequestException('申购单里没有物品');
+    if (before.kind === 'DEPARTMENT') {
+      // 部门申购单提交 = 交给客服汇总，本身不审批（审批发生在汇总申购单上）
+      if (before.createdBy !== this.ctx.accountId && !(await this.isProcurementStaff())) throw new ForbiddenException('只能提交自己的申购单');
+      const submitted = await runVersionedUpdate(() => this.prisma.purchaseRequest.update({ where: { id, version: expectedVersion }, data: { status: 'SUBMITTED', version: { increment: 1 } }, include }));
+      await this.audit('STATE_TRANSITION', id, before, submitted, 'DRAFT -> SUBMITTED（提交给客服汇总）', before.storeId);
+      return submitted;
+    }
 
     await this.workflowEngineService.startInstance(
       { definitionCode: DEFINITION_CODE, businessType: BUSINESS_TYPE, businessId: id, title: before.requestNo, storeId: before.storeId },
@@ -179,9 +320,14 @@ export class PurchaseRequestService {
   async cancel(id: string, cancelReason: string, expectedVersion: number) {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
-    if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(before.status)) throw new BadRequestException(`申购单当前状态「${before.status}」不允许取消`);
+    if (!['DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(before.status)) throw new BadRequestException(`申购单当前状态「${before.status}」不允许取消`);
+    if (before.kind === 'DEPARTMENT' && before.createdBy !== this.ctx.accountId && !(await this.isProcurementStaff())) throw new ForbiddenException('只能取消自己的申购单');
     const updated = await runVersionedUpdate(() =>
-      this.prisma.purchaseRequest.update({ where: { id, version: expectedVersion }, data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } }, include }),
+      this.prisma.$transaction(async (tx) => {
+        // 汇总申购单作废：被它汇总的部门申购单放回“待汇总”，客服可以重新汇总
+        await tx.purchaseRequest.updateMany({ where: { summaryRequestId: id, status: 'COLLECTED' }, data: { status: 'SUBMITTED', summaryRequestId: null } });
+        return tx.purchaseRequest.update({ where: { id, version: expectedVersion }, data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } }, include });
+      }),
     );
     await this.audit('STATE_TRANSITION', id, before, updated, `${before.status} -> CANCELLED：${cancelReason}`, before.storeId);
     return updated;
@@ -198,6 +344,7 @@ export class PurchaseRequestService {
   ) {
     let before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
+    if (before.kind !== 'SUMMARY') throw new BadRequestException('部门申购单要先由客服汇总，汇总申购单审批通过后才能生成采购单');
     if (before.status !== 'APPROVED') throw new BadRequestException('只有已批准的申购单可以生成采购单');
     // 已批准后才知道报价/物品的行：这里允许补填“缺单价”“没对上物品”的行（已有的不改，避免改动批准过的内容）
     for (const fix of input.fixes ?? []) {
@@ -233,7 +380,7 @@ export class PurchaseRequestService {
       supplierId: input.supplierId,
       remark: `由申购单 ${before.requestNo} 生成`,
       items: before.items.map((l) => ({ itemId: l.itemId!, quantity: l.quantity, unitPrice: Math.round(Number(l.unitPrice) * 100) })),
-    });
+    }, { autoApprove: true }); // 申购单已经店长审批过，采购单不再审批，直接交给采购员
     const updated = await runVersionedUpdate(() =>
       this.prisma.purchaseRequest.update({ where: { id, version: expectedVersion }, data: { status: 'ORDERED', purchaseOrderId: order.id, version: { increment: 1 } }, include }),
     );

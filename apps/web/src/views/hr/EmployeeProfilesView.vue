@@ -16,16 +16,22 @@ import {
   renderStatusBadge, EMPLOYEE_PROFILE_STATUS_MAP, EMPLOYMENT_TYPE_LABEL_MAP, CONTRACT_TYPE_LABEL_MAP, SOCIAL_INSURANCE_LABEL_MAP, EMPLOYEE_GENDER_LABEL_MAP,
 } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
+import { useAuthStore } from '../../stores/auth'
+
+const auth = useAuthStore()
+const canChangeNo = computed(() => auth.hasAccess('hr.employee-profile.change-no'))
+const canArchive = computed(() => auth.hasAccess('hr.employee-profile.archive'))
+const canRestore = computed(() => auth.hasAccess('hr.employee-profile.restore'))
 
 const ALERT_TYPE_LABEL_MAP: Record<string, string> = { HEALTH_CERT: '健康证', CONTRACT: '合同', PROBATION: '转正' }
 const toOptions = (m: Record<string, string>) => Object.entries(m).map(([value, label]) => ({ label, value }))
 const contractOptions = toOptions(CONTRACT_TYPE_LABEL_MAP)
 const insuranceOptions = toOptions(SOCIAL_INSURANCE_LABEL_MAP)
 const employmentOptions = toOptions(EMPLOYMENT_TYPE_LABEL_MAP)
+// 离职不在这里选：要点“离职归档”（会停用账号并释放工号）
 const statusOptions = [
   { label: '在职', value: 'ACTIVE' },
   { label: '休假中', value: 'ON_LEAVE' },
-  { label: '已离职', value: 'TERMINATED' },
 ]
 
 const rows = ref<EmployeeProfile[]>([])
@@ -34,6 +40,7 @@ const accounts = ref<Account[]>([])
 const departments = ref<{ label: string; value: string }[]>([])
 const loading = ref(false)
 const alertsOnly = ref(false)
+const showArchived = ref(false)
 const keyword = ref('')
 const filterDept = ref<string | null>(null)
 const filterStatus = ref<string | null>(null)
@@ -59,7 +66,7 @@ async function fetchList() {
     if (alertsOnly.value) {
       alertRows.value = await employeeProfileApi.expiryAlerts(30)
     } else {
-      rows.value = await employeeProfileApi.list({ keyword: keyword.value.trim() || undefined, departmentId: filterDept.value ?? undefined, status: filterStatus.value ?? undefined })
+      rows.value = await employeeProfileApi.list({ keyword: keyword.value.trim() || undefined, departmentId: filterDept.value ?? undefined, status: filterStatus.value ?? undefined, archived: showArchived.value ? 'only' : undefined })
     }
   } finally {
     loading.value = false
@@ -96,18 +103,12 @@ const model = ref(blank())
 const ts = (iso: string | null) => (iso ? new Date(iso).getTime() : null)
 const iso = (t: number | null) => (t ? new Date(t).toISOString() : undefined)
 
-/** 建议工号：现有工号都是数字时取最大值+1，否则留空让人填 */
-function nextEmployeeNo(): string {
-  const nums = rows.value.map((r) => r.employeeNo)
-  if (nums.length === 0 || !nums.every((n) => /^\d+$/.test(n))) return ''
-  const width = Math.max(...nums.map((n) => n.length))
-  return String(Math.max(...nums.map(Number)) + 1).padStart(width, '0')
-}
-
 function openCreate() {
   editingRow.value = null
-  model.value = { ...blank(), employeeNo: nextEmployeeNo() }
+  model.value = blank()
   formVisible.value = true
+  // 建议工号由系统按在职名册顺延给出（已归档释放的小号不自动回收，需要时手动填）
+  employeeProfileApi.nextNo().then((no) => !editingRow.value && !model.value.employeeNo && (model.value.employeeNo = no)).catch(() => {})
 }
 
 function openEdit(row: EmployeeProfile) {
@@ -167,9 +168,9 @@ async function handleSubmit() {
     if (editingRow.value) {
       await employeeProfileApi.update(editingRow.value.id, {
         ...common,
-        status: m.status,
-        terminationDate: iso(m.terminationDate),
-        terminationReason: text(m.terminationReason),
+        // 没有“修改工号”权限的人不传工号（后端也会拒绝）
+        employeeNo: canChangeNo.value ? common.employeeNo : undefined,
+        status: m.status === 'TERMINATED' ? undefined : m.status,
         version: editingRow.value.version,
       })
       message.success('员工档案已更新')
@@ -181,6 +182,49 @@ async function handleSubmit() {
     await fetchList()
   } finally {
     submitting.value = false
+  }
+}
+
+// ---------------- 离职归档 / 恢复在职 ----------------
+const archiveRow = ref<EmployeeProfile | null>(null)
+const archiveModel = ref({ terminationDate: Date.now() as number | null, reason: '' })
+const archiving = ref(false)
+function openArchive(row: EmployeeProfile) {
+  archiveRow.value = row
+  archiveModel.value = { terminationDate: Date.now(), reason: '' }
+  detailRow.value = null
+}
+async function doArchive() {
+  if (!archiveRow.value) return
+  archiving.value = true
+  try {
+    await employeeProfileApi.archive(archiveRow.value.id, { terminationDate: iso(archiveModel.value.terminationDate), reason: archiveModel.value.reason.trim() || undefined, version: archiveRow.value.version })
+    message.success('已离职归档，账号已停用，工号已释放')
+    archiveRow.value = null
+    await fetchList()
+  } finally {
+    archiving.value = false
+  }
+}
+
+const restoreRow = ref<EmployeeProfile | null>(null)
+const restoreNo = ref('')
+const restoring = ref(false)
+function openRestore(row: EmployeeProfile) {
+  restoreRow.value = row
+  restoreNo.value = row.employeeNo
+  detailRow.value = null
+}
+async function doRestore() {
+  if (!restoreRow.value) return
+  restoring.value = true
+  try {
+    await employeeProfileApi.restore(restoreRow.value.id, { employeeNo: restoreNo.value.trim() || undefined, version: restoreRow.value.version })
+    message.success('已恢复在职，账号已重新启用')
+    restoreRow.value = null
+    await fetchList()
+  } finally {
+    restoring.value = false
   }
 }
 
@@ -204,13 +248,18 @@ const columns: DataTableColumns<EmployeeProfile> = [
   {
     key: 'actions',
     title: '操作',
-    width: 130,
+    width: 200,
     fixed: 'right',
     render: (row) =>
       h(NSpace, { size: 4 }, {
         default: () => [
           h(NButton, { size: 'small', onClick: () => (detailRow.value = row) }, { default: () => '详情' }),
-          h(NButton, { size: 'small', type: 'primary', secondary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
+          ...(row.archivedAt
+            ? canRestore.value ? [h(NButton, { size: 'small', type: 'primary', secondary: true, onClick: () => openRestore(row) }, { default: () => '恢复在职' })] : []
+            : [
+                h(NButton, { size: 'small', type: 'primary', secondary: true, onClick: () => openEdit(row) }, { default: () => '编辑' }),
+                ...(canArchive.value ? [h(NButton, { size: 'small', type: 'error', quaternary: true, onClick: () => openArchive(row) }, { default: () => '离职归档' })] : []),
+              ]),
         ],
       }),
   },
@@ -242,7 +291,7 @@ onMounted(async () => {
   departments.value = deps.map((d) => ({ label: d.name, value: d.id }))
   await fetchList()
 })
-watch([alertsOnly, filterDept, filterStatus], fetchList)
+watch([alertsOnly, showArchived, filterDept, filterStatus], fetchList)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(keyword, () => {
   clearTimeout(searchTimer)
@@ -255,12 +304,16 @@ watch(keyword, () => {
     <n-space style="margin-bottom: 12px" align="center">
       <n-input v-model:value="keyword" clearable placeholder="搜索姓名 / 工号" style="width: min(200px, 60vw)" :disabled="alertsOnly" />
       <n-select v-model:value="filterDept" :options="departments" clearable placeholder="部门" style="width: 130px" :disabled="alertsOnly" />
-      <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="状态" style="width: 110px" :disabled="alertsOnly" />
+      <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="状态" style="width: 110px" :disabled="alertsOnly || showArchived" />
+      <n-space align="center" :size="6">
+        <n-switch v-model:value="showArchived" :disabled="alertsOnly" />
+        <span>看已离职归档的</span>
+      </n-space>
       <n-space align="center" :size="6">
         <n-switch v-model:value="alertsOnly" />
         <span>只看到期提醒（30天内）</span>
       </n-space>
-      <n-button type="primary" @click="openCreate">建立员工档案</n-button>
+      <n-button v-if="!showArchived" type="primary" @click="openCreate">建立员工档案</n-button>
     </n-space>
 
     <template v-if="!alertsOnly">
@@ -284,7 +337,17 @@ watch(keyword, () => {
     <!-- 详情 -->
     <n-modal :show="!!detailRow" @update:show="(v) => !v && (detailRow = null)">
       <n-card v-if="detailRow" :title="`${detailRow.account.realName} 的员工档案`" style="width: min(760px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
-        <template #header-extra><n-button size="small" type="primary" @click="openEdit(detailRow)">编辑</n-button></template>
+        <template #header-extra>
+          <n-space :size="6">
+            <template v-if="detailRow.archivedAt">
+              <n-button v-if="canRestore" size="small" type="primary" @click="openRestore(detailRow)">恢复在职</n-button>
+            </template>
+            <template v-else>
+              <n-button size="small" type="primary" @click="openEdit(detailRow)">编辑</n-button>
+              <n-button v-if="canArchive" size="small" type="error" quaternary @click="openArchive(detailRow)">离职归档</n-button>
+            </template>
+          </n-space>
+        </template>
         <div class="ep-sec">基本信息</div>
         <n-descriptions :column="isMobile ? 1 : 2" label-placement="left" size="small" bordered>
           <n-descriptions-item label="姓名">{{ detailRow.account.realName }}</n-descriptions-item>
@@ -334,6 +397,39 @@ watch(keyword, () => {
       </n-card>
     </n-modal>
 
+    <!-- 离职归档 -->
+    <n-modal :show="!!archiveRow" @update:show="(v) => !v && (archiveRow = null)">
+      <n-card v-if="archiveRow" :title="`离职归档：${archiveRow.account.realName}（工号 ${archiveRow.employeeNo}）`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="top" size="small">
+          <n-form-item label="离职日期"><n-date-picker v-model:value="archiveModel.terminationDate" type="date" style="width: 100%" /></n-form-item>
+          <n-form-item label="离职原因（选填）"><n-input v-model:value="archiveModel.reason" /></n-form-item>
+        </n-form>
+        <div class="ep-hint">归档后：档案转为只读并移出在职名册；登录账号立即停用；工号 {{ archiveRow.employeeNo }} 释放，可分配给新员工；手机号仍属于该账号，不能重复开通。</div>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="archiveRow = null">取消</n-button>
+            <n-button type="error" :loading="archiving" @click="doArchive">确认离职归档</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <!-- 恢复在职 -->
+    <n-modal :show="!!restoreRow" @update:show="(v) => !v && (restoreRow = null)">
+      <n-card v-if="restoreRow" :title="`恢复在职：${restoreRow.account.realName}`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+        <n-form label-placement="top" size="small">
+          <n-form-item label="工号（原工号如果已被新员工使用，请换一个）"><n-input v-model:value="restoreNo" /></n-form-item>
+        </n-form>
+        <div class="ep-hint">恢复后：重新计入在职名册，登录账号重新启用（密码不变）。</div>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="restoreRow = null">取消</n-button>
+            <n-button type="primary" :loading="restoring" @click="doRestore">确认恢复在职</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
     <!-- 新建 / 编辑 -->
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? `编辑员工档案：${editingRow.account.realName}` : '建立员工档案'" style="width: min(720px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
@@ -343,7 +439,7 @@ watch(keyword, () => {
             <n-form-item v-if="!editingRow" label="账号（姓名、部门、职务、电话来自账号）" class="ep-wide">
               <n-select v-model:value="model.accountId" :options="accountOptions" filterable placeholder="仅显示尚未建档的账号" />
             </n-form-item>
-            <n-form-item label="工号"><n-input v-model:value="model.employeeNo" /></n-form-item>
+            <n-form-item label="工号" :feedback="editingRow && !canChangeNo ? '工号一旦分配，只有管理员才能修改' : undefined"><n-input v-model:value="model.employeeNo" :disabled="!!editingRow && !canChangeNo" /></n-form-item>
             <n-form-item label="身份证号（保存时自动识别性别和出生日期）"><n-input v-model:value="model.idCardNo" maxlength="18" placeholder="18 位身份证号" /></n-form-item>
             <n-form-item label="现住址" class="ep-wide"><n-input v-model:value="model.address" /></n-form-item>
           </div>
@@ -357,10 +453,6 @@ watch(keyword, () => {
             <n-form-item label="社保缴纳"><n-select v-model:value="model.socialInsurance" :options="insuranceOptions" clearable placeholder="请选择" /></n-form-item>
             <n-form-item label="健康证到期"><n-date-picker v-model:value="model.healthCertExpiresAt" type="date" style="width: 100%" clearable /></n-form-item>
             <n-form-item v-if="editingRow" label="状态"><n-select v-model:value="model.status" :options="statusOptions" /></n-form-item>
-            <template v-if="editingRow && model.status === 'TERMINATED'">
-              <n-form-item label="离职日期"><n-date-picker v-model:value="model.terminationDate" type="date" style="width: 100%" clearable /></n-form-item>
-              <n-form-item label="离职原因"><n-input v-model:value="model.terminationReason" /></n-form-item>
-            </template>
           </div>
           <div class="ep-sec">工资卡</div>
           <div class="ep-grid">

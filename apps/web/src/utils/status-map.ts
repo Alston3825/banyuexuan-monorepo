@@ -64,6 +64,7 @@ export const WORKFLOW_ACTION_LABEL_MAP: Record<string, string> = {
   ADD_APPROVER: '加签',
   CC: '抄送',
   ARCHIVE: '归档',
+  URGE: '催办',
 }
 
 export const LEAD_STATUS_MAP: Record<string, StatusMeta> = {
@@ -303,7 +304,29 @@ export const INVENTORY_DOC_STATUS_MAP: Record<string, StatusMeta> = {
   COMPLETED: { label: '已完成', type: 'success' },
 }
 
+/** 采购单状态（采购员视角）：已批准=待采购 */
+export const PURCHASE_ORDER_STATUS_MAP: Record<string, StatusMeta> = {
+  DRAFT: { label: '草稿', type: 'default' },
+  PENDING_APPROVAL: { label: '审批中', type: 'warning' },
+  APPROVED: { label: '待采购', type: 'info' },
+  REJECTED: { label: '已驳回', type: 'error' },
+  CANCELLED: { label: '已取消', type: 'default' },
+  PURCHASED: { label: '已采购·等到货', type: 'warning' },
+  PARTIALLY_RECEIVED: { label: '部分到货', type: 'warning' },
+  COMPLETED: { label: '已到齐', type: 'success' },
+}
+
+/** 入库单状态：逐项收货的入库单有“待收货/部分到货” */
+export const GOODS_RECEIPT_STATUS_MAP: Record<string, StatusMeta> = {
+  ...INVENTORY_DOC_STATUS_MAP,
+  PENDING_RECEIPT: { label: '待收货', type: 'info' },
+  PARTIALLY_RECEIVED: { label: '部分到货', type: 'warning' },
+  COMPLETED: { label: '已入库完成', type: 'success' },
+}
+
 export const PURCHASE_REQUEST_STATUS_MAP: Record<string, StatusMeta> = {
+  SUBMITTED: { label: '已提交·待客服汇总', type: 'info' },
+  COLLECTED: { label: '已汇总', type: 'success' },
   DRAFT: { label: '草稿', type: 'default' },
   PENDING_APPROVAL: { label: '审批中', type: 'warning' },
   APPROVED: { label: '已批准(待生成采购单)', type: 'info' },

@@ -4,6 +4,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { RequestContextService } from '../../common/context/request-context.service';
 import { ActorContext } from '../../common/context/actor-context';
 import { WorkflowEngineService } from './workflow-engine.service';
+import { WorkflowQueryService } from './workflow-query.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CommentDto } from './dto/comment.dto';
 import { ReassignDto } from './dto/reassign.dto';
@@ -16,6 +17,7 @@ import { QueryWorkflowInstanceDto } from './dto/query-workflow-instance.dto';
 export class WorkflowEngineController {
   constructor(
     private readonly workflowEngineService: WorkflowEngineService,
+    private readonly queryService: WorkflowQueryService,
     private readonly prisma: PrismaService,
     private readonly ctx: RequestContextService,
   ) {}
@@ -28,6 +30,34 @@ export class WorkflowEngineController {
       where: { tenantId: this.ctx.tenantId, businessType: query.businessType, businessId: query.businessId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** 审批中心：tab = pending 待我审批 / done 我已处理 / mine 我发起的 / cc 抄送我的。 */
+  @Get('approvals')
+  @RequirePermission('workflow.instance.view')
+  approvals(@Query('tab') tab = 'pending', @Query('keyword') keyword?: string) {
+    const t = (['pending', 'done', 'mine', 'cc'] as const).find((x) => x === tab) ?? 'pending';
+    return this.queryService.approvals(t, keyword);
+  }
+
+  /** 业务单据详情页用：按“单据类型+单据id”取审批进度（没有审批返回 null）。 */
+  @Get('progress')
+  @RequirePermission('workflow.instance.view')
+  async progressByBusiness(@Query() query: QueryWorkflowInstanceDto) {
+    const id = await this.queryService.instanceIdByBusiness(query.businessType, query.businessId);
+    return id ? this.queryService.progress(id) : null;
+  }
+
+  @Get(':id/progress')
+  @RequirePermission('workflow.instance.view')
+  progress(@Param('id') id: string) {
+    return this.queryService.progress(id);
+  }
+
+  @Post(':id/urge')
+  @RequirePermission('workflow.instance.view')
+  urge(@Param('id') id: string, @Body() dto: CommentDto) {
+    return this.workflowEngineService.urge(id, this.actor(), dto.comment);
   }
 
   @Get(':id')
@@ -65,7 +95,8 @@ export class WorkflowEngineController {
   @Post(':id/reassign')
   @RequirePermission('workflow.instance.reassign')
   reassign(@Param('id') id: string, @Body() dto: ReassignDto) {
-    return this.workflowEngineService.reassign(id, dto.toAccountId, this.actor(), dto.comment);
+    // 拥有“修改审批流程”权限的管理员，即使自己不是审批人也能把卡住的单据转给别人
+    return this.ctx.hasPermission('workflow.definition.update').then((asAdmin) => this.workflowEngineService.reassign(id, dto.toAccountId, this.actor(), dto.comment, asAdmin));
   }
 
   @Post(':id/add-approver')

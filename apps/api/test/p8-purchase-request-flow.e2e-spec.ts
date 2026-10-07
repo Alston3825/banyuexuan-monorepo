@@ -146,7 +146,7 @@ describe('P8 申购单：Excel 导入 + 审批 + 生成采购单 (e2e)', () => {
 
     const instance = (await request(server).get('/api/v1/workflow/instances').query({ businessType: 'PURCHASE_REQUEST', businessId: requestId }).set(authed(adminToken)).expect(200)).body as Json;
     await request(server).post(`/api/v1/workflow/instances/${instance.id}/approve`).set(authed(managerToken)).send({ comment: '同意' }).expect(201);
-    await request(server).post(`/api/v1/workflow/instances/${instance.id}/approve`).set(authed(otherManagerToken)).send({ comment: '同意' }).expect(201);
+    await request(server).post(`/api/v1/workflow/instances/${instance.id}/approve`).set(authed(otherManagerToken)).send({ comment: '同意' }).expect(409); // 本店店长批完就通过了，另一门店的店长不是审批人
     const approved = await get(requestId);
     expect(approved.status).toBe('APPROVED');
     const line = approved.items[0];
@@ -170,7 +170,7 @@ describe('P8 申购单：Excel 导入 + 审批 + 生成采购单 (e2e)', () => {
     expect(res.request.status).toBe('ORDERED');
     expect(res.request.purchaseOrderId).toBe(res.purchaseOrder.id);
     const order = (await request(server).get(`/api/v1/inventory/purchase-orders/${res.purchaseOrder.id}`).set(authed(adminToken)).expect(200)).body as Json;
-    expect(order).toMatchObject({ status: 'DRAFT', supplierId, warehouseId });
+    expect(order).toMatchObject({ status: 'APPROVED', supplierId, warehouseId }); // 申购单已经店长审批，采购单直接是“待采购”，不再审批
     expect(order.items).toHaveLength(7);
     const glove = order.items.find((i: Json) => i.item.name === '申购测试手套');
     expect(glove).toMatchObject({ quantity: 20, unitPrice: 162 }); // 1.615 元 → 162 分

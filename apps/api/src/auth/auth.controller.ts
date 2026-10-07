@@ -12,14 +12,14 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  login(@Body() dto: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent: string) {
-    return this.authService.login(dto.username, dto.password, { ip, userAgent });
+  login(@Body() dto: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent: string, @Headers('x-device-id') deviceId?: string) {
+    return this.authService.login(dto.username, dto.password, { ip, userAgent, deviceId });
   }
 
   @Public()
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto, @Ip() ip: string, @Headers('user-agent') userAgent: string) {
-    return this.authService.refresh(dto.refreshToken, { ip, userAgent });
+  refresh(@Body() dto: RefreshTokenDto, @Ip() ip: string, @Headers('user-agent') userAgent: string, @Headers('x-device-id') deviceId?: string) {
+    return this.authService.refresh(dto.refreshToken, { ip, userAgent, deviceId });
   }
 
   @Public()

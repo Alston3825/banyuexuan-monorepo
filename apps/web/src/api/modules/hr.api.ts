@@ -17,8 +17,15 @@ import type {
 } from '../types/hr'
 
 export const employeeProfileApi = {
-  list: (params?: { storeId?: string; status?: string; departmentId?: string; keyword?: string }) =>
+  /** archived: 不传=只看在职名册；only=只看已归档（离职）；all=全部 */
+  list: (params?: { storeId?: string; status?: string; departmentId?: string; keyword?: string; archived?: 'only' | 'all' }) =>
     http.get<EmployeeProfile[]>('/hr/employee-profiles', { params }).then((r) => r.data),
+  /** 系统建议的下一个工号 */
+  nextNo: () => http.get<{ employeeNo: string }>('/hr/employee-profiles/next-no').then((r) => r.data.employeeNo),
+  archive: (id: string, body: { terminationDate?: string; reason?: string; version: number }) =>
+    http.post<EmployeeProfile>(`/hr/employee-profiles/${id}/archive`, body).then((r) => r.data),
+  restore: (id: string, body: { employeeNo?: string; version: number }) =>
+    http.post<EmployeeProfile>(`/hr/employee-profiles/${id}/restore`, body).then((r) => r.data),
   get: (id: string) => http.get<EmployeeProfile>(`/hr/employee-profiles/${id}`).then((r) => r.data),
   create: (body: CreateEmployeeProfileDto) => http.post<EmployeeProfile>('/hr/employee-profiles', body).then((r) => r.data),
   update: (id: string, body: UpdateEmployeeProfileDto) => http.patch<EmployeeProfile>(`/hr/employee-profiles/${id}`, body).then((r) => r.data),

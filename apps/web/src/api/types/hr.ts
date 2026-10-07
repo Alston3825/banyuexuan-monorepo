@@ -27,6 +27,9 @@ export interface EmployeeProfile {
   tenantId: string
   accountId: string
   employeeNo: string
+  /** 在职时等于工号，离职归档后为空（工号释放，可分配给新员工） */
+  activeEmployeeNo: string | null
+  archivedAt: string | null
   hireDate: string
   employmentType: EmploymentType
   healthCertExpiresAt: string | null

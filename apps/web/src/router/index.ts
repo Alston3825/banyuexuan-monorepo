@@ -6,10 +6,20 @@ import { message } from '../utils/discrete-api'
 declare module 'vue-router' {
   interface RouteMeta {
     title?: string
+    /** 不需要登录就能打开的页面（如客户确认服务报告） */
+    public?: boolean
   }
 }
 
 const routes: RouteRecordRaw[] = [
+  // 客户确认每日服务报告：客户在手机上打开护理师发的链接，不登录，靠手机号后四位核验本人
+  {
+    path: '/c/:token',
+    name: 'care-confirm',
+    component: () => import('../views/public/CareConfirmView.vue'),
+    props: true,
+    meta: { title: '每日服务报告', public: true },
+  },
   {
     path: '/login',
     name: 'login',
@@ -106,7 +116,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'base/parameters', name: 'parameters', component: () => import('../views/base/ParametersView.vue'), meta: { title: '参数配置' } },
       { path: 'workflow/demo-approvals', name: 'demo-approvals', component: () => import('../views/workflow/DemoApprovalsView.vue'), meta: { title: '示例审批单' } },
       { path: 'workflow/instances/:id', name: 'workflow-instance-detail', component: () => import('../views/workflow/WorkflowInstanceDetailView.vue'), meta: { title: '审批详情' } },
-      { path: 'workflow/definitions', name: 'workflow-definitions', component: () => import('../views/workflow/WorkflowDefinitionsView.vue'), meta: { title: '流程定义' } },
+      { path: 'workspace/todos', name: 'workspace-todos', component: () => import('../views/workspace/TodoView.vue'), meta: { title: '我的待办' } },
+      { path: 'workflow/approvals', name: 'workflow-approvals', component: () => import('../views/workflow/ApprovalCenterView.vue'), meta: { title: '审批中心' } },
+      { path: 'workflow/settings', name: 'workflow-settings', component: () => import('../views/workflow/WorkflowSettingsView.vue'), meta: { title: '审批流程设置' } },
+      { path: 'workflow/definitions', redirect: '/workflow/settings' },
       { path: 'audit-logs', name: 'audit-logs', component: () => import('../views/AuditLogView.vue'), meta: { title: '审计日志' } },
     ],
   },
@@ -128,6 +141,7 @@ function resolveRequiredPermission(path: string): string | string[] | undefined 
 }
 
 router.beforeEach((to) => {
+  if (to.meta.public) return true
   const auth = useAuthStore()
   if (to.path === '/login') {
     if (auth.isAuthenticated) return firstAccessibleRoute(auth.hasAccess) ?? '/crm/customers'

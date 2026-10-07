@@ -194,23 +194,26 @@ enum AccountStatus {
 }
 
 model Account {
-  id           String        @id @default(cuid())
-  tenantId     String        @map("tenant_id")
-  storeId      String?       @map("store_id") // 主门店，总部账号可为空
-  departmentId String?       @map("department_id")
-  teamId       String?       @map("team_id")
-  positionId   String?       @map("position_id")
-  username     String
-  phone        String? // 敏感字段，见 FieldMaskInterceptor
-  email        String?
-  passwordHash String        @map("password_hash")
-  realName     String        @map("real_name")
-  status       AccountStatus @default(ACTIVE)
-  lastLoginAt  DateTime?     @map("last_login_at")
-  createdBy    String        @map("created_by")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  version      Int           @default(0)
+  id                 String        @id @default(cuid())
+  tenantId           String        @map("tenant_id")
+  storeId            String?       @map("store_id") // 主门店，总部账号可为空
+  departmentId       String?       @map("department_id")
+  teamId             String?       @map("team_id")
+  positionId         String?       @map("position_id")
+  username           String
+  phone              String? // 敏感字段，见 FieldMaskInterceptor
+  email              String?
+  passwordHash       String        @map("password_hash")
+  /// 电子签名图（PNG 的 data URL，员工自己在“我的电子签名”里录入一次，护理档案签字时选用）
+  signatureData      String?       @map("signature_data") @db.MediumText
+  signatureUpdatedAt DateTime?     @map("signature_updated_at")
+  realName           String        @map("real_name")
+  status             AccountStatus @default(ACTIVE)
+  lastLoginAt        DateTime?     @map("last_login_at")
+  createdBy          String        @map("created_by")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  version            Int           @default(0)
 
   store                  Store?                  @relation(fields: [storeId], references: [id])
   department             Department?             @relation(fields: [departmentId], references: [id])
@@ -231,9 +234,12 @@ model Account {
   gradedExamAttempts     ExamAttempt[]           @relation("ExamAttemptGradedBy")
   signedContracts        Contract[]              @relation("ContractSigner")
   completedOutreachTasks CareOutreachTask[]
+  devices                StaffDevice[]
+  careDailySignatures    CareDailySignature[]
   nursedMotherProfiles   MotherProfile[]         @relation("MotherPrimaryNurse")
 
   @@unique([tenantId, username])
+  @@unique([tenantId, phone])
   @@index([tenantId, storeId])
   @@map("accounts")
 }
@@ -501,6 +507,12 @@ enum WorkflowNodeApproverType {
   ACCOUNT
 }
 
+/// 节点审批方式：ALL=会签（节点上所有审批人都通过才进入下一节点）；ANY=或签（任意一人通过即可）
+enum WorkflowApprovalMode {
+  ALL
+  ANY
+}
+
 /// 顺序审批节点定义。
 model WorkflowNode {
   id                   String                   @id @default(cuid())
@@ -510,6 +522,9 @@ model WorkflowNode {
   approverType         WorkflowNodeApproverType @map("approver_type")
   approverRoleId       String?                  @map("approver_role_id")
   approverAccountId    String?                  @map("approver_account_id")
+  approvalMode         WorkflowApprovalMode     @default(ALL) @map("approval_mode")
+  /// 处理时限（小时）：审批人收到待办后超过这个时间算“超时”，在待办里标红提醒；空=不限时
+  timeoutHours         Int?                     @map("timeout_hours")
   createdAt            DateTime                 @default(now()) @map("created_at")
   updatedAt            DateTime                 @updatedAt @map("updated_at")
 
@@ -602,6 +617,7 @@ enum WorkflowAction {
   ADD_APPROVER
   CC
   ARCHIVE
+  URGE
 }
 
 /// 审批时间线，供后续 UI 展示；每次动作同时写一份摘要进 AuditLog。
@@ -1470,6 +1486,7 @@ model MotherProfile {
   medicationAuths     CareMedicationAuth[]
   planVersions        CarePlanVersion[]
   serviceLogs         CareServiceLog[]
+  confirmLinks        CareConfirmLink[]
   admissionAssessment CareMotherAdmission?
   dischargeAssessment CareMotherDischarge?
 
@@ -1900,13 +1917,124 @@ model CareDailyRecord {
   updatedAt          DateTime @updatedAt @map("updated_at")
   version            Int      @default(0)
 
-  motherProfile MotherProfile         @relation(fields: [motherProfileId], references: [id])
-  document      CareDocument?         @relation("DailyRecordDocument", fields: [documentId], references: [id])
+  motherProfile MotherProfile           @relation(fields: [motherProfileId], references: [id])
+  document      CareDocument?           @relation("DailyRecordDocument", fields: [documentId], references: [id])
   babies        CareDailyBabyRecord[]
+  signatures    CareDailySignature[]
+  confirmations CareDailyConfirmation[]
 
   @@unique([motherProfileId, recordDate])
   @@index([tenantId, storeId, recordDate])
   @@map("care_daily_records")
+}
+
+enum CareSignShift {
+  DAY // 白班
+  NIGHT // 夜班
+  RELIEF // 替班/支援
+}
+
+enum CareConfirmMethod {
+  SIGNATURE // 客户手写签名
+  BUTTON // 客户点击确认（需长按 + 本人手机号后四位核验）
+}
+
+/// 日常护理记录的护理师签字：谁（账号）、哪个班次、什么时间、签字时的内容指纹。
+/// 一个妈妈一天可以有多位护理师各签一条（1对多服务、早晚班不同人、替班都支持）；
+/// 只能用自己的账号签自己的字，签字图取签字当时的快照。内容签字后被改动 → contentHash 对不上 → 页面提示“需重新签字”。
+model CareDailySignature {
+  id             String        @id @default(cuid())
+  tenantId       String        @map("tenant_id")
+  storeId        String        @map("store_id")
+  dailyRecordId  String        @map("daily_record_id")
+  shift          CareSignShift
+  nurseAccountId String        @map("nurse_account_id")
+  nurseName      String        @map("nurse_name") // 签字时的姓名快照
+  signatureData  String?       @map("signature_data") @db.MediumText // 签字时的签名图快照
+  contentHash    String        @map("content_hash") @db.VarChar(64)
+  signedAt       DateTime      @default(now()) @map("signed_at")
+  ip             String?
+  deviceId       String?       @map("device_id") @db.VarChar(64)
+
+  dailyRecord  CareDailyRecord @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  nurseAccount Account         @relation(fields: [nurseAccountId], references: [id])
+
+  @@unique([dailyRecordId, nurseAccountId])
+  @@index([tenantId, nurseAccountId])
+  @@map("care_daily_signatures")
+}
+
+/// 发给客户的“护理记录确认”链接（客户用手机打开，不用登录）。链接本身只存哈希；7 天有效；
+/// 打开后要先输入登记手机号后四位核验本人，输错 5 次锁 30 分钟。后期小程序复用同一套接口。
+model CareConfirmLink {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  storeId         String    @map("store_id")
+  motherProfileId String    @map("mother_profile_id")
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt       DateTime  @map("expires_at")
+  createdBy       String    @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  revokedAt       DateTime? @map("revoked_at")
+  failedAttempts  Int       @default(0) @map("failed_attempts")
+  lockedUntil     DateTime? @map("locked_until")
+  openCount       Int       @default(0) @map("open_count")
+  lastOpenedAt    DateTime? @map("last_opened_at")
+
+  motherProfile MotherProfile           @relation(fields: [motherProfileId], references: [id])
+  confirmations CareDailyConfirmation[]
+
+  @@index([tenantId, motherProfileId])
+  @@map("care_confirm_links")
+}
+
+/// 客户对某一天护理记录小结 + 满意度的确认。每次确认一条（内容被改后客户重新确认会再产生一条，取最新）。
+/// 证据：链接、手机号后四位核验通过、IP/设备/浏览器、页面停留时长、长按时长、手写签名图或按钮确认、
+/// 确认当时的内容指纹，以及系统判断的风险标记（如在护理师用过的设备上确认）。
+model CareDailyConfirmation {
+  id            String            @id @default(cuid())
+  tenantId      String            @map("tenant_id")
+  storeId       String            @map("store_id")
+  dailyRecordId String            @map("daily_record_id")
+  linkId        String            @map("link_id")
+  batchId       String            @map("batch_id") @db.VarChar(40) // 一次点“确认”提交的多天共用一个
+  method        CareConfirmMethod
+  signatureData String?           @map("signature_data") @db.MediumText
+  satisfaction  Int // 当天整体满意度 1~5
+  /// 对当班各位护理师的评价：[{signatureId, nurseAccountId, nurseName, shift, score}]
+  nurseRatings  Json?             @map("nurse_ratings")
+  comment       String?           @db.VarChar(500)
+  contentHash   String            @map("content_hash") @db.VarChar(64)
+  confirmedAt   DateTime          @default(now()) @map("confirmed_at")
+  ip            String?
+  userAgent     String?           @map("user_agent") @db.VarChar(300)
+  deviceId      String?           @map("device_id") @db.VarChar(64)
+  dwellMs       Int               @map("dwell_ms") // 从看到内容到点确认的时长（服务器计时）
+  holdMs        Int?              @map("hold_ms") // 长按确认键的时长（客户端上报）
+  riskFlags     Json?             @map("risk_flags") // 如 ["STAFF_DEVICE"]
+
+  dailyRecord CareDailyRecord @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  link        CareConfirmLink @relation(fields: [linkId], references: [id])
+
+  @@index([dailyRecordId, confirmedAt])
+  @@index([deviceId])
+  @@map("care_daily_confirmations")
+}
+
+/// 员工登录过的设备（浏览器本地生成的随机设备号）。用来识别“客户确认是不是在护理师自己的手机上点的”。
+model StaffDevice {
+  id          String   @id @default(cuid())
+  accountId   String   @map("account_id")
+  deviceId    String   @map("device_id") @db.VarChar(64)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  lastIp      String?  @map("last_ip")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, deviceId])
+  @@index([deviceId])
+  @@map("staff_devices")
 }
 
 /// 日常护理记录里每个宝宝的那一栏（多胞胎每个宝宝一条）。
@@ -2939,6 +3067,19 @@ enum InventoryDocStatus {
   REJECTED
   CANCELLED
   COMPLETED
+  /// 采购单：采购员已完成采购，等货到（已自动生成待收货的入库单）
+  PURCHASED
+  /// 入库单：等快递到货，客服逐项确认收货
+  PENDING_RECEIPT
+  /// 采购单/入库单：已有部分货品到货入库，还有没到的
+  PARTIALLY_RECEIVED
+}
+
+/// 申购单类型：DEPARTMENT=部门申购单（部门负责人填，提交后自动出现在客服的“待汇总”里，本身不走审批）；
+/// SUMMARY=汇总申购单（客服汇总各部门申购单生成，或沿用 Excel 导入的整张申购表；提交店长审批）
+enum PurchaseRequestKind {
+  SUMMARY
+  DEPARTMENT
 }
 
 enum PurchaseRequestStatus {
@@ -2948,35 +3089,43 @@ enum PurchaseRequestStatus {
   REJECTED // 已驳回
   CANCELLED // 已取消
   ORDERED // 已生成采购单
+  SUBMITTED // 部门申购单：已提交，等客服汇总
+  COLLECTED // 部门申购单：已被客服汇总进某张汇总申购单
 }
 
 /// 申购单(SG)：各部门每月提交的采购申请（对应公司现在用的《申购表》Excel：申请部门、申请人、物品、数量、单价、用途）。
 /// 流程：导入/新建(DRAFT) → 提交审批(PENDING_APPROVAL，走通用工作流，店长审批) → APPROVED → 选供应商和仓库“生成采购单”(ORDERED)。
 /// 金额用元（小数），生成采购单时单价四舍五入到分。
 model PurchaseRequest {
-  id              String                @id @default(cuid())
-  tenantId        String                @map("tenant_id")
-  storeId         String                @map("store_id")
-  requestNo       String                @map("request_no")
-  requestDate     DateTime              @map("request_date") @db.Date // 申购日期（表头里的日期，如 2026.8.25）
-  status          PurchaseRequestStatus @default(DRAFT)
-  totalAmount     Decimal               @default(0) @map("total_amount") @db.Decimal(14, 2) // 冗余汇总，元
-  sourceFileName  String?               @map("source_file_name") // Excel 导入时的文件名
-  remark          String?               @db.Text
-  cancelReason    String?               @map("cancel_reason") @db.Text
-  purchaseOrderId String?               @map("purchase_order_id") // 已生成的采购单
-  createdBy       String                @map("created_by")
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
-  version         Int                   @default(0)
+  id               String                @id @default(cuid())
+  tenantId         String                @map("tenant_id")
+  storeId          String                @map("store_id")
+  requestNo        String                @map("request_no")
+  requestDate      DateTime              @map("request_date") @db.Date // 申购日期（表头里的日期，如 2026.8.25）
+  status           PurchaseRequestStatus @default(DRAFT)
+  totalAmount      Decimal               @default(0) @map("total_amount") @db.Decimal(14, 2) // 冗余汇总，元
+  sourceFileName   String?               @map("source_file_name") // Excel 导入时的文件名
+  remark           String?               @db.Text
+  cancelReason     String?               @map("cancel_reason") @db.Text
+  purchaseOrderId  String?               @map("purchase_order_id") // 已生成的采购单
+  kind             PurchaseRequestKind   @default(SUMMARY)
+  departmentName   String?               @map("department_name") // 部门申购单：申请部门
+  summaryRequestId String?               @map("summary_request_id") // 部门申购单被汇总进的汇总申购单
+  createdBy        String                @map("created_by")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  version          Int                   @default(0)
 
-  store         Store                 @relation(fields: [storeId], references: [id])
-  purchaseOrder PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id])
-  items         PurchaseRequestItem[]
+  store          Store                 @relation(fields: [storeId], references: [id])
+  purchaseOrder  PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id])
+  items          PurchaseRequestItem[]
+  summaryRequest PurchaseRequest?      @relation("RequestCollect", fields: [summaryRequestId], references: [id])
+  collected      PurchaseRequest[]     @relation("RequestCollect")
 
   @@unique([tenantId, requestNo])
   @@index([tenantId, storeId, requestDate])
   @@index([tenantId, status])
+  @@index([tenantId, kind, status])
   @@map("purchase_requests")
 }
 
@@ -3007,20 +3156,25 @@ model PurchaseRequestItem {
 /// 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED；
 /// APPROVED 后可据此创建入库单（收货数量与采购数量的对比只做展示，不做强校验，见 schema 顶部范围收窄说明）。
 model PurchaseOrder {
-  id           String             @id @default(cuid())
-  tenantId     String             @map("tenant_id")
-  storeId      String             @map("store_id")
-  warehouseId  String             @map("warehouse_id")
-  supplierId   String             @map("supplier_id")
-  orderNo      String             @map("order_no")
-  status       InventoryDocStatus @default(DRAFT)
-  totalAmount  Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
-  remark       String?            @db.Text
-  cancelReason String?            @map("cancel_reason") @db.Text
-  createdBy    String             @map("created_by")
-  createdAt    DateTime           @default(now()) @map("created_at")
-  updatedAt    DateTime           @updatedAt @map("updated_at")
-  version      Int                @default(0)
+  id            String             @id @default(cuid())
+  tenantId      String             @map("tenant_id")
+  storeId       String             @map("store_id")
+  warehouseId   String             @map("warehouse_id")
+  supplierId    String             @map("supplier_id")
+  orderNo       String             @map("order_no")
+  status        InventoryDocStatus @default(DRAFT)
+  totalAmount   Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
+  remark        String?            @db.Text
+  cancelReason  String?            @map("cancel_reason") @db.Text
+  /// 采购员点“确认采购”的时间/人、运单号与备注（确认采购会自动生成待收货的入库单）
+  purchasedAt   DateTime?          @map("purchased_at")
+  purchasedById String?            @map("purchased_by_id")
+  expressNo     String?            @map("express_no")
+  purchaseNote  String?            @map("purchase_note") @db.Text
+  createdBy     String             @map("created_by")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  version       Int                @default(0)
 
   store            Store               @relation(fields: [storeId], references: [id])
   warehouse        Warehouse           @relation(fields: [warehouseId], references: [id])
@@ -3061,15 +3215,20 @@ model GoodsReceipt {
   remark          String?            @db.Text
   cancelReason    String?            @map("cancel_reason") @db.Text
   completedAt     DateTime?          @map("completed_at")
+  /// 逐项收货的入库单（由“确认采购”自动生成）：货品陆续到，客服每次确认到了哪几项、各多少，立即入库；
+  /// 不走“提交→执行”。老的手工入库单 tracked=false，行为不变。
+  tracked         Boolean            @default(false)
+  shortClosedNote String?            @map("short_closed_note") @db.Text // 结束收货时登记的“未到货原因”
   createdBy       String             @map("created_by")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   version         Int                @default(0)
 
-  store         Store              @relation(fields: [storeId], references: [id])
-  warehouse     Warehouse          @relation(fields: [warehouseId], references: [id])
-  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  store         Store                      @relation(fields: [storeId], references: [id])
+  warehouse     Warehouse                  @relation(fields: [warehouseId], references: [id])
+  purchaseOrder PurchaseOrder?             @relation(fields: [purchaseOrderId], references: [id])
   items         GoodsReceiptItem[]
+  confirmations GoodsReceiptConfirmation[]
 
   @@unique([tenantId, receiptNo])
   @@index([tenantId, status])
@@ -3077,16 +3236,50 @@ model GoodsReceipt {
 }
 
 model GoodsReceiptItem {
-  id             String @id @default(cuid())
-  goodsReceiptId String @map("goods_receipt_id")
-  itemId         String @map("item_id")
-  quantity       Int
-  unitCost       Int    @map("unit_cost") // 最小货币单位，用于移动加权平均法与批次成本
+  id               String @id @default(cuid())
+  goodsReceiptId   String @map("goods_receipt_id")
+  itemId           String @map("item_id")
+  quantity         Int // 老入库单：本次入库数量；逐项收货的入库单：采购数量（应到）
+  unitCost         Int    @map("unit_cost") // 最小货币单位，用于移动加权平均法与批次成本
+  receivedQuantity Int    @default(0) @map("received_quantity") // 逐项收货的入库单：已到货入库的累计数量
 
-  goodsReceipt GoodsReceipt  @relation(fields: [goodsReceiptId], references: [id])
-  item         InventoryItem @relation(fields: [itemId], references: [id])
+  goodsReceipt      GoodsReceipt                   @relation(fields: [goodsReceiptId], references: [id])
+  item              InventoryItem                  @relation(fields: [itemId], references: [id])
+  confirmationLines GoodsReceiptConfirmationLine[]
 
   @@map("goods_receipt_items")
+}
+
+/// 收货确认记录：每次快递到货，客服确认收到了哪几项、各多少，对应一次库存入账。
+model GoodsReceiptConfirmation {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  goodsReceiptId String   @map("goods_receipt_id")
+  confirmedById  String   @map("confirmed_by_id")
+  confirmedAt    DateTime @default(now()) @map("confirmed_at")
+  expressNo      String?  @map("express_no") // 这一批的快递单号
+  note           String?  @db.Text
+
+  goodsReceipt GoodsReceipt                   @relation(fields: [goodsReceiptId], references: [id])
+  lines        GoodsReceiptConfirmationLine[]
+
+  @@index([goodsReceiptId, confirmedAt])
+  @@map("goods_receipt_confirmations")
+}
+
+model GoodsReceiptConfirmationLine {
+  id                 String    @id @default(cuid())
+  confirmationId     String    @map("confirmation_id")
+  goodsReceiptItemId String    @map("goods_receipt_item_id")
+  quantity           Int
+  expiresAt          DateTime? @map("expires_at") // 这批货的到期日（不填则按物品保质期推算）
+  note               String? // 如：外包装破损、少 1 件
+
+  confirmation GoodsReceiptConfirmation @relation(fields: [confirmationId], references: [id], onDelete: Cascade)
+  receiptItem  GoodsReceiptItem         @relation(fields: [goodsReceiptItemId], references: [id])
+
+  @@index([confirmationId])
+  @@map("goods_receipt_confirmation_lines")
 }
 
 enum StockIssueType {
@@ -3264,7 +3457,11 @@ model EmployeeProfile {
   id                       String                 @id @default(cuid())
   tenantId                 String                 @map("tenant_id")
   accountId                String                 @unique @map("account_id")
-  employeeNo               String                 @map("employee_no")
+  employeeNo               String                 @map("employee_no") // 工号（归档后仍保留，用于历史查询）
+  /// 占用中的工号：在册员工 = employeeNo；离职归档后置空 → 工号释放，可回收给新员工。唯一约束建在这一列上。
+  activeEmployeeNo         String?                @map("active_employee_no")
+  /// 离职归档时间；归档后档案只读、账号停用、工号释放
+  archivedAt               DateTime?              @map("archived_at")
   hireDate                 DateTime               @map("hire_date")
   employmentType           EmploymentType         @default(EMPLOYEE) @map("employment_type")
   healthCertExpiresAt      DateTime?              @map("health_cert_expires_at")
@@ -3297,8 +3494,9 @@ model EmployeeProfile {
   payrollRecords        PayrollRecord[]
   leaveRequests         LeaveRequest[]
 
-  @@unique([tenantId, employeeNo])
+  @@unique([tenantId, activeEmployeeNo])
   @@unique([tenantId, idCardNo])
+  @@index([tenantId, employeeNo])
   @@map("employee_profiles")
 }
 

@@ -1,5 +1,5 @@
 import { http } from '../client'
-import type { WorkflowInstance } from '../types/workflow'
+import type { ApprovalRow, ApprovalTab, WorkflowInstance, WorkflowProgress } from '../types/workflow'
 
 export const workflowInstanceApi = {
   get: (id: string) => http.get<WorkflowInstance>(`/workflow/instances/${id}`).then((r) => r.data),
@@ -23,5 +23,11 @@ export const workflowInstanceApi = {
       .then((r) => r.data),
   cc: (id: string, accountIds: string[]) =>
     http.post<WorkflowInstance>(`/workflow/instances/${id}/cc`, { accountIds }).then((r) => r.data),
+  /** 审批进度（带姓名、时限、超时、我能做的操作） */
+  progress: (id: string) => http.get<WorkflowProgress>(`/workflow/instances/${id}/progress`).then((r) => r.data),
+  progressByBusiness: (businessType: string, businessId: string) =>
+    http.get<WorkflowProgress | null>('/workflow/instances/progress', { params: { businessType, businessId } }).then((r) => r.data),
+  approvals: (tab: ApprovalTab, keyword?: string) => http.get<ApprovalRow[]>('/workflow/instances/approvals', { params: { tab, keyword: keyword || undefined } }).then((r) => r.data),
+  urge: (id: string, comment?: string) => http.post<WorkflowInstance>(`/workflow/instances/${id}/urge`, { comment }).then((r) => r.data),
   archive: (id: string) => http.post<WorkflowInstance>(`/workflow/instances/${id}/archive`).then((r) => r.data),
 }

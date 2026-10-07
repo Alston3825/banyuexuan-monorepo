@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import {
   NButton,
   NSpace,
@@ -31,6 +31,13 @@ import type { EmployeeProfile } from '../../api/types/hr'
 import type { Account, DataScopeType } from '../../api/types/account'
 import { renderStatusBadge, ACCOUNT_STATUS_MAP, SCOPE_TYPE_LABEL_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useAuthStore } from '../../stores/auth'
+import AccountImportDialog from '../../components/account/AccountImportDialog.vue'
+
+const DEFAULT_PASSWORD = 'banyuexuan'
+const auth = useAuthStore()
+/** 员工工号一旦分配，只有拥有“修改工号”权限的人（默认仅管理员）才能改 */
+const canChangeNo = computed(() => auth.hasAccess('hr.employee-profile.change-no'))
 
 const rows = ref<Account[]>([])
 const loading = ref(false)
@@ -80,7 +87,6 @@ const model = ref({
   realName: '',
   password: '',
   phone: '',
-  email: '',
   storeId: undefined as string | undefined,
   departmentId: undefined as string | undefined,
   teamId: undefined as string | undefined,
@@ -112,9 +118,8 @@ function openCreateModal() {
   model.value = {
     username: '',
     realName: '',
-    password: '',
+    password: DEFAULT_PASSWORD,
     phone: '',
-    email: '',
     storeId: undefined,
     departmentId: undefined,
     teamId: undefined,
@@ -124,6 +129,43 @@ function openCreateModal() {
     hireDate: Date.now(),
   }
   formVisible.value = true
+  employeeProfileApi.nextNo().then((no) => !editingRow.value && !model.value.employeeNo && (model.value.employeeNo = no)).catch(() => {})
+}
+
+// 用户名默认跟着手机号走（手动改过用户名后就不再跟）
+watch(
+  () => model.value.phone,
+  (phone, old) => {
+    if (editingRow.value) return
+    if (!model.value.username || model.value.username === (old ?? '').trim()) model.value.username = phone.trim()
+  },
+)
+
+// ---------------- 拖入员工信息表批量开通 ----------------
+const importVisible = ref(false)
+const importFile = ref<File | null>(null)
+const dragging = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+function takeFile(file?: File | null) {
+  dragging.value = false
+  if (!file) return
+  if (!/\.xlsx$/i.test(file.name)) return void message.error('请选择 .xlsx 格式的 Excel 员工信息表（.xls 请先另存为 .xlsx）')
+  importFile.value = file
+  formVisible.value = false
+  importVisible.value = true
+}
+function onDrop(e: DragEvent) {
+  e.preventDefault()
+  takeFile(e.dataTransfer?.files?.[0])
+}
+function onPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  takeFile(input.files?.[0])
+  input.value = ''
+}
+async function onImported() {
+  await Promise.all([fetchList(), fetchProfiles()])
 }
 
 function openEditModal(row: Account) {
@@ -133,7 +175,6 @@ function openEditModal(row: Account) {
     realName: row.realName,
     password: '',
     phone: row.phone ?? '',
-    email: row.email ?? '',
     storeId: row.storeId ?? undefined,
     departmentId: row.departmentId ?? undefined,
     teamId: row.teamId ?? undefined,
@@ -158,7 +199,6 @@ async function handleSubmit() {
       await accountApi.update(editingRow.value.id, {
         realName: m.realName,
         phone: m.phone || undefined,
-        email: m.email || undefined,
         storeId: m.storeId ?? null,
         departmentId: m.departmentId ?? null,
         teamId: m.teamId ?? null,
@@ -185,7 +225,6 @@ async function handleSubmit() {
         realName: model.value.realName,
         password: model.value.password,
         phone: model.value.phone || undefined,
-        email: model.value.email || undefined,
         storeId: model.value.storeId,
         departmentId: model.value.departmentId,
         teamId: model.value.teamId,
@@ -345,6 +384,10 @@ onMounted(async () => {
 
 <template>
   <div>
+    <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onPick" />
+    <div class="acc-drop acc-drop-page" :class="{ 'acc-drop-on': dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop="onDrop" @click="fileInput?.click()">
+      📄 把填好的《员工信息表》Excel 拖到这里（或点击选择），自动读取并批量开通账号；用户名 = 手机号，初始密码 {{ DEFAULT_PASSWORD }}
+    </div>
     <n-space justify="space-between" style="margin-bottom: 12px">
       <span />
       <n-button type="primary" @click="openCreateModal">新建账号</n-button>
@@ -354,21 +397,22 @@ onMounted(async () => {
     <!-- 新建/编辑 -->
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑账号' : '新建账号'" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+        <div v-if="!editingRow" class="acc-drop" :class="{ 'acc-drop-on': dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop="onDrop" @click="fileInput?.click()">
+          📄 有员工信息表？把 Excel 拖到这里（或点击选择），批量开通账号
+        </div>
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
+          <n-form-item label="手机号" path="phone" :rule="editingRow ? undefined : [{ required: true, message: '请输入手机号' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入 11 位手机号', trigger: ['blur', 'input'] }]">
+            <n-input v-model:value="model.phone" placeholder="员工的主要识别信息，不能重复" maxlength="11" />
+          </n-form-item>
           <n-form-item label="用户名" path="username" :rule="editingRow ? undefined : { required: true, message: '请输入用户名' }">
-            <n-input v-model:value="model.username" :disabled="!!editingRow" placeholder="登录用，建好后不能改" />
+            <n-input v-model:value="model.username" :disabled="!!editingRow" placeholder="默认就是手机号，登录用，建好后不能改" />
           </n-form-item>
           <n-form-item label="姓名" path="realName" :rule="{ required: true, message: '请输入姓名' }">
             <n-input v-model:value="model.realName" />
           </n-form-item>
           <n-form-item :label="editingRow ? '新密码' : '初始密码'" path="password" :rule="editingRow ? undefined : { required: true, message: '请输入初始密码' }">
             <n-input v-model:value="model.password" type="password" show-password-on="click" :placeholder="editingRow ? '不修改密码请留空' : '至少 6 位'" />
-          </n-form-item>
-          <n-form-item label="手机号" path="phone">
-            <n-input v-model:value="model.phone" />
-          </n-form-item>
-          <n-form-item label="邮箱" path="email">
-            <n-input v-model:value="model.email" />
+            <template v-if="!editingRow" #feedback>默认 {{ DEFAULT_PASSWORD }}，可以改</template>
           </n-form-item>
           <n-form-item label="门店" path="storeId">
             <n-select v-model:value="model.storeId" :options="storeOptions" clearable />
@@ -385,7 +429,8 @@ onMounted(async () => {
           <!-- 账号与员工档案一一对应：新建账号顺带把员工档案建了；编辑时这两项取自员工档案，改了同步过去。
                更详细的人事信息（合同、社保、身份证、工资卡等）在“员工档案”模块里维护。 -->
           <n-form-item label="员工工号" path="employeeNo" :rule="editingRow ? undefined : { required: true, message: '请输入员工工号' }">
-            <n-input v-model:value="model.employeeNo" placeholder="用于建立对应的员工档案" />
+            <n-input v-model:value="model.employeeNo" :disabled="!!editingRow && !canChangeNo" placeholder="系统已建议下一个工号，可以改" />
+            <template v-if="editingRow && !canChangeNo" #feedback>工号一旦分配，只有管理员才能修改</template>
           </n-form-item>
           <n-form-item label="入职日期" path="hireDate" :rule="editingRow ? undefined : { required: true, type: 'number', message: '请选择入职日期' }">
             <n-date-picker v-model:value="model.hireDate" type="date" style="width: 100%" :clearable="!!editingRow" />
@@ -402,6 +447,8 @@ onMounted(async () => {
         </template>
       </n-card>
     </n-modal>
+
+    <account-import-dialog v-model:show="importVisible" :file="importFile" :store-options="storeOptions" :role-options="roleOptions" @done="onImported" />
 
     <!-- 重置密码 -->
     <n-modal :show="resetPwdVisible" @update:show="(v) => (resetPwdVisible = v)">
@@ -468,3 +515,24 @@ onMounted(async () => {
     </n-drawer>
   </div>
 </template>
+
+<style scoped>
+.acc-drop {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1.5px dashed #d9b38c;
+  border-radius: 8px;
+  background: #fffaf3;
+  color: #8a5a22;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+.acc-drop-page {
+  line-height: 1.6;
+}
+.acc-drop-on {
+  background: #ffe9cc;
+  border-color: #d9822b;
+}
+</style>

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { GoodsReceipt } from '@prisma/client';
+import { GoodsReceipt, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -13,7 +13,19 @@ import { QueryGoodsReceiptDto } from './dto/query-goods-receipt.dto';
 
 const DEFINITION_CODE = 'INVENTORY_GOODS_RECEIPT';
 const BUSINESS_TYPE = 'GOODS_RECEIPT';
-const includeReceipt = { warehouse: true, purchaseOrder: true, items: { include: { item: true } } };
+const includeReceipt = {
+  warehouse: true,
+  purchaseOrder: true,
+  items: { include: { item: true } },
+  confirmations: { orderBy: { confirmedAt: 'asc' as const }, include: { lines: true } },
+};
+
+export interface ReceiveLineInput {
+  receiptItemId: string;
+  quantity: number;
+  expiresAt?: string;
+  note?: string;
+}
 
 /**
  * 入库单(RK)：DRAFT -(提交)-> [挂在已审批采购单下则直接跳过审批 / 否则按仓库
@@ -21,6 +33,10 @@ const includeReceipt = { warehouse: true, purchaseOrder: true, items: { include:
  * （更新 WarehouseStock 移动加权平均成本 + 生成 StockBatch）。COMPLETED 后不可变，
  * 冲正需另开一张出库单反向操作，不修改本单据。PENDING_APPROVAL 的推进由 reconcileStatus()
  * 懒同步自 WorkflowInstance，与 ContractRecordService 同构。
+ *
+ * 另一种“逐项收货”入库单（tracked=true，由采购单“确认采购”自动生成）：PENDING_RECEIPT → 货陆续到，
+ * 客服每次 receive() 确认到了哪几项、各多少，立即入库（更新库存+批次）→ PARTIALLY_RECEIVED → 全部到齐 COMPLETED；
+ * 个别货不来了可 closeShort() 结束收货。不走“提交/审批/执行”。
  */
 @Injectable()
 export class GoodsReceiptService {
@@ -43,7 +59,17 @@ export class GoodsReceiptService {
   async findOneOrThrow(id: string): Promise<GoodsReceipt> {
     const receipt = await this.prisma.goodsReceipt.findUnique({ where: { id }, include: includeReceipt });
     if (!receipt) throw new NotFoundException(`GoodsReceipt ${id} 不存在`);
-    return this.reconcileStatus(receipt);
+    return this.attachConfirmerNames(await this.reconcileStatus(receipt));
+  }
+
+  /** 给每次收货确认带上确认人姓名（详情页展示“谁在什么时候确认了什么”）。 */
+  private async attachConfirmerNames(receipt: GoodsReceipt): Promise<GoodsReceipt> {
+    const confirmations = (receipt as unknown as { confirmations?: { confirmedById: string }[] }).confirmations ?? [];
+    if (confirmations.length === 0) return receipt;
+    const ids = [...new Set(confirmations.map((c) => c.confirmedById))];
+    const accs = await this.prisma.account.findMany({ where: { id: { in: ids } }, select: { id: true, realName: true } });
+    const name = new Map(accs.map((x) => [x.id, x.realName]));
+    return { ...receipt, confirmations: confirmations.map((c) => ({ ...c, confirmedByName: name.get(c.confirmedById) ?? '' })) } as unknown as GoodsReceipt;
   }
 
   async create(dto: CreateGoodsReceiptDto): Promise<GoodsReceipt> {
@@ -83,6 +109,7 @@ export class GoodsReceiptService {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
     if (before.status !== 'DRAFT') throw new BadRequestException(`入库单当前状态「${before.status}」不允许提交`);
+    this.assertNotTracked(before);
 
     if (before.purchaseOrderId) {
       const updated = await runVersionedUpdate(() =>
@@ -151,6 +178,7 @@ export class GoodsReceiptService {
   async cancel(id: string, cancelReason: string, expectedVersion: number): Promise<GoodsReceipt> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
+    this.assertNotTracked(before, '这张入库单是按到货逐项确认的，要作废请取消对应的采购单');
     if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
       throw new BadRequestException(`入库单当前状态「${before.status}」不允许取消`);
     }
@@ -178,6 +206,7 @@ export class GoodsReceiptService {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
     if (before.status !== 'APPROVED') throw new BadRequestException(`入库单当前状态「${before.status}」不允许执行`);
+    this.assertNotTracked(before);
 
     const receiptWithItems = await this.prisma.goodsReceipt.findUniqueOrThrow({ where: { id }, include: { items: { include: { item: true } } } });
 
@@ -241,6 +270,125 @@ export class GoodsReceiptService {
       ...this.auditCtx(before.storeId),
     });
     return updated;
+  }
+
+  /** 逐项收货：客服确认这一批到了哪几项、各多少，立即入库。 */
+  async receive(id: string, input: { lines: ReceiveLineInput[]; expressNo?: string; note?: string }) {
+    const before = await this.findOneOrThrow(id);
+    if (!(before as unknown as { tracked: boolean }).tracked) throw new BadRequestException('这张入库单不是按到货逐项确认的');
+    if (!['PENDING_RECEIPT', 'PARTIALLY_RECEIVED'].includes(before.status)) throw new BadRequestException(`入库单当前状态「${before.status}」不能再收货`);
+    if (!input.lines?.length) throw new BadRequestException('请至少填写一项到货数量');
+    const seen = new Set<string>();
+    for (const l of input.lines) {
+      if (seen.has(l.receiptItemId)) throw new BadRequestException('同一个物品在这次收货里填了两次');
+      seen.add(l.receiptItemId);
+      if (!Number.isInteger(l.quantity) || l.quantity < 1) throw new BadRequestException('到货数量应为大于 0 的整数');
+    }
+
+    const updated = await retryOnVersionConflict(() =>
+      this.prisma.$transaction(async (tx) => {
+        const receipt = await tx.goodsReceipt.findUniqueOrThrow({ where: { id }, include: { items: { include: { item: true } } } });
+        const now = new Date();
+        const confirmation = await tx.goodsReceiptConfirmation.create({
+          data: { tenantId: this.ctx.tenantId!, goodsReceiptId: id, confirmedById: this.ctx.accountId!, confirmedAt: now, expressNo: input.expressNo?.trim() || null, note: input.note?.trim() || null },
+        });
+        for (const l of input.lines) {
+          const line = receipt.items.find((i) => i.id === l.receiptItemId);
+          if (!line) throw new BadRequestException('收货的物品不属于这张入库单');
+          const remaining = line.quantity - line.receivedQuantity;
+          if (l.quantity > remaining) {
+            throw new BadRequestException(`「${line.item.name}」这次填了 ${l.quantity}，但采购 ${line.quantity}、已收 ${line.receivedQuantity}，最多还能收 ${remaining}。多收的货请联系采购员处理`);
+          }
+          // 并发保护：两个人同时确认同一项时，后到的这一次整体回滚重来，不会多入库
+          const bumped = await tx.goodsReceiptItem.updateMany({ where: { id: line.id, receivedQuantity: line.receivedQuantity }, data: { receivedQuantity: { increment: l.quantity } } });
+          if (bumped.count === 0) throw new ConflictException('这几项刚刚被别人确认过收货，请刷新后再试');
+          await this.stockIn(tx, { warehouseId: receipt.warehouseId, itemId: line.itemId, quantity: l.quantity, unitCost: line.unitCost, shelfLifeDays: line.item.shelfLifeDays, expiresAt: l.expiresAt ? new Date(l.expiresAt) : null, sourceId: receipt.id, now });
+          await tx.goodsReceiptConfirmationLine.create({
+            data: { confirmationId: confirmation.id, goodsReceiptItemId: line.id, quantity: l.quantity, expiresAt: l.expiresAt ? new Date(l.expiresAt) : null, note: l.note?.trim() || null },
+          });
+        }
+        const items = await tx.goodsReceiptItem.findMany({ where: { goodsReceiptId: id } });
+        const done = items.every((i) => i.receivedQuantity >= i.quantity);
+        if (receipt.purchaseOrderId) {
+          await tx.purchaseOrder.update({ where: { id: receipt.purchaseOrderId }, data: { status: done ? 'COMPLETED' : 'PARTIALLY_RECEIVED', version: { increment: 1 } } });
+        }
+        return tx.goodsReceipt.update({
+          where: { id },
+          data: { status: done ? 'COMPLETED' : 'PARTIALLY_RECEIVED', completedAt: done ? now : null, version: { increment: 1 } },
+          include: includeReceipt,
+        });
+      }),
+    );
+    await this.auditLogService.record({
+      action: 'STATE_TRANSITION',
+      entityType: 'GoodsReceipt',
+      entityId: id,
+      beforeData: before,
+      afterData: updated,
+      remark: `${before.status} -> ${updated.status}（收货确认：${input.lines.length} 项${input.expressNo ? `，快递 ${input.expressNo}` : ''}，已入库）`,
+      ...this.auditCtx(before.storeId),
+    });
+    return updated;
+  }
+
+  /** 部分货品不会再到了：结束收货（必须写原因），入库单和采购单都标记完成。 */
+  async closeShort(id: string, reason: string) {
+    const before = await this.findOneOrThrow(id);
+    if (!(before as unknown as { tracked: boolean }).tracked) throw new BadRequestException('这张入库单不是按到货逐项确认的');
+    if (before.status !== 'PARTIALLY_RECEIVED') throw new BadRequestException('只有已经到过一部分货的入库单才能“结束收货”；一件都没到请取消采购单');
+    if (!reason?.trim()) throw new BadRequestException('请写明未到货的原因（如：缺货、供应商退款）');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (before.purchaseOrderId) await tx.purchaseOrder.update({ where: { id: before.purchaseOrderId }, data: { status: 'COMPLETED', version: { increment: 1 } } });
+      return tx.goodsReceipt.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date(), shortClosedNote: reason.trim(), version: { increment: 1 } }, include: includeReceipt });
+    });
+    await this.auditLogService.record({
+      action: 'STATE_TRANSITION',
+      entityType: 'GoodsReceipt',
+      entityId: id,
+      beforeData: before,
+      afterData: updated,
+      remark: `PARTIALLY_RECEIVED -> COMPLETED（结束收货，未到货原因：${reason.trim()}）`,
+      ...this.auditCtx(before.storeId),
+    });
+    return updated;
+  }
+
+  private assertNotTracked(receipt: GoodsReceipt, msg = '这张入库单是按到货逐项确认的，请使用“收货确认”，不走提交/执行') {
+    if ((receipt as unknown as { tracked: boolean }).tracked) throw new BadRequestException(msg);
+  }
+
+  /** 入库：更新库存汇总（移动加权平均成本）并生成批次。老的“执行入库”和新的“收货确认”共用。 */
+  private async stockIn(
+    tx: Prisma.TransactionClient,
+    p: { warehouseId: string; itemId: string; quantity: number; unitCost: number; shelfLifeDays: number | null; expiresAt: Date | null; sourceId: string; now: Date },
+  ) {
+    const existing = await tx.warehouseStock.findUnique({ where: { warehouseId_itemId: { warehouseId: p.warehouseId, itemId: p.itemId } } });
+    const oldQuantity = existing?.quantity ?? 0;
+    const oldAvgCost = existing?.avgCost ?? 0;
+    const newQuantity = oldQuantity + p.quantity;
+    const newAvgCost = newQuantity === 0 ? 0 : Math.round((oldQuantity * oldAvgCost + p.quantity * p.unitCost) / newQuantity);
+    if (existing) {
+      await tx.warehouseStock.update({
+        where: { warehouseId_itemId: { warehouseId: p.warehouseId, itemId: p.itemId }, version: existing.version },
+        data: { quantity: newQuantity, avgCost: newAvgCost, version: { increment: 1 } },
+      });
+    } else {
+      await tx.warehouseStock.create({ data: { warehouseId: p.warehouseId, itemId: p.itemId, quantity: newQuantity, avgCost: newAvgCost } });
+    }
+    await tx.stockBatch.create({
+      data: {
+        tenantId: this.ctx.tenantId!,
+        warehouseId: p.warehouseId,
+        itemId: p.itemId,
+        batchNo: generateBusinessNo('BAT'),
+        quantity: p.quantity,
+        unitCost: p.unitCost,
+        receivedAt: p.now,
+        expiresAt: p.expiresAt ?? (p.shelfLifeDays ? addDays(p.now, p.shelfLifeDays) : null),
+        sourceType: 'GOODS_RECEIPT',
+        sourceId: p.sourceId,
+      },
+    });
   }
 
   /** 只要入库单还停在 PENDING_APPROVAL，就查一下挂在它身上的 WorkflowInstance，按其终态推进。 */

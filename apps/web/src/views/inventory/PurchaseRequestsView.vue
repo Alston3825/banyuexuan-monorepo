@@ -4,12 +4,16 @@
  * 表里的 申请部门/申请人/物品/规格/品牌/数量/单位/单价/用途 都会保留，金额按“数量×单价”重新核算并和表里的合计对账。
  */
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NTag, NAlert, NCheckbox, NDatePicker, NEmpty, NDescriptions, NDescriptionsItem,
+  NTabs, NTabPane,
   type DataTableColumns,
 } from 'naive-ui'
 import { inventoryItemApi, purchaseRequestApi, supplierApi, warehouseApi } from '../../api/modules/inventory.api'
 import { storeApi } from '../../api/modules/store.api'
+import ApprovalProgress from '../../components/workflow/ApprovalProgress.vue'
+import { useAuthStore } from '../../stores/auth'
 import type {
   InventoryItem, PurchaseRequest, PurchaseRequestItem, PurchaseRequestStatus, RequestImportPreview, RequestImportPreviewRow, Supplier, Warehouse,
 } from '../../api/types/inventory'
@@ -32,29 +36,113 @@ const loading = ref(false)
 const stores = ref<{ label: string; value: string }[]>([])
 const filterStore = ref<string | null>(null)
 const filterStatus = ref<PurchaseRequestStatus | null>(null)
-const statusOptions = Object.entries(PURCHASE_REQUEST_STATUS_MAP).map(([value, m]) => ({ label: m.label, value }))
+
+// 采购流程：部门负责人填“部门申购单”→ 客服在“部门申购”里勾选汇总 → 汇总申购单（店长审批）→ 采购员生成采购单
+const route = useRoute()
+const auth = useAuthStore()
+const canCollect = computed(() => auth.hasAccess('inventory.purchase-request.collect'))
+const canConvert = computed(() => auth.hasAccess('inventory.purchase-request.convert'))
+const isStaff = computed(() => canCollect.value || canConvert.value) // 采购岗：能看整个门店；其它人只看自己的部门申购单
+const tab = ref<'dept' | 'summary'>(route.query.tab === 'dept' ? 'dept' : isStaff.value ? 'summary' : 'dept')
+const DEPT_STATUS = ['DRAFT', 'SUBMITTED', 'COLLECTED', 'CANCELLED']
+const statusOptions = computed(() =>
+  Object.entries(PURCHASE_REQUEST_STATUS_MAP)
+    .filter(([k]) => (tab.value === 'dept' ? DEPT_STATUS.includes(k) : !['SUBMITTED', 'COLLECTED'].includes(k)))
+    .map(([value, m]) => ({ label: m.label, value })),
+)
+const collectKeys = ref<string[]>([])
 
 async function fetchList() {
   loading.value = true
   try {
-    rows.value = await purchaseRequestApi.list({ storeId: filterStore.value ?? undefined, status: filterStatus.value ?? undefined })
+    rows.value = await purchaseRequestApi.list({ storeId: filterStore.value ?? undefined, status: filterStatus.value ?? undefined, kind: tab.value === 'dept' ? 'DEPARTMENT' : 'SUMMARY' })
+    collectKeys.value = collectKeys.value.filter((id) => rows.value.some((r) => r.id === id && r.status === 'SUBMITTED'))
   } finally {
     loading.value = false
   }
 }
 watch([filterStore, filterStatus], fetchList)
+watch(tab, () => {
+  filterStatus.value = null
+  collectKeys.value = []
+  fetchList()
+})
 
-const columns: DataTableColumns<PurchaseRequest> = [
+const columns = computed<DataTableColumns<PurchaseRequest>>(() => [
+  ...(tab.value === 'dept' && canCollect.value ? [{ type: 'selection' as const, disabled: (r: PurchaseRequest) => r.status !== 'SUBMITTED' }] : []),
   { key: 'requestNo', title: '申购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => openDetail(r.id) }, r.requestNo) },
+  ...(tab.value === 'dept'
+    ? [
+        { key: 'dept', title: '申请部门', width: 110, render: (r: PurchaseRequest) => r.departmentName ?? '-' },
+        { key: 'creator', title: '提交人', width: 90, render: (r: PurchaseRequest) => r.creatorName ?? '-' },
+      ]
+    : []),
   { key: 'requestDate', title: '申购日期', width: 110, render: (r) => day(r.requestDate) },
   { key: 'store', title: '门店', width: 130, render: (r) => r.store.name },
   { key: 'status', title: '状态', width: 150, render: (r) => renderStatusBadge(r.status, PURCHASE_REQUEST_STATUS_MAP) },
   { key: 'count', title: '物品数', width: 80, render: (r) => r._count?.items ?? '-' },
   { key: 'totalAmount', title: '金额（元）', width: 110, render: (r) => money(r.totalAmount) },
-  { key: 'purchaseOrder', title: '采购单', width: 170, render: (r) => r.purchaseOrder?.orderNo ?? '-' },
-  { key: 'sourceFileName', title: '来源文件', ellipsis: { tooltip: true }, render: (r) => r.sourceFileName ?? '手工' },
+  tab.value === 'dept'
+    ? { key: 'summaryRequest', title: '汇总到', width: 170, render: (r: PurchaseRequest) => r.summaryRequest?.requestNo ?? '-' }
+    : { key: 'purchaseOrder', title: '采购单', width: 170, render: (r: PurchaseRequest) => r.purchaseOrder?.orderNo ?? '-' },
   { key: 'actions', title: '操作', width: 80, fixed: 'right', render: (r) => h(NButton, { size: 'small', onClick: () => openDetail(r.id) }, { default: () => '查看' }) },
-]
+])
+
+// ---------------- 部门申购单：新建 / 汇总 ----------------
+interface DeptLine { key: number; name: string; spec: string; quantity: number | null; unit: string; unitPrice: number | null; purpose: string }
+const deptVisible = ref(false)
+const deptSaving = ref(false)
+let deptKey = 0
+const newLine = (): DeptLine => ({ key: deptKey++, name: '', spec: '', quantity: 1, unit: '', unitPrice: null, purpose: '' })
+const deptLines = ref<DeptLine[]>([newLine()])
+const deptRemark = ref('')
+function openDept() {
+  deptLines.value = [newLine()]
+  deptRemark.value = ''
+  deptVisible.value = true
+}
+async function saveDept(submit: boolean) {
+  const lines = deptLines.value.filter((l) => l.name.trim())
+  if (lines.length === 0) return void message.error('请至少填写一项要申购的物品名称')
+  const bad = lines.find((l) => !l.quantity || l.quantity < 1)
+  if (bad) return void message.error(`「${bad.name}」请填写数量`)
+  deptSaving.value = true
+  try {
+    await purchaseRequestApi.createDepartment({
+      submit,
+      remark: deptRemark.value.trim() || undefined,
+      items: lines.map((l) => ({ name: l.name.trim(), spec: l.spec.trim() || null, quantity: l.quantity!, unit: l.unit.trim() || null, unitPrice: l.unitPrice, purpose: l.purpose.trim() || null })),
+    })
+    deptVisible.value = false
+    message.success(submit ? '已提交，客服会在“待汇总”里看到' : '已保存为草稿，确认无误后再提交')
+    await fetchList()
+  } finally {
+    deptSaving.value = false
+  }
+}
+const collecting = ref(false)
+function doCollect() {
+  if (collectKeys.value.length === 0) return void message.error('请先勾选要汇总的部门申购单')
+  dialog.info({
+    title: `汇总 ${collectKeys.value.length} 张部门申购单？`,
+    content: '会合并成一张汇总申购单（草稿），你可以补全单价、调整数量后再提交店长审批。',
+    positiveText: '汇总',
+    negativeText: '再看看',
+    onPositiveClick: async () => {
+      collecting.value = true
+      try {
+        const summary = await purchaseRequestApi.collect(collectKeys.value)
+        collectKeys.value = []
+        message.success(`已生成汇总申购单 ${summary.requestNo}`)
+        tab.value = 'summary'
+        await fetchList()
+        await openDetail(summary.id)
+      } finally {
+        collecting.value = false
+      }
+    },
+  })
+}
 
 // ---------------- Excel 导入 ----------------
 const importVisible = ref(false)
@@ -200,6 +288,20 @@ async function openDetail(id: string) {
   detailVisible.value = true
 }
 const isDraft = computed(() => detail.value?.status === 'DRAFT')
+const isDept = computed(() => detail.value?.kind === 'DEPARTMENT')
+const isMine = computed(() => !!detail.value && detail.value.createdBy === auth.account?.id)
+async function doRecall() {
+  if (!detail.value) return
+  detail.value = await purchaseRequestApi.recall(detail.value.id, detail.value.version)
+  message.success('已撤回，可以修改后重新提交')
+  await fetchList()
+}
+// 审批进度里点了通过/驳回/撤回之后：重新取一遍申购单（后端会按审批结果同步单据状态）并刷新列表
+async function onApprovalChanged() {
+  if (!detail.value) return
+  detail.value = await purchaseRequestApi.get(detail.value.id)
+  await fetchList()
+}
 const detailDeptSummary = computed(() => {
   const m = new Map<string, number>()
   for (const l of detail.value?.items ?? []) m.set(l.department ?? '（未填部门）', (m.get(l.department ?? '（未填部门）') ?? 0) + Number(l.subtotal))
@@ -277,14 +379,15 @@ function removeLine(l: PurchaseRequestItem) {
 async function doSubmit() {
   if (!detail.value) return
   const tip = noPriceLines.value > 0 ? `有 ${noPriceLines.value} 行还没有单价（待询价），审批时会按 0 元显示。` : ''
+  const dept = detail.value.kind === 'DEPARTMENT'
   dialog.info({
-    title: '提交审批？',
-    content: `提交后不能再改明细，由店长审批。${tip}`,
+    title: dept ? '提交给客服汇总？' : '提交店长审批？',
+    content: dept ? '提交后客服会在“待汇总”里看到这张申购单（提交后、被汇总前你还可以撤回修改）。' : `提交后不能再改明细，由店长审批；批准后交给采购员采购。${tip}`,
     positiveText: '提交',
     negativeText: '再看看',
     onPositiveClick: async () => {
       detail.value = await purchaseRequestApi.submit(detail.value!.id, detail.value!.version)
-      message.success('已提交审批')
+      message.success(dept ? '已提交，等客服汇总' : '已提交审批')
       await fetchList()
     },
   })
@@ -337,7 +440,7 @@ async function doConvert() {
     await fetchList()
     dialog.success({
       title: '已生成采购单',
-      content: `采购单 ${res.purchaseOrder.orderNo}（草稿）。到“采购单”页面提交采购审批。${res.amountDiff ? `采购单单价按“分”记录，合计与申购单相差 ${Math.abs(res.amountDiff).toFixed(2)} 元（${res.amountDiff > 0 ? '多' : '少'}），属于四舍五入。` : ''}`,
+      content: `采购单 ${res.purchaseOrder.orderNo} 已生成，不需要再审批，直接交给采购员采购（采购员的待办里会出现）。${res.amountDiff ? `采购单单价按“分”记录，合计与申购单相差 ${Math.abs(res.amountDiff).toFixed(2)} 元（${res.amountDiff > 0 ? '多' : '少'}），属于四舍五入。` : ''}`,
       positiveText: '知道了',
     })
   } finally {
@@ -354,23 +457,36 @@ onMounted(async () => {
 
 <template>
   <div>
+    <div class="pr-flow">采购流程：① 部门负责人填申购单 → ② 自动汇总给客服 → ③ 客服提交店长审批 → ④ 采购员采购（不再审批）→ ⑤ 客服逐项收货入库</div>
+    <n-tabs v-if="isStaff" v-model:value="tab" type="line" style="margin-bottom: 8px">
+      <n-tab-pane name="dept" tab="部门申购（待汇总）" />
+      <n-tab-pane name="summary" tab="汇总申购单" />
+    </n-tabs>
     <n-space justify="space-between" style="margin-bottom: 12px" align="center">
       <n-space>
         <n-select v-model:value="filterStore" :options="stores" clearable placeholder="全部门店" style="width: 160px" />
         <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 170px" />
       </n-space>
-      <n-button type="primary" @click="openImport">从 Excel 导入申购表</n-button>
+      <n-space>
+        <n-button v-if="tab === 'dept' && canCollect" type="warning" :disabled="collectKeys.length === 0" :loading="collecting" @click="doCollect">汇总所选（{{ collectKeys.length }}）</n-button>
+        <n-button v-if="tab === 'dept'" type="primary" @click="openDept">＋ 新建部门申购单</n-button>
+        <n-button v-else type="primary" @click="openImport">从 Excel 导入申购表</n-button>
+      </n-space>
     </n-space>
 
     <template v-if="isMobile">
-      <n-empty v-if="!loading && rows.length === 0" description="还没有申购单，点右上角导入每月的申购表" />
+      <n-empty v-if="!loading && rows.length === 0" :description="tab === 'dept' ? '还没有部门申购单，点右上角新建' : '还没有汇总申购单，点右上角导入每月的申购表，或到“部门申购”里汇总'" />
       <div v-for="r in rows" :key="r.id" class="pr-card" @click="openDetail(r.id)">
-        <div class="pr-top"><b>{{ r.requestNo }}</b><component :is="() => renderStatusBadge(r.status, PURCHASE_REQUEST_STATUS_MAP)" /></div>
-        <div class="pr-line">{{ day(r.requestDate) }} · {{ r.store.name }} · {{ r._count?.items ?? '-' }} 项 · <b>{{ money(r.totalAmount) }} 元</b></div>
+        <div class="pr-top">
+          <n-checkbox v-if="tab === 'dept' && canCollect && r.status === 'SUBMITTED'" :checked="collectKeys.includes(r.id)" @click.stop @update:checked="(v: boolean) => (collectKeys = v ? [...collectKeys, r.id] : collectKeys.filter((x) => x !== r.id))" />
+          <b>{{ r.requestNo }}</b><component :is="() => renderStatusBadge(r.status, PURCHASE_REQUEST_STATUS_MAP)" />
+        </div>
+        <div class="pr-line"><template v-if="r.kind === 'DEPARTMENT'">{{ r.departmentName }} · {{ r.creatorName }} · </template>{{ day(r.requestDate) }} · {{ r._count?.items ?? '-' }} 项<template v-if="r.kind !== 'DEPARTMENT'"> · {{ r.store.name }} · <b>{{ money(r.totalAmount) }} 元</b></template></div>
         <div v-if="r.purchaseOrder" class="pr-line">采购单 {{ r.purchaseOrder.orderNo }}</div>
+        <div v-if="r.summaryRequest" class="pr-line">已汇总到 {{ r.summaryRequest.requestNo }}</div>
       </div>
     </template>
-    <n-data-table v-else :columns="columns" :data="rows" :loading="loading" :row-key="(r: PurchaseRequest) => r.id" :scroll-x="1100" />
+    <n-data-table v-else :columns="columns" :data="rows" :loading="loading" :row-key="(r: PurchaseRequest) => r.id" v-model:checked-row-keys="collectKeys" :scroll-x="1100" />
 
     <!-- Excel 导入 -->
     <n-modal :show="importVisible" @update:show="(v) => (importVisible = v)">
@@ -412,11 +528,40 @@ onMounted(async () => {
       </n-card>
     </n-modal>
 
+    <!-- 新建部门申购单 -->
+    <n-modal :show="deptVisible" @update:show="(v) => (deptVisible = v)">
+      <n-card title="新建部门申购单" style="width: min(860px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+        <p class="pr-tip">填写本部门要买的东西。申请部门和申请人会自动带出（取自你的账号）。提交后自动汇总给客服，由客服统一提交店长审批。单价不知道可以不填，客服会补。</p>
+        <div v-for="(l, i) in deptLines" :key="l.key" class="pr-line-box">
+          <div class="pr-line-head"><b>第 {{ i + 1 }} 项</b><n-button v-if="deptLines.length > 1" size="tiny" type="error" quaternary @click="deptLines.splice(i, 1)">删除</n-button></div>
+          <div class="pr-grid">
+            <n-input v-model:value="l.name" placeholder="物品名称（必填）" />
+            <n-input v-model:value="l.spec" placeholder="规格/型号/尺寸" />
+            <n-input-number v-model:value="l.quantity" :min="1" :precision="0" placeholder="数量" style="width: 100%" />
+            <n-input v-model:value="l.unit" placeholder="单位（个/箱/桶…）" />
+            <n-input-number v-model:value="l.unitPrice" :min="0" :show-button="false" placeholder="单价（选填）" style="width: 100%" />
+            <n-input v-model:value="l.purpose" placeholder="用途（选填）" />
+          </div>
+        </div>
+        <n-button dashed block style="margin-top: 8px" @click="deptLines.push(newLine())">＋ 再加一项</n-button>
+        <n-input v-model:value="deptRemark" type="textarea" placeholder="备注（选填）" :autosize="{ minRows: 1 }" style="margin-top: 10px" />
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="deptVisible = false">取消</n-button>
+            <n-button :loading="deptSaving" @click="saveDept(false)">存为草稿</n-button>
+            <n-button type="primary" :loading="deptSaving" @click="saveDept(true)">保存并提交</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
     <!-- 详情 -->
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card v-if="detail" :title="`申购单 ${detail.requestNo}`" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detail" :title="`${isDept ? '部门申购单' : '汇总申购单'} ${detail.requestNo}`" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <template #header-extra><component :is="() => renderStatusBadge(detail!.status, PURCHASE_REQUEST_STATUS_MAP)" /></template>
         <n-descriptions :column="isMobile ? 1 : 4" label-placement="left" size="small" bordered style="margin-bottom: 10px">
+          <n-descriptions-item v-if="isDept" label="申请部门">{{ detail.departmentName ?? '-' }}</n-descriptions-item>
+          <n-descriptions-item v-if="isDept && detail.summaryRequest" label="已汇总到">{{ detail.summaryRequest.requestNo }}</n-descriptions-item>
           <n-descriptions-item label="门店">{{ detail.store.name }}</n-descriptions-item>
           <n-descriptions-item label="申购日期">{{ day(detail.requestDate) }}</n-descriptions-item>
           <n-descriptions-item label="合计金额"><b>{{ money(detail.totalAmount) }} 元</b></n-descriptions-item>
@@ -428,13 +573,17 @@ onMounted(async () => {
           <n-tag v-for="d in detailDeptSummary" :key="d.dept" size="small" round>{{ d.dept }}：{{ money(d.amount) }} 元</n-tag>
         </n-space>
         <n-alert v-if="noPriceLines > 0" type="warning" :show-icon="false" style="margin-bottom: 8px">有 {{ noPriceLines }} 行还没有单价（待询价）。</n-alert>
+        <n-card v-if="!isDept && detail.status !== 'DRAFT'" size="small" title="审批进度" style="margin-bottom: 10px; background: #fcfaf6">
+          <ApprovalProgress :key="detail.id + detail.status" business-type="PURCHASE_REQUEST" :business-id="detail.id" @changed="onApprovalChanged" />
+        </n-card>
         <n-space v-if="isDraft" style="margin-bottom: 8px"><n-button size="small" @click="openLine(null)">＋ 加一行</n-button></n-space>
         <n-data-table :columns="detailColumns" :data="detail.items" :row-key="(l: PurchaseRequestItem) => l.id" :scroll-x="1250" :max-height="380" size="small" />
         <template #footer>
           <n-space justify="end">
-            <n-button v-if="['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(detail.status)" quaternary type="error" @click="(cancelReason = ''), (cancelVisible = true)">取消申购单</n-button>
-            <n-button v-if="detail.status === 'DRAFT'" type="primary" @click="doSubmit">提交审批</n-button>
-            <n-button v-if="detail.status === 'APPROVED'" type="primary" @click="openConvert">生成采购单</n-button>
+            <n-button v-if="['DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(detail.status) && (!isDept || isMine || canCollect)" quaternary type="error" @click="(cancelReason = ''), (cancelVisible = true)">取消申购单</n-button>
+            <n-button v-if="isDept && detail.status === 'SUBMITTED' && (isMine || canCollect)" @click="doRecall">撤回修改</n-button>
+            <n-button v-if="detail.status === 'DRAFT'" type="primary" @click="doSubmit">{{ isDept ? '提交给客服汇总' : '提交店长审批' }}</n-button>
+            <n-button v-if="!isDept && detail.status === 'APPROVED' && canConvert" type="primary" @click="openConvert">生成采购单</n-button>
             <n-button @click="detailVisible = false">关闭</n-button>
           </n-space>
         </template>
@@ -527,5 +676,45 @@ onMounted(async () => {
 .pr-sub {
   color: #888;
   font-size: 12px;
+}
+.pr-flow {
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: #faf6f0;
+  border-radius: 6px;
+  color: #8a5a22;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.pr-tip {
+  margin: 0 0 10px;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pr-line-box {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+.pr-line-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.pr-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.4fr 1fr 1fr 1fr 1.4fr;
+  gap: 8px;
+}
+@media (max-width: 767px) {
+  .pr-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pr-grid > :first-child {
+    grid-column: 1 / -1;
+  }
 }
 </style>

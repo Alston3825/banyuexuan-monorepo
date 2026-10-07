@@ -8,6 +8,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // 生产：浏览器 → 宿主机 nginx → web 容器 nginx → api，共两层代理。不告诉 Express 信任它们，req.ip 就永远是内部代理地址：
+  // 全体用户共用同一份限流额度、操作日志/签字证据里的 IP 也不是真实 IP。TRUST_PROXY_HOPS 可覆盖（本机开发没有代理，默认 0）。
+  const hops = Number(process.env.TRUST_PROXY_HOPS ?? (isProduction ? 2 : 0));
+  if (hops > 0) (app.getHttpAdapter().getInstance() as { set: (k: string, v: number) => void }).set('trust proxy', hops);
+
   app.use(helmet());
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

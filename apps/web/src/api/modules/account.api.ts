@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios'
 import { http } from '../client'
-import type { Account, AssignRoleDto, CreateAccountDto, UpdateAccountDto } from '../types/account'
+import type { Account, AssignRoleDto, CreateAccountDto, ImportCommitDto, ImportCommitResult, ImportPreview, UpdateAccountDto } from '../types/account'
 
 export const accountApi = {
   // 同 storeApi.list() 的道理：大量业务页面用这个接口只是填"归属销售"下拉选项，
@@ -22,4 +22,11 @@ export const accountApi = {
   revokeRoleAssignment: (id: string, assignmentId: string) =>
     http.delete(`/platform/accounts/${id}/role-assignments/${assignmentId}`).then((r) => r.data),
   remove: (id: string) => http.delete(`/platform/accounts/${id}`).then((r) => r.data),
+  /** 员工信息表批量开通：第一步读表检查，第二步确认开通 */
+  importPreview: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return http.post<ImportPreview>('/platform/accounts/import/preview', fd).then((r) => r.data)
+  },
+  importCommit: (body: ImportCommitDto) => http.post<ImportCommitResult>('/platform/accounts/import/commit', body).then((r) => r.data),
 }

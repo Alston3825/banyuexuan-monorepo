@@ -12,13 +12,22 @@ import { QueryPurchaseOrderDto } from './dto/query-purchase-order.dto';
 
 const DEFINITION_CODE = 'INVENTORY_PURCHASE';
 const BUSINESS_TYPE = 'PURCHASE_ORDER';
-const includeOrder = { supplier: true, warehouse: true, items: { include: { item: true } } };
+const includeOrder = {
+  supplier: true,
+  warehouse: true,
+  items: { include: { item: true } },
+  goodsReceipts: { select: { id: true, receiptNo: true, status: true, tracked: true } },
+};
 
 /**
  * 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(通用工作流引擎审批)-> APPROVED/REJECTED；
- * 始终走审批，不受仓库"免审批"配置影响（花钱承诺，风险等级不同于仓内操作，见schema顶部
+ * 手工新建的采购单始终走审批，不受仓库"免审批"配置影响（花钱承诺，风险等级不同于仓内操作，见schema顶部
  * 范围收窄说明）。PENDING_APPROVAL 的后续推进由 reconcileStatus() 在读取时懒同步自
  * WorkflowInstance，与 ContractRecordService 完全同构。
+ *
+ * 申购流程生成的采购单（申购单已经过店长审批）：创建即 APPROVED（待采购），不再审批，直接交给采购员；
+ * 采购员采购完点“确认采购” → PURCHASED，并自动生成“逐项收货”的入库单（见 GoodsReceiptService.receive）；
+ * 货陆续到齐 → COMPLETED。
  */
 @Injectable()
 export class PurchaseOrderService {
@@ -50,7 +59,8 @@ export class PurchaseOrderService {
     return this.reconcileStatus(order);
   }
 
-  async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+  /** autoApprove：由已批准的申购单生成，直接是“待采购(APPROVED)”，不再走审批。 */
+  async create(dto: CreatePurchaseOrderDto, opts: { autoApprove?: boolean } = {}): Promise<PurchaseOrder> {
     const itemIds = [...new Set(dto.items.map((i) => i.itemId))];
     const items = await this.prisma.inventoryItem.findMany({ where: { id: { in: itemIds } } });
     if (items.length !== itemIds.length) throw new BadRequestException('存在不存在的物品 ID');
@@ -65,6 +75,7 @@ export class PurchaseOrderService {
           supplierId: dto.supplierId,
           orderNo: generateBusinessNo('CG'),
           totalAmount,
+          status: opts.autoApprove ? 'APPROVED' : undefined,
           remark: dto.remark,
           createdBy: this.ctx.accountId!,
         },
@@ -81,8 +92,65 @@ export class PurchaseOrderService {
       return order;
     });
     const withItems = await this.findOneOrThrow(created.id);
-    await this.auditLogService.record({ action: 'CREATE', entityType: 'PurchaseOrder', entityId: created.id, afterData: withItems, ...this.auditCtx(dto.storeId) });
+    await this.auditLogService.record({
+      action: 'CREATE',
+      entityType: 'PurchaseOrder',
+      entityId: created.id,
+      afterData: withItems,
+      remark: opts.autoApprove ? '由已批准的申购单生成，无需再审批，待采购员采购' : undefined,
+      ...this.auditCtx(dto.storeId),
+    });
     return withItems;
+  }
+
+  /**
+   * 采购员确认已完成采购：采购单 APPROVED → PURCHASED，同时自动生成一张“逐项收货”的入库单（待收货），
+   * 之后客服按快递到货情况逐项确认收货、入库。
+   */
+  async confirmPurchase(id: string, input: { expressNo?: string; note?: string }, expectedVersion: number) {
+    const before = await this.findOneOrThrow(id);
+    this.assertVersion(before, expectedVersion);
+    if (before.status !== 'APPROVED') throw new BadRequestException(`采购单当前状态「${before.status}」不能确认采购（只有“待采购”的采购单可以）`);
+    const order = await this.prisma.purchaseOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.purchaseOrder.update({
+        where: { id, version: expectedVersion },
+        data: {
+          status: 'PURCHASED',
+          purchasedAt: new Date(),
+          purchasedById: this.ctx.accountId!,
+          expressNo: input.expressNo?.trim() || null,
+          purchaseNote: input.note?.trim() || null,
+          version: { increment: 1 },
+        },
+        include: includeOrder,
+      });
+      const receipt = await tx.goodsReceipt.create({
+        data: {
+          tenantId: this.ctx.tenantId!,
+          storeId: order.storeId,
+          warehouseId: order.warehouseId,
+          purchaseOrderId: order.id,
+          receiptNo: generateBusinessNo('RK'),
+          status: 'PENDING_RECEIPT',
+          tracked: true,
+          remark: `由采购单 ${order.orderNo} 确认采购后自动生成，等快递到货后逐项确认收货`,
+          createdBy: this.ctx.accountId!,
+          items: { create: order.items.map((i) => ({ itemId: i.itemId, quantity: i.quantity, unitCost: i.unitPrice })) },
+        },
+      });
+      return { updated, receipt };
+    });
+    await this.auditLogService.record({
+      action: 'STATE_TRANSITION',
+      entityType: 'PurchaseOrder',
+      entityId: id,
+      beforeData: before,
+      afterData: result.updated,
+      remark: `APPROVED -> PURCHASED（采购员确认采购，已生成入库单 ${result.receipt.receiptNo}）`,
+      ...this.auditCtx(before.storeId),
+    });
+    return { order: result.updated, receipt: result.receipt };
   }
 
   async submit(id: string, expectedVersion: number): Promise<PurchaseOrder> {
@@ -116,14 +184,21 @@ export class PurchaseOrderService {
   async cancel(id: string, cancelReason: string, expectedVersion: number): Promise<PurchaseOrder> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
-    if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(before.status)) {
+    if (!['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PURCHASED'].includes(before.status)) {
       throw new BadRequestException(`采购单当前状态「${before.status}」不允许取消`);
     }
+    if (before.status === 'PURCHASED') {
+      const received = await this.prisma.goodsReceiptItem.aggregate({ where: { goodsReceipt: { purchaseOrderId: id, tracked: true } }, _sum: { receivedQuantity: true } });
+      if ((received._sum.receivedQuantity ?? 0) > 0) throw new BadRequestException('已经有货品到货入库，不能取消采购单');
+    }
     const updated = await runVersionedUpdate(() =>
-      this.prisma.purchaseOrder.update({
-        where: { id, version: expectedVersion },
-        data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
-        include: includeOrder,
+      this.prisma.$transaction(async (tx) => {
+        await tx.goodsReceipt.updateMany({ where: { purchaseOrderId: id, tracked: true, status: { in: ['PENDING_RECEIPT'] } }, data: { status: 'CANCELLED', cancelReason: `采购单已取消：${cancelReason}` } });
+        return tx.purchaseOrder.update({
+          where: { id, version: expectedVersion },
+          data: { status: 'CANCELLED', cancelReason, version: { increment: 1 } },
+          include: includeOrder,
+        });
       }),
     );
     await this.auditLogService.record({

@@ -37,6 +37,18 @@ export class AccountService {
     return account;
   }
 
+  /** 手机号、工号是员工的主要识别方式，都不能重复：提前查出来给一句人话，不让用户看到数据库报错。 */
+  private async assertPhoneFree(phone: string | null | undefined, exceptAccountId?: string) {
+    if (!phone) return;
+    const dup = await this.prisma.account.findFirst({ where: { tenantId: this.ctx.tenantId, phone, ...(exceptAccountId ? { NOT: { id: exceptAccountId } } : {}) }, select: { realName: true, status: true } });
+    if (dup) throw new ConflictException(`手机号 ${phone} 已经是「${dup.realName}」的账号了${dup.status !== 'ACTIVE' ? '（已停用）' : ''}，同一个手机号只能开一个账号`);
+  }
+
+  private async assertEmployeeNoFree(employeeNo: string) {
+    const dup = await this.prisma.employeeProfile.findFirst({ where: { tenantId: this.ctx.tenantId, activeEmployeeNo: employeeNo }, include: { account: { select: { realName: true } } } });
+    if (dup) throw new ConflictException(`工号 ${employeeNo} 已经分配给「${dup.account.realName}」，请换一个（离职归档的员工工号才可以回收）`);
+  }
+
   async create(data: {
     username: string;
     realName: string;
@@ -52,7 +64,10 @@ export class AccountService {
     hireDate?: string;
   }) {
     await this.dataScopeService.assertStoreAccessible(this.ctx, data.storeId);
-    const { password, employeeNo, hireDate, ...rest } = data;
+    const { password, employeeNo, hireDate, ...restRaw } = data;
+    const rest = { ...restRaw, phone: restRaw.phone?.trim() || undefined, email: restRaw.email?.trim() || undefined };
+    await this.assertPhoneFree(rest.phone);
+    if (employeeNo && hireDate) await this.assertEmployeeNoFree(employeeNo);
     const passwordHash = await this.passwordService.hash(password);
     // 账号与员工档案一一对应（EmployeeProfile.accountId是唯一外键）：员工的工号/入职日期
     // 一起传了，就在同一个事务里把账号和员工档案一起建好，不需要再单独跑一遍"员工档案"
@@ -70,6 +85,7 @@ export class AccountService {
             tenantId: this.ctx.tenantId!,
             accountId: account.id,
             employeeNo,
+            activeEmployeeNo: employeeNo, // 占用工号（离职归档时释放）
             hireDate: new Date(hireDate),
             createdBy: this.ctx.accountId!,
           },
@@ -102,6 +118,10 @@ export class AccountService {
     expectedVersion: number,
   ) {
     const before = await this.findOneOrThrow(id);
+    if (data.phone !== undefined) {
+      data = { ...data, phone: data.phone?.trim() || (null as unknown as undefined) }; // 空 = 清空（存成 null，不占手机号唯一）
+      if (data.phone && data.phone !== before.phone) await this.assertPhoneFree(data.phone, id);
+    }
     if (data.storeId && data.storeId !== before.storeId) await this.dataScopeService.assertStoreAccessible(this.ctx, data.storeId);
     if (before.version !== expectedVersion) {
       throw new ConflictException('数据已被他人修改，请刷新后重试');

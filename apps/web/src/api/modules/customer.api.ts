@@ -17,7 +17,9 @@ export const customerApi = {
   update: (id: string, body: UpdateCustomerDto) =>
     http.patch<Customer>(`/crm/customers/${id}`, body).then((r) => r.data),
   // 新建/编辑客户页的选择器数据：不依赖 platform.account 权限，店员也能选
-  staffOptions: (keyword?: string) => http.get<StaffOption[]>('/crm/customers/staff-options', { params: { keyword } }).then((r) => r.data),
+  /** salesOnly=true 只返回销售部员工 */
+  staffOptions: (keyword?: string, salesOnly?: boolean) =>
+    http.get<StaffOption[]>('/crm/customers/staff-options', { params: { keyword, salesOnly: salesOnly ? 1 : undefined } }).then((r) => r.data),
   referrerSearch: (keyword: string) =>
     http.get<ReferrerSearchResult>('/crm/customers/referrer-search', { params: { keyword } }).then((r) => r.data),
   idCardCheck: (idCardNo: string) => http.get<IdCardCheck>('/crm/customers/id-card-check', { params: { idCardNo } }).then((r) => r.data),

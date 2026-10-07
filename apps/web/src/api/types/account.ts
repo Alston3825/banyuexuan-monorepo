@@ -64,6 +64,55 @@ export interface UpdateAccountDto {
   version: number
 }
 
+/** 员工信息表（Excel）批量开通账号：读表后的逐行结果 */
+export interface ImportRow {
+  rowNo: number
+  employeeNo: string | null
+  name: string
+  phone: string | null
+  storeName: string | null
+  teamName: string | null
+  departmentName: string | null
+  positionName: string | null
+  hireDate: string | null
+  contractType: string | null
+  socialInsurance: string | null
+  idCardNo: string | null
+  bankAccountNo: string | null
+  bankName: string | null
+  remark: string | null
+}
+
+export interface ImportPreviewRow extends ImportRow {
+  storeId: string | null
+  employeeNoSuggested: boolean
+  newDepartment: boolean
+  newPosition: boolean
+  resigned: boolean
+  issues: { level: 'error' | 'warn'; text: string }[]
+}
+
+export interface ImportPreview {
+  sheetName: string
+  headerRow: number
+  ignoredColumns: string[]
+  rows: ImportPreviewRow[]
+}
+
+export interface ImportCommitDto {
+  rows: ImportRow[]
+  storeId: string
+  createMissing: boolean
+  roleId?: string
+  importProfileDetails: boolean
+}
+
+export interface ImportCommitResult {
+  created: number
+  failed: { rowNo: number; name: string; error?: string }[]
+  results: { rowNo: number; name: string; ok: boolean; employeeNo?: string; error?: string }[]
+}
+
 export interface AssignRoleDto {
   roleId: string
   scopeType: DataScopeType

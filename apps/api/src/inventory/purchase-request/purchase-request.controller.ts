@@ -3,6 +3,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
 import { PurchaseRequestStatus } from '@prisma/client';
 import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { PurchaseRequestKind } from '@prisma/client';
+import { RequestLineBody } from './purchase-request.service';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { PurchaseRequestService } from './purchase-request.service';
 import { PurchaseRequestImportService, RequestImportRow } from './purchase-request-import.service';
@@ -10,6 +12,7 @@ import { PurchaseRequestImportService, RequestImportRow } from './purchase-reque
 class QueryDto {
   @IsOptional() @IsString() storeId?: string;
   @IsOptional() @IsEnum(PurchaseRequestStatus) status?: PurchaseRequestStatus;
+  @IsOptional() @IsEnum(PurchaseRequestKind) kind?: PurchaseRequestKind;
 }
 class VersionDto {
   @ApiProperty() @IsInt() version: number;
@@ -43,6 +46,19 @@ class ConvertDto extends VersionDto {
   @IsString() @IsNotEmpty() supplierId: string;
   @IsString() @IsNotEmpty() warehouseId: string;
   @IsOptional() @IsArray() fixes?: { lineId: string; unitPrice?: number; itemId?: string }[];
+}
+
+class CreateDepartmentDto {
+  @IsOptional() @IsString() storeId?: string;
+  @IsOptional() @IsString() requestDate?: string;
+  @IsOptional() @IsString() remark?: string;
+  @IsArray() items: RequestLineBody[];
+  /** true=保存并提交（交给客服汇总） */
+  @IsOptional() @IsBoolean() submit?: boolean;
+}
+class CollectDto {
+  @IsArray() @IsString({ each: true }) ids: string[];
+  @IsOptional() @IsString() remark?: string;
 }
 
 @ApiTags('inventory/purchase-request')
@@ -82,6 +98,20 @@ export class PurchaseRequestController {
     return this.importService.commit(dto);
   }
 
+  /** 部门负责人新建部门申购单（申请部门取自本人所在部门） */
+  @Post('department')
+  @RequirePermission('inventory.purchase-request.create')
+  createDepartment(@Body() dto: CreateDepartmentDto) {
+    return this.service.createDepartment(dto);
+  }
+
+  /** 客服汇总：把勾选的“已提交”部门申购单合并成一张汇总申购单 */
+  @Post('collect')
+  @RequirePermission('inventory.purchase-request.collect')
+  collect(@Body() dto: CollectDto) {
+    return this.service.collect(dto.ids, dto.remark);
+  }
+
   @Get(':id')
   @RequirePermission('inventory.purchase-request.view')
   findOne(@Param('id') id: string) {
@@ -112,6 +142,12 @@ export class PurchaseRequestController {
   @RequirePermission('inventory.purchase-request.submit')
   submit(@Param('id') id: string, @Body() dto: VersionDto) {
     return this.service.submit(id, dto.version);
+  }
+
+  @Post(':id/recall')
+  @RequirePermission('inventory.purchase-request.submit')
+  recall(@Param('id') id: string, @Body() dto: VersionDto) {
+    return this.service.recall(id, dto.version);
   }
 
   @Post(':id/cancel')

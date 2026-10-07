@@ -49,6 +49,8 @@ import {
   HardwareChipOutline,
   SchoolOutline,
   HeartOutline,
+  NotificationsOutline,
+  CheckmarkDoneOutline,
 } from '@vicons/ionicons5'
 
 function icon(component: Component) {
@@ -92,6 +94,15 @@ interface NavGroup {
 // 权限动态过滤，不是所有账号看到的都一样（店员看不到经营分析/设备网关/账号权限/
 // 基础资料/审计日志这类管理侧功能，见业务规则确认记录"导航菜单按权限显示"）。
 const navGroups: NavGroup[] = [
+  // ==================== 工作台：每个人每天先看这里 ====================
+  {
+    label: '工作台',
+    key: 'group-workspace',
+    items: [
+      { label: '我的待办', to: '/workspace/todos', icon: NotificationsOutline, perm: 'workflow.instance' },
+      { label: '审批中心', to: '/workflow/approvals', icon: CheckmarkDoneOutline, perm: 'workflow.instance' },
+    ],
+  },
   // ==================== 业务模块 ====================
   {
     label: '经营分析',
@@ -282,7 +293,7 @@ const navGroups: NavGroup[] = [
     key: 'group-workflow',
     items: [
       { label: '示例审批单', to: '/workflow/demo-approvals', icon: DocumentText, perm: 'workflow.demo-approval' },
-      { label: '流程定义', to: '/workflow/definitions', icon: List, perm: 'workflow.instance' },
+      { label: '流程设置', to: '/workflow/settings', icon: List, perm: 'workflow.definition' },
     ],
   },
 ]

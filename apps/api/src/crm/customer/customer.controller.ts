@@ -45,8 +45,8 @@ export class CustomerController {
   /** 员工下拉：电话销售员/门店销售员/抄送人。不要求 platform.account 权限，店员也能选。 */
   @Get('staff-options')
   @RequirePermission('crm.customer.view')
-  staffOptions(@Query('keyword') keyword?: string) {
-    return this.customerService.staffOptions(keyword);
+  staffOptions(@Query('keyword') keyword?: string, @Query('salesOnly') salesOnly?: string) {
+    return this.customerService.staffOptions(keyword, salesOnly === '1');
   }
 
   /** 推荐人搜索：老客户 + 员工，支持姓名/手机号/拼音简拼。 */

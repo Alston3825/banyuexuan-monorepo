@@ -31,7 +31,14 @@ export class WorkflowEngineService {
       include: { nodes: { orderBy: { seq: 'asc' } } },
     });
     if (!definition) {
-      throw new NotFoundException(`工作流定义 ${params.definitionCode} 不存在或未发布`);
+      throw new NotFoundException(`这类单据的审批流程已停用或还没设置，请联系管理员到“审批流程设置”里启用（${params.definitionCode}）`);
+    }
+    const first = definition.nodes[0];
+    if (first) {
+      const people = await this.resolveApprovers(first.approverType, first.approverRoleId, first.approverAccountId, params.storeId);
+      if (people.length === 0) {
+        throw new ConflictException(`审批流程「${definition.name}」的第一个节点「${first.name}」当前没有可审批的人（对应角色没有分配给任何在职员工），请联系管理员到“审批流程设置”里处理`);
+      }
     }
 
     const instance = await this.prisma.workflowInstance.create({
@@ -81,6 +88,17 @@ export class WorkflowEngineService {
     });
     await this.logAction(instanceId, instance.currentNodeSeq, 'APPROVE', actor.accountId, comment);
     await this.auditRecord('APPROVE', instanceId, actor, { nodeSeq: instance.currentNodeSeq });
+
+    // 或签（ANY）节点：任意一人通过即算本节点通过，其余待审批人标记为“已跳过”
+    const currentNode = await this.prisma.workflowNode.findUnique({
+      where: { workflowDefinitionId_seq: { workflowDefinitionId: instance.workflowDefinitionId, seq: instance.currentNodeSeq ?? -1 } },
+    });
+    if (currentNode?.approvalMode === 'ANY') {
+      await this.prisma.workflowInstanceApprover.updateMany({
+        where: { workflowInstanceId: instanceId, nodeSeq: instance.currentNodeSeq ?? -1, role: { in: ['APPROVER', 'ADDED_APPROVER'] }, status: 'PENDING' },
+        data: { status: 'SKIPPED', actedAt: new Date() },
+      });
+    }
 
     const pendingCount = await this.prisma.workflowInstanceApprover.count({
       where: {
@@ -153,8 +171,26 @@ export class WorkflowEngineService {
     toAccountId: string,
     actor: ActorContext,
     comment?: string,
+    asAdmin = false,
   ): Promise<WorkflowInstance> {
     const instance = await this.getInstanceOrThrow(instanceId);
+    if (asAdmin && instance.status === 'IN_REVIEW') {
+      // 管理员干预：审批人离职/停用/不在岗导致单据没人处理时，把当前节点所有待审批人换成指定的人
+      const target = await this.prisma.account.findFirst({ where: { id: toAccountId, tenantId: instance.tenantId, status: 'ACTIVE' }, select: { id: true } });
+      if (!target) throw new ConflictException('转交对象不存在或已停用');
+      const pending = await this.prisma.workflowInstanceApprover.findMany({
+        where: { workflowInstanceId: instanceId, nodeSeq: instance.currentNodeSeq ?? -1, role: { in: ['APPROVER', 'ADDED_APPROVER'] }, status: 'PENDING' },
+      });
+      await this.prisma.$transaction([
+        this.prisma.workflowInstanceApprover.updateMany({ where: { id: { in: pending.map((p) => p.id) } }, data: { status: 'REASSIGNED', actedAt: new Date(), comment: comment ?? '管理员重新指定审批人' } }),
+        this.prisma.workflowInstanceApprover.create({
+          data: { workflowInstanceId: instanceId, nodeSeq: instance.currentNodeSeq ?? 0, accountId: toAccountId, role: 'APPROVER', status: 'PENDING', reassignedFromId: pending[0]?.id },
+        }),
+      ]);
+      await this.logAction(instanceId, instance.currentNodeSeq, 'REASSIGN', actor.accountId, comment ?? '管理员重新指定审批人');
+      await this.auditRecord('REASSIGN', instanceId, actor, { toAccountId, byAdmin: true });
+      return this.getInstanceOrThrow(instanceId);
+    }
     const row = await this.prisma.workflowInstanceApprover.findFirst({
       where: {
         workflowInstanceId: instanceId,
@@ -222,6 +258,17 @@ export class WorkflowEngineService {
     return this.getInstanceOrThrow(instanceId);
   }
 
+  /** 发起人催办：给当前待审批人的待办上打“被催办”标记（同一单据 1 小时内只能催一次）。 */
+  async urge(instanceId: string, actor: ActorContext, comment?: string): Promise<WorkflowInstance> {
+    const instance = await this.getInstanceOrThrow(instanceId);
+    if (instance.initiatorId !== actor.accountId) throw new ForbiddenException('只有发起人可以催办');
+    if (instance.status !== 'IN_REVIEW') throw new ConflictException('这张单据当前不在审批中，不需要催办');
+    const last = await this.prisma.workflowActionLog.findFirst({ where: { workflowInstanceId: instanceId, action: 'URGE' }, orderBy: { createdAt: 'desc' } });
+    if (last && Date.now() - last.createdAt.getTime() < 3600_000) throw new ConflictException('刚催办过，请 1 小时后再催');
+    await this.logAction(instanceId, instance.currentNodeSeq, 'URGE', actor.accountId, comment);
+    return instance;
+  }
+
   /** 供 BullMQ 延迟任务或手动接口调用，归档为终态，幂等（已归档直接返回）。 */
   async archive(instanceId: string, actor: ActorContext = SYSTEM_ACTOR): Promise<WorkflowInstance> {
     const instance = await this.getInstanceOrThrow(instanceId);
@@ -248,7 +295,15 @@ export class WorkflowEngineService {
       return;
     }
 
-    const approverAccountIds = await this.resolveApprovers(node.approverType, node.approverRoleId, node.approverAccountId);
+    const inst = await this.prisma.workflowInstance.findUnique({ where: { id: instanceId }, select: { storeId: true } });
+    const approverAccountIds = await this.resolveApprovers(node.approverType, node.approverRoleId, node.approverAccountId, inst?.storeId);
+    if (approverAccountIds.length === 0) {
+      // 后面的节点没有可审批的人：自动跳过，免得单据卡死在没人处理的节点上
+      const nextNode = await this.prisma.workflowNode.findFirst({ where: { workflowDefinitionId: definitionId, seq: { gt: seq } }, orderBy: { seq: 'asc' } });
+      await this.logAction(instanceId, seq, 'APPROVE', 'SYSTEM', `节点「${node.name}」没有可审批的人，系统自动跳过`);
+      await this.advanceToNode(instanceId, nextNode?.seq ?? null, definitionId);
+      return;
+    }
     await this.prisma.$transaction([
       this.prisma.workflowInstance.update({
         where: { id: instanceId },
@@ -262,18 +317,31 @@ export class WorkflowEngineService {
     ]);
   }
 
+  /** 按角色找审批人：只取在职账号；优先取“角色范围覆盖这家门店”的人（全局 / 本店 / 本区域），一个都没有才退回取所有持有该角色的人。 */
   private async resolveApprovers(
     approverType: 'ROLE' | 'ACCOUNT',
     approverRoleId: string | null,
     approverAccountId: string | null,
+    storeId?: string | null,
   ): Promise<string[]> {
-    if (approverType === 'ACCOUNT' && approverAccountId) return [approverAccountId];
+    if (approverType === 'ACCOUNT' && approverAccountId) {
+      const acc = await this.prisma.account.findUnique({ where: { id: approverAccountId }, select: { status: true } });
+      return acc?.status === 'ACTIVE' ? [approverAccountId] : [];
+    }
     if (approverType === 'ROLE' && approverRoleId) {
       const assignments = await this.prisma.accountRoleAssignment.findMany({
-        where: { roleId: approverRoleId, revokedAt: null },
-        select: { accountId: true },
+        where: { roleId: approverRoleId, revokedAt: null, account: { status: 'ACTIVE' } },
+        select: { accountId: true, scopeType: true, scopeId: true },
       });
-      return Array.from(new Set(assignments.map((a) => a.accountId)));
+      let matched = assignments;
+      if (storeId) {
+        const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { regionId: true } });
+        const covering = assignments.filter(
+          (a) => a.scopeType === 'TENANT' || (a.scopeType === 'STORE' && a.scopeId === storeId) || (a.scopeType === 'REGION' && !!store && a.scopeId === store.regionId),
+        );
+        if (covering.length > 0) matched = covering;
+      }
+      return Array.from(new Set(matched.map((a) => a.accountId)));
     }
     return [];
   }

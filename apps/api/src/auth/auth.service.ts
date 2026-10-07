@@ -10,6 +10,8 @@ import { PermissionLookupService } from '../common/context/permission-lookup.ser
 interface RequestMeta {
   ip?: string;
   userAgent?: string;
+  /** 浏览器本地生成的设备号（X-Device-Id），用来识别“这台手机/电脑是员工用过的”，见 CareConfirmPublicService */
+  deviceId?: string;
 }
 
 interface AccountForToken {
@@ -61,6 +63,7 @@ export class AuthService {
 
     const accessToken = this.signAccessToken(account);
     const refreshToken = await this.issueRefreshToken(account.id, meta);
+    await this.touchDevice(account.id, meta);
 
     await this.prisma.account.update({ where: { id: account.id }, data: { lastLoginAt: new Date() } });
     await this.auditLogService.record({
@@ -101,6 +104,7 @@ export class AuthService {
     await this.prisma.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
     const accessToken = this.signAccessToken(record.account);
     const newRefreshToken = await this.issueRefreshToken(record.accountId, meta);
+    await this.touchDevice(record.accountId, meta);
     // 每次静默刷新时都重新取一遍权限点：管理员改了这个账号的角色后，不需要等对方
     // 主动退出重新登录，下一次刷新（access token每30分钟过期一次）就能拿到最新权限。
     const permissions = Array.from(await this.permissionLookupService.getPermissionCodes(record.accountId)).sort();
@@ -113,6 +117,21 @@ export class AuthService {
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /** 记录员工登录过的设备号（格式不对就忽略，记录失败也不能影响登录）。 */
+  private async touchDevice(accountId: string, meta: RequestMeta): Promise<void> {
+    const deviceId = meta.deviceId;
+    if (!deviceId || !/^[A-Za-z0-9_-]{16,64}$/.test(deviceId)) return;
+    try {
+      await this.prisma.staffDevice.upsert({
+        where: { accountId_deviceId: { accountId, deviceId } },
+        update: { lastSeenAt: new Date(), lastIp: meta.ip ?? null },
+        create: { accountId, deviceId, lastIp: meta.ip ?? null },
+      });
+    } catch {
+      /* 设备记录只是辅助证据，不影响登录 */
+    }
   }
 
   private signAccessToken(account: AccountForToken): string {

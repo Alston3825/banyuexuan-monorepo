@@ -4,21 +4,27 @@
  * 已填/未填一目了然；点某一天进去填（妈妈 + 每个宝宝 + 宝宝 24 小时喂养记录单）。最上面是“填今天”的大按钮。
  */
 import { computed, onMounted, ref } from 'vue'
-import { NButton, NCard, NEmpty, NSpin, NTag } from 'naive-ui'
+import { NButton, NCard, NEmpty, NSpace, NSpin, NTag } from 'naive-ui'
 import { careDailyApi } from '../../api/modules/care-archive.api'
 import type { DailyDays } from '../../api/types/care-archive'
 import DailyRecordDialog from './DailyRecordDialog.vue'
+import ConfirmLinkDialog from './ConfirmLinkDialog.vue'
+import { careSignApi, type SignOverviewRow } from '../../api/modules/care-sign.api'
 
 const props = defineProps<{ motherProfileId: string }>()
 
 const data = ref<DailyDays | null>(null)
 const loading = ref(false)
 const dlg = ref({ show: false, date: '' })
+const linkDlg = ref(false)
+const signs = ref<Record<string, SignOverviewRow>>({})
 
 async function load() {
   loading.value = true
   try {
-    data.value = await careDailyApi.days(props.motherProfileId)
+    const [d, o] = await Promise.all([careDailyApi.days(props.motherProfileId), careSignApi.overview(props.motherProfileId).catch(() => [] as SignOverviewRow[])])
+    data.value = d
+    signs.value = Object.fromEntries(o.map((r) => [r.date, r]))
   } finally {
     loading.value = false
   }
@@ -46,7 +52,10 @@ onMounted(load)
             <span :style="{ color: missing > 0 ? '#b25e00' : '#2a8a3e' }">{{ missing > 0 ? `共 ${missing} 天还没填` : '每天都已填写' }}</span>
           </div>
         </div>
-        <n-button v-if="data" type="primary" size="large" @click="open(data.today)">{{ todayRow?.filled ? '查看 / 修改今天' : '填写今天的记录' }}</n-button>
+        <n-space v-if="data" :wrap="true">
+          <n-button size="large" @click="linkDlg = true">发给客户确认</n-button>
+          <n-button type="primary" size="large" @click="open(data.today)">{{ todayRow?.filled ? '查看 / 修改今天' : '填写今天的记录' }}</n-button>
+        </n-space>
       </div>
     </n-card>
 
@@ -59,12 +68,21 @@ onMounted(load)
         <n-tag v-if="d.filled" type="success" size="small" round>已填</n-tag>
         <n-tag v-else-if="d.date === data?.today" type="warning" size="small" round>今天待填</n-tag>
         <n-tag v-else type="error" size="small" round>未填</n-tag>
+        <template v-if="d.filled && signs[d.date]">
+          <n-tag v-if="signs[d.date].signatureCount === 0" size="small" round>未签字</n-tag>
+          <n-tag v-else-if="signs[d.date].staleSignatures > 0" type="warning" size="small" round>需重新签字</n-tag>
+          <n-tag v-else type="info" size="small" round>✍ {{ signs[d.date].signatureCount }} 人已签</n-tag>
+          <n-tag v-if="signs[d.date].confirmation === 'CONFIRMED'" type="success" size="small" round>客户已确认 {{ signs[d.date].satisfaction }}★</n-tag>
+          <n-tag v-else-if="signs[d.date].confirmation === 'STALE'" type="warning" size="small" round>确认后有改动</n-tag>
+          <n-tag v-else size="small" round>客户未确认</n-tag>
+        </template>
         <span class="dl-go">›</span>
       </div>
       <n-empty v-if="data && data.days.length === 0" description="暂无记录" />
     </div>
 
     <DailyRecordDialog v-model:show="dlg.show" :mother-profile-id="motherProfileId" :date="dlg.date" @saved="load" />
+    <ConfirmLinkDialog v-model:show="linkDlg" :mother-profile-id="motherProfileId" @update:show="(v) => !v && load()" />
   </n-spin>
 </template>
 
@@ -92,8 +110,9 @@ onMounted(load)
 }
 .dl-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   padding: 12px;
   border: 1px solid #e6e6e6;
   border-radius: 8px;

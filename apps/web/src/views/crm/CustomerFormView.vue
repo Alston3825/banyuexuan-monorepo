@@ -194,6 +194,13 @@ async function searchStaff(keyword = '') {
   rememberStaff(list)
   staffShown.value = list
 }
+// 电话销售员 / 门店销售员只从销售部里选
+const salesShown = ref<StaffOption[]>([])
+async function searchSales(keyword = '') {
+  const list = await customerApi.staffOptions(keyword, true)
+  rememberStaff(list)
+  salesShown.value = list
+}
 /** 当前列表 + 已选中的人（搜索后列表变了，已选的也要保留显示，否则标签会变成一串 id）。 */
 function staffSelectOptions(selected: (string | null)[]): SelectOption[] {
   const ids = new Set(staffShown.value.map((a) => a.id))
@@ -201,8 +208,13 @@ function staffSelectOptions(selected: (string | null)[]): SelectOption[] {
   return [...staffShown.value, ...extra].map((a) => ({ label: staffLabel(a), value: a.id }))
 }
 const ccOptions = computed(() => staffSelectOptions(model.ccAccountIds))
-const phoneSalesOptions = computed(() => staffSelectOptions([model.phoneSalesId]))
-const storeSalesOptions = computed(() => staffSelectOptions([model.assignedToId]))
+function salesSelectOptions(selected: (string | null)[]): SelectOption[] {
+  const ids = new Set(salesShown.value.map((a) => a.id))
+  const extra = selected.filter((id): id is string => !!id && !ids.has(id) && !!staffMap[id]).map((id) => staffMap[id])
+  return [...salesShown.value, ...extra].map((a) => ({ label: staffLabel(a), value: a.id }))
+}
+const phoneSalesOptions = computed(() => salesSelectOptions([model.phoneSalesId]))
+const storeSalesOptions = computed(() => salesSelectOptions([model.assignedToId]))
 
 const referrerLabels = reactive<Record<string, string>>({})
 const referrerShown = ref<SelectOption[]>([])
@@ -387,7 +399,7 @@ async function loadForEdit(id: string) {
 onMounted(async () => {
   loading.value = true
   try {
-    const [stores, chans, types] = await Promise.all([storeApi.list(), customerChannelApi.list(), customerChannelApi.listTypes(), searchStaff('')])
+    const [stores, chans, types] = await Promise.all([storeApi.list(), customerChannelApi.list(), customerChannelApi.listTypes(), searchStaff(''), searchSales('')])
     storeOptions.value = stores.map((s) => ({ label: s.name, value: s.id }))
     channels.value = chans
     channelTypes.value = types
@@ -588,8 +600,8 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
               </n-space>
               <n-space :size="12" style="margin-top: 8px" align="center">
                 <span class="cf-hint">或指定：</span>
-                <n-select v-model:value="model.phoneSalesId" :options="phoneSalesOptions" placeholder="电话销售员" clearable filterable remote style="width: 170px" @search="searchStaff" />
-                <n-select v-model:value="model.assignedToId" :options="storeSalesOptions" placeholder="门店销售员" clearable filterable remote style="width: 170px" @search="searchStaff" />
+                <n-select v-model:value="model.phoneSalesId" :options="phoneSalesOptions" placeholder="电话销售员（销售部）" clearable filterable remote style="width: 190px" @search="searchSales" />
+                <n-select v-model:value="model.assignedToId" :options="storeSalesOptions" placeholder="门店销售员（销售部）" clearable filterable remote style="width: 190px" @search="searchSales" />
               </n-space>
               <div v-if="!isEdit" class="cf-hint" style="margin-top: 4px">不指定门店销售员时，默认归属为录入人本人。</div>
             </div>

@@ -154,6 +154,7 @@ async function main() {
     { code: 'workflow', name: '审批流程', type: 'MODULE' },
     { code: 'workflow.instance', name: '审批流程-实例', type: 'PAGE', parentCode: 'workflow' },
     { code: 'workflow.demo-approval', name: '审批流程-示例审批单', type: 'PAGE', parentCode: 'workflow' },
+    { code: 'workflow.definition', name: '审批流程-流程设置', type: 'PAGE', parentCode: 'workflow' },
 
     { code: 'audit', name: '审计日志', type: 'MODULE' },
     { code: 'audit.log', name: '审计日志-查询', type: 'PAGE', parentCode: 'audit' },
@@ -291,6 +292,10 @@ async function main() {
       type: 'BUTTON',
       parentCode: 'workflow.instance',
     });
+  }
+  // 流程设置：谁来审批、几级审批、处理时限（默认只有管理员）
+  for (const action of ['view', 'update']) {
+    permSpecs.push({ code: `workflow.definition.${action}`, name: `审批流程-流程设置-${action}`, type: 'BUTTON', parentCode: 'workflow.definition' });
   }
   for (const action of ['view', 'create']) {
     permSpecs.push({
@@ -436,13 +441,16 @@ async function main() {
   }
   permSpecs.push({ code: 'inventory.warehouse-stock.view', name: '库存-库存查询-view', type: 'BUTTON', parentCode: 'inventory.warehouse-stock' });
   permSpecs.push({ code: 'inventory.stock-batch.view', name: '库存-批次与效期-view', type: 'BUTTON', parentCode: 'inventory.stock-batch' });
-  for (const action of ['view', 'create', 'update', 'submit', 'cancel', 'convert']) {
+  // collect=客服汇总各部门申购单；convert=已批准的申购单生成采购单
+  for (const action of ['view', 'create', 'update', 'submit', 'cancel', 'convert', 'collect']) {
     permSpecs.push({ code: `inventory.purchase-request.${action}`, name: `库存-申购单-${action}`, type: 'BUTTON', parentCode: 'inventory.purchase-request' });
   }
-  for (const action of ['view', 'create', 'submit', 'cancel']) {
+  // purchase=采购员“确认采购”（确认后自动生成待收货的入库单）
+  for (const action of ['view', 'create', 'submit', 'cancel', 'purchase']) {
     permSpecs.push({ code: `inventory.purchase-order.${action}`, name: `库存-采购单-${action}`, type: 'BUTTON', parentCode: 'inventory.purchase-order' });
   }
-  for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
+  // receive=客服按快递到货情况逐项确认收货（确认即入库）
+  for (const action of ['view', 'create', 'submit', 'execute', 'cancel', 'receive']) {
     permSpecs.push({ code: `inventory.goods-receipt.${action}`, name: `库存-入库单-${action}`, type: 'BUTTON', parentCode: 'inventory.goods-receipt' });
   }
   for (const action of ['view', 'create', 'submit', 'execute', 'cancel']) {
@@ -455,7 +463,8 @@ async function main() {
     permSpecs.push({ code: `inventory.stock-count.${action}`, name: `库存-盘点单-${action}`, type: 'BUTTON', parentCode: 'inventory.stock-count' });
   }
 
-  for (const action of ['view', 'create', 'update']) {
+  // change-no=修改员工工号（一旦分配只有管理员能改）；archive=离职归档（释放工号）；restore=恢复在职（返聘/误归档，仅管理员）
+  for (const action of ['view', 'create', 'update', 'change-no', 'archive', 'restore']) {
     permSpecs.push({ code: `hr.employee-profile.${action}`, name: `人事-员工档案-${action}`, type: 'BUTTON', parentCode: 'hr.employee-profile' });
   }
   for (const action of ['view', 'create', 'update']) {
@@ -678,6 +687,8 @@ async function main() {
     'platform.store.delete',
     'room.room.force-delete',
     'care.profile.force-delete',
+    'hr.employee-profile.change-no',
+    'hr.employee-profile.restore',
     'crm.lead.lose',
     'crm.opportunity.lose',
     'contract.record.void',
@@ -765,7 +776,7 @@ async function main() {
   // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
   // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
   // 另外"删除房间"(room.room.delete)是不可逆操作，只给店长/管理员，普通员工不开放。
-  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve']); // 审核护理计划只给店长/护理主任
+  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive']); // 审核护理计划只给店长/护理主任
   const storeStaffCodes = storeManagerCodes.filter(
     (code) =>
       !storeStaffExcluded.has(code) &&
@@ -784,6 +795,58 @@ async function main() {
         create: { roleId: storeStaffRole.id, permissionPointId, createdBy: 'SEED' },
       })
       .catch(() => undefined);
+  }
+
+  // ---------- 采购流程岗位角色：部门负责人 / 客服 / 采购员 ----------
+  // 采购流程：部门负责人填部门申购单 → 自动汇总到客服 → 客服汇总后提交店长审批 → 批准后生成采购单（不再审批）
+  // → 采购员采购完“确认采购”（自动生成入库单）→ 客服按快递逐项确认收货入库。
+  // 这几个角色只给各自岗位需要的权限；具体谁担任哪个岗位，在“账号管理 → 角色分配”里给员工分配（范围选“门店级”）。
+  const procurementRoles: { code: string; name: string; description: string; perms: string[] }[] = [
+    {
+      code: 'DEPT_HEAD',
+      name: '部门负责人',
+      description: '填写本部门申购单（提交后自动汇总给客服），只能看到自己提交的申购单',
+      perms: ['inventory.purchase-request.view', 'inventory.purchase-request.create', 'inventory.purchase-request.update', 'inventory.purchase-request.submit', 'inventory.purchase-request.cancel', 'inventory.item.view', 'workflow.instance.view'],
+    },
+    {
+      code: 'CUSTOMER_SERVICE',
+      name: '客服',
+      description: '汇总各部门申购单并提交店长审批；货到后逐项确认收货、入库',
+      perms: [
+        'inventory.purchase-request.view', 'inventory.purchase-request.create', 'inventory.purchase-request.update', 'inventory.purchase-request.submit', 'inventory.purchase-request.cancel', 'inventory.purchase-request.convert', 'inventory.purchase-request.collect',
+        'inventory.purchase-order.view', 'inventory.goods-receipt.view', 'inventory.goods-receipt.receive',
+        'inventory.item.view', 'inventory.warehouse.view', 'inventory.supplier.view', 'inventory.warehouse-stock.view', 'workflow.instance.view',
+      ],
+    },
+    {
+      code: 'PURCHASER',
+      name: '采购员',
+      description: '收到店长批准的申购单后生成采购单、去采购，采购完点“确认采购”',
+      perms: [
+        'inventory.purchase-request.view', 'inventory.purchase-request.convert',
+        'inventory.purchase-order.view', 'inventory.purchase-order.create', 'inventory.purchase-order.purchase', 'inventory.purchase-order.cancel',
+        'inventory.goods-receipt.view',
+        'inventory.supplier.view', 'inventory.supplier.create', 'inventory.supplier.update', 'inventory.item.view', 'inventory.warehouse.view', 'workflow.instance.view',
+      ],
+    },
+  ];
+  for (const r of procurementRoles) {
+    const role = await prisma.role.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: r.code } },
+      update: {},
+      create: { tenantId: tenant.id, code: r.code, name: r.name, description: r.description, createdBy: 'SEED' },
+    });
+    for (const code of r.perms) {
+      const permissionPointId = codeToId.get(code);
+      if (!permissionPointId) continue;
+      await prisma.roleOnPermission
+        .upsert({
+          where: { roleId_permissionPointId: { roleId: role.id, permissionPointId } },
+          update: {},
+          create: { roleId: role.id, permissionPointId, createdBy: 'SEED' },
+        })
+        .catch(() => undefined);
+    }
   }
 
   // ---------- 账号 ----------

@@ -1,7 +1,7 @@
 import type { CommonStatus, ScopedEntityBase } from './common'
 
 export type WarehousePurpose = 'OPERATING' | 'LOGISTICS'
-export type InventoryDocStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+export type InventoryDocStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'PURCHASED' | 'PENDING_RECEIPT' | 'PARTIALLY_RECEIVED'
 export type StockIssueType = 'ISSUE' | 'REQUISITION' | 'LOSS'
 
 export interface Supplier extends ScopedEntityBase {
@@ -152,9 +152,15 @@ export interface PurchaseOrder {
   createdAt: string
   updatedAt: string
   version: number
+  /** 采购员确认采购的信息 */
+  purchasedAt?: string | null
+  purchasedById?: string | null
+  expressNo?: string | null
+  purchaseNote?: string | null
   supplier: Supplier
   warehouse: Warehouse
   items: PurchaseOrderItem[]
+  goodsReceipts?: { id: string; receiptNo: string; status: InventoryDocStatus; tracked: boolean }[]
 }
 export interface CreatePurchaseOrderDto {
   storeId: string
@@ -176,7 +182,19 @@ export interface GoodsReceiptItem {
   itemId: string
   quantity: number
   unitCost: number
+  /** 逐项收货的入库单：已到货入库的累计数量 */
+  receivedQuantity: number
   item: InventoryItem
+}
+export interface GoodsReceiptConfirmation {
+  id: string
+  goodsReceiptId: string
+  confirmedById: string
+  confirmedByName?: string
+  confirmedAt: string
+  expressNo: string | null
+  note: string | null
+  lines: { id: string; goodsReceiptItemId: string; quantity: number; expiresAt: string | null; note: string | null }[]
 }
 export interface GoodsReceipt {
   id: string
@@ -189,6 +207,9 @@ export interface GoodsReceipt {
   remark: string | null
   cancelReason: string | null
   completedAt: string | null
+  /** true=按快递到货逐项确认收货的入库单（由“确认采购”自动生成） */
+  tracked: boolean
+  shortClosedNote: string | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -196,6 +217,7 @@ export interface GoodsReceipt {
   warehouse: Warehouse
   purchaseOrder: PurchaseOrder | null
   items: GoodsReceiptItem[]
+  confirmations?: GoodsReceiptConfirmation[]
 }
 export interface CreateGoodsReceiptDto {
   storeId: string
@@ -348,7 +370,8 @@ export interface ItemImportResult {
 }
 
 // ---------------- 申购单 ----------------
-export type PurchaseRequestStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'ORDERED'
+export type PurchaseRequestStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'ORDERED' | 'SUBMITTED' | 'COLLECTED'
+export type PurchaseRequestKind = 'SUMMARY' | 'DEPARTMENT'
 
 export interface PurchaseRequestItem {
   id: string
@@ -369,6 +392,13 @@ export interface PurchaseRequestItem {
 
 export interface PurchaseRequest {
   id: string
+  kind: PurchaseRequestKind
+  departmentName: string | null
+  createdBy: string
+  /** 列表接口附带：提交人姓名 */
+  creatorName?: string
+  summaryRequestId: string | null
+  summaryRequest?: { id: string; requestNo: string; status?: string } | null
   storeId: string
   requestNo: string
   requestDate: string

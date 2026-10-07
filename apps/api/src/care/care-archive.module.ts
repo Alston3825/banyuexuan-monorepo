@@ -14,12 +14,15 @@ import { CareDocumentController } from './care-document/care-document.controller
 import { CareDocumentExtractionService } from './care-document/care-document-extraction.service';
 import { CareDocumentService } from './care-document/care-document.service';
 import { CareStorageService } from './care-document/care-storage.service';
+import { CareConfirmPublicService } from './care-signature/care-confirm-public.service';
+import { CareSignatureController, MySignatureController, PublicCareConfirmController } from './care-signature/care-signature.controller';
+import { CareSignatureService } from './care-signature/care-signature.service';
 
 /** 护理档案（母婴档案下的纸质资料留档 + 单次评估表）：资料上传/识别、四张评估表。 */
 @Module({
   imports: [AiGatewayModule],
-  controllers: [CareDocumentController, CareAssessmentController, CareDailyController, CareMedicationController, CarePlanVersionController, CareStatsController],
-  providers: [CareStorageService, CareDocumentExtractionService, CareDocumentService, CareAssessmentService, CareDailyService, CareMedicationService, CarePlanVersionService, CareServiceLogService, CareStatsService],
+  controllers: [MySignatureController, CareSignatureController, PublicCareConfirmController, CareDocumentController, CareAssessmentController, CareDailyController, CareMedicationController, CarePlanVersionController, CareStatsController],
+  providers: [CareSignatureService, CareConfirmPublicService, CareStorageService, CareDocumentExtractionService, CareDocumentService, CareAssessmentService, CareDailyService, CareMedicationService, CarePlanVersionService, CareServiceLogService, CareStatsService],
   exports: [CareStorageService],
 })
 export class CareArchiveModule {}

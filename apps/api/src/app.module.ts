@@ -9,6 +9,7 @@ import { QueueModule } from './queue/queue.module';
 import { AuthModule } from './auth/auth.module';
 import { PlatformModule } from './platform/platform.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { WorkspaceModule } from './workspace/workspace.module';
 import { CrmModule } from './crm/crm.module';
 import { ContractModule } from './contract/contract.module';
 import { RoomModule } from './room/room.module';
@@ -44,6 +45,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     AuthModule,
     PlatformModule,
     WorkflowModule,
+    WorkspaceModule,
     CrmModule,
     ContractModule,
     RoomModule,

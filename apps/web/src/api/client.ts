@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { message } from '../utils/discrete-api'
+import { getDeviceId } from '../utils/device-id'
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
@@ -8,6 +9,7 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
+  config.headers['X-Device-Id'] = getDeviceId()
   const auth = useAuthStore()
   if (auth.accessToken) {
     config.headers.Authorization = `Bearer ${auth.accessToken}`
@@ -24,7 +26,10 @@ http.interceptors.response.use(
     const { config, response } = error
     const status = response?.status
 
-    if (status === 401 && config && !(config as any)._retried) {
+    // 登录/刷新接口本身返回 401 = 用户名或密码不对（或账号被停用），不是“登录过期”：
+    // 不能走静默刷新再整页跳回 /login（那样输入框被清空、错误提示丢失，浏览器还会把保存的管理员账号密码重新填回来）。
+    const isAuthCall = /\/auth\/(login|refresh)$/.test(config?.url ?? '')
+    if (status === 401 && config && !isAuthCall && !(config as any)._retried) {
       ;(config as any)._retried = true
       const auth = useAuthStore()
       try {

@@ -14,6 +14,7 @@ import type {
   PurchaseRequest,
   PurchaseRequestLineBody,
   PurchaseRequestStatus,
+  PurchaseRequestKind,
   RequestImportPreview,
   RequestImportResult,
   RequestImportRow,
@@ -79,6 +80,9 @@ export const purchaseOrderApi = {
   get: (id: string) => http.get<PurchaseOrder>(`/inventory/purchase-orders/${id}`).then((r) => r.data),
   create: (body: CreatePurchaseOrderDto) => http.post<PurchaseOrder>('/inventory/purchase-orders', body).then((r) => r.data),
   submit: (id: string, version: number) => http.post<PurchaseOrder>(`/inventory/purchase-orders/${id}/submit`, { version }).then((r) => r.data),
+  /** 采购员确认已完成采购：采购单变“已采购”，并自动生成待收货的入库单 */
+  confirmPurchase: (id: string, body: { version: number; expressNo?: string; note?: string }) =>
+    http.post<{ order: PurchaseOrder; receipt: { id: string; receiptNo: string } }>(`/inventory/purchase-orders/${id}/confirm-purchase`, body).then((r) => r.data),
   cancel: (id: string, cancelReason: string, version: number) =>
     http.post<PurchaseOrder>(`/inventory/purchase-orders/${id}/cancel`, { cancelReason, version }).then((r) => r.data),
 }
@@ -90,6 +94,10 @@ export const goodsReceiptApi = {
   create: (body: CreateGoodsReceiptDto) => http.post<GoodsReceipt>('/inventory/goods-receipts', body).then((r) => r.data),
   submit: (id: string, version: number) => http.post<GoodsReceipt>(`/inventory/goods-receipts/${id}/submit`, { version }).then((r) => r.data),
   execute: (id: string, version: number) => http.post<GoodsReceipt>(`/inventory/goods-receipts/${id}/execute`, { version }).then((r) => r.data),
+  /** 收货确认：快递到货后逐项确认到了几个，确认即入库（可分多次） */
+  receive: (id: string, body: { lines: { receiptItemId: string; quantity: number; expiresAt?: string; note?: string }[]; expressNo?: string; note?: string }) =>
+    http.post<GoodsReceipt>(`/inventory/goods-receipts/${id}/receive`, body).then((r) => r.data),
+  closeShort: (id: string, reason: string) => http.post<GoodsReceipt>(`/inventory/goods-receipts/${id}/close-short`, { reason }).then((r) => r.data),
   cancel: (id: string, cancelReason: string, version: number) =>
     http.post<GoodsReceipt>(`/inventory/goods-receipts/${id}/cancel`, { cancelReason, version }).then((r) => r.data),
 }
@@ -128,7 +136,13 @@ export const stockCountApi = {
 }
 
 export const purchaseRequestApi = {
-  list: (params?: { storeId?: string; status?: PurchaseRequestStatus }) => http.get<PurchaseRequest[]>('/inventory/purchase-requests', { params }).then((r) => r.data),
+  list: (params?: { storeId?: string; status?: PurchaseRequestStatus; kind?: PurchaseRequestKind }) => http.get<PurchaseRequest[]>('/inventory/purchase-requests', { params }).then((r) => r.data),
+  /** 部门负责人新建部门申购单（submit=true 直接提交给客服汇总） */
+  createDepartment: (body: { items: PurchaseRequestLineBody[]; remark?: string; storeId?: string; submit?: boolean }) =>
+    http.post<PurchaseRequest>('/inventory/purchase-requests/department', body).then((r) => r.data),
+  /** 客服汇总：把勾选的已提交部门申购单合成一张汇总申购单 */
+  collect: (ids: string[], remark?: string) => http.post<PurchaseRequest>('/inventory/purchase-requests/collect', { ids, remark }).then((r) => r.data),
+  recall: (id: string, version: number) => http.post<PurchaseRequest>(`/inventory/purchase-requests/${id}/recall`, { version }).then((r) => r.data),
   get: (id: string) => http.get<PurchaseRequest>(`/inventory/purchase-requests/${id}`).then((r) => r.data),
   importPreview: (file: File) => {
     const form = new FormData()

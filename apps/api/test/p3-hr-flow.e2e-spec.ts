@@ -61,8 +61,11 @@ describe('P3 人事域：员工档案+排班+提成+薪资单 (e2e)', () => {
     await request(server)
       .post(`/api/v1/workflow/instances/${instanceId}/approve`)
       .set(authed(otherStoreManagerToken))
-      .send({ comment: '（另一门店店长）一并批准' })
-      .expect(201);
+      .send({ comment: '（另一门店店长）不应该能批' })
+      .expect((res) => {
+        // 审批人按门店范围解析：另一门店的店长不是本店单据的审批人——单节点流程已通过(409)，多级流程里已轮到下一级(403)
+        if (![403, 409].includes(res.status)) throw new Error(`另一门店店长不应能审批，实际 ${res.status}`);
+      });
   }
 
   async function findInstanceId(businessType: string, businessId: string): Promise<string> {
