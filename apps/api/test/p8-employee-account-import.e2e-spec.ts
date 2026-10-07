@@ -32,7 +32,7 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
     expect(r.status).toBe(code);
     return r;
   };
-  const PHONES = ['19900000001', '19900000002', '19900000003', '19900000006', '19900000008', '19900000011', '19900000012'];
+  const PHONES = ['19900000001', '19900000002', '19900000003', '19900000006', '19900000008', '19900000011', '19900000012', '19900000020'];
 
   async function cleanup() {
     const accounts = await prisma.account.findMany({ where: { phone: { in: PHONES } }, select: { id: true } });
@@ -201,5 +201,16 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
     expect(back).toMatchObject({ status: 'ACTIVE', employeeNo: 'IMP-013', activeEmployeeNo: 'IMP-013', archivedAt: null });
     await login('19900000011', 'banyuexuan').expect(201);
     await request(server).patch(`/api/v1/hr/employee-profiles/${profileId}`).set(authed(adminToken)).send({ address: '恢复后可以改了', version: back.version }).expect(200);
+  });
+  it('7. 用户名或手机号都能登录：用户名和手机号不同的账号，用手机号（带空格/横线/+86）也能登录；错误密码和停用账号仍被拒绝', async () => {
+    const acc = (await request(server).post('/api/v1/platform/accounts').set(authed(adminToken)).send({ username: 'loginbyphone_x', realName: '手机号登录测试', password: 'banyuexuan', phone: '19900000020', storeId }).expect(201)).body as Json;
+    for (const key of ['loginbyphone_x', '19900000020', '199-0000-0020', ' 199 0000 0020 ', '+8619900000020']) {
+      const res = (await login(key, 'banyuexuan').expect(201)).body as Json;
+      expect(res.account.id).toBe(acc.id);
+    }
+    await login('19900000020', 'wrong-pass').expect(401);
+    await login('19900000099', 'banyuexuan').expect(401); // 不存在的手机号
+    await prisma.account.update({ where: { id: acc.id }, data: { status: 'DISABLED' } });
+    await login('19900000020', 'banyuexuan').expect(401);
   });
 });

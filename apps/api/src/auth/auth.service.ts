@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PasswordService } from './password.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { PermissionLookupService } from '../common/context/permission-lookup.service';
+import { normalizeMobile } from '../common/utils/employee-no.util';
 
 interface RequestMeta {
   ip?: string;
@@ -32,13 +33,19 @@ export class AuthService {
   ) {}
 
   async login(username: string, password: string, meta: RequestMeta) {
-    const account = await this.prisma.account.findFirst({ where: { username } });
+    // 用户名或手机号都能登录：先按用户名找（管理员 admin 等），找不到再按手机号找（手机号在同一租户内唯一）
+    const key = username.trim();
+    let account = await this.prisma.account.findFirst({ where: { username: key } });
+    if (!account) {
+      const phone = normalizeMobile(key);
+      if (phone) account = await this.prisma.account.findFirst({ where: { phone } });
+    }
 
     if (!account || account.status !== 'ACTIVE') {
       await this.auditLogService.record({
         action: 'LOGIN_FAILED',
         entityType: 'Account',
-        remark: `username=${username}`,
+        remark: `username=${key}`,
         result: 'FAILURE',
         ip: meta.ip,
         userAgent: meta.userAgent,
