@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NCard,
@@ -82,6 +82,32 @@ const activeTab = ref<string>(TAB_NAMES.includes(String(route.query.tab)) ? Stri
 watch(activeTab, (name) => {
   if (route.query.tab !== name) router.replace({ query: { ...route.query, tab: name } })
 })
+// 子页面不再做成横向滑动：电脑上是左侧竖排菜单；手机上是“当前页 ▾”点开后上下排列的列表
+const TAB_LABELS: { name: string; label: string }[] = [
+  { name: 'overview', label: '概览' },
+  { name: 'admission', label: '入所评估' },
+  { name: 'plans', label: '护理计划' },
+  { name: 'services', label: '服务执行' },
+  { name: 'daily', label: '日常护理记录' },
+  { name: 'medication', label: '用药委托书' },
+  { name: 'discharge', label: '出所评估' },
+  { name: 'summary', label: '出所小结' },
+  { name: 'risk', label: '风险告知书' },
+  { name: 'orientation', label: '入所宣教' },
+  { name: 'choking', label: '呛奶应急预案' },
+  { name: 'outreach', label: '离店后关怀' },
+]
+const mql = window.matchMedia('(max-width: 767px)')
+const isMobile = ref(mql.matches)
+const onMql = (e: MediaQueryListEvent) => (isMobile.value = e.matches)
+mql.addEventListener('change', onMql)
+onBeforeUnmount(() => mql.removeEventListener('change', onMql))
+const menuOpen = ref(false)
+const activeLabel = computed(() => TAB_LABELS.find((t) => t.name === activeTab.value)?.label ?? '')
+function pickTab(name: string) {
+  activeTab.value = name
+  menuOpen.value = false
+}
 const mother = ref<MotherProfile | null>(null)
 const motherRiskTags = ref<TagBinding[]>([])
 const babyRiskTags = ref<Record<string, TagBinding[]>>({})
@@ -600,7 +626,17 @@ onMounted(fetchAll)
 
 <template>
   <div v-if="mother">
-    <n-tabs v-model:value="activeTab" type="line" animated display-directive="show:lazy">
+    <!-- 手机：当前子页面 + 点开后上下排列的完整列表 -->
+    <div v-if="isMobile" class="cp-mmenu">
+      <div class="cp-mcur" @click="menuOpen = !menuOpen">
+        <span>{{ activeLabel }}</span>
+        <span class="cp-hint">{{ menuOpen ? '收起 ▴' : '切换子页面 ▾' }}</span>
+      </div>
+      <div v-if="menuOpen" class="cp-mlist">
+        <div v-for="t in TAB_LABELS" :key="t.name" class="cp-mitem" :class="{ 'cp-mon': t.name === activeTab }" @click="pickTab(t.name)">{{ t.label }}</div>
+      </div>
+    </div>
+    <n-tabs v-model:value="activeTab" :placement="isMobile ? 'top' : 'left'" :class="{ 'cp-nonav': isMobile }" type="line" animated display-directive="show:lazy">
       <n-tab-pane name="overview" tab="概览">
     <n-card :title="'母婴档案'" style="margin-bottom: 16px">
       <template #header-extra>
@@ -925,3 +961,49 @@ onMounted(fetchAll)
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+.cp-mmenu {
+  margin-bottom: 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.cp-mcur {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: #1f3a5f;
+}
+.cp-hint {
+  color: #999;
+  font-size: 12px;
+  font-weight: 400;
+}
+.cp-mlist {
+  border-top: 1px solid #f0f0f0;
+}
+.cp-mitem {
+  padding: 13px 14px;
+  border-bottom: 1px solid #f6f6f6;
+  font-size: 15px;
+}
+.cp-mitem:last-child {
+  border-bottom: none;
+}
+.cp-mon {
+  background: #eef7f0;
+  color: #18a058;
+  font-weight: 600;
+}
+/* 手机上用自己的竖排列表，隐藏 naive 自带的标签栏 */
+.cp-nonav :deep(.n-tabs-nav) {
+  display: none;
+}
+:deep(.n-tabs.n-tabs--left .n-tabs-nav) {
+  min-width: 120px;
+}
+</style>
