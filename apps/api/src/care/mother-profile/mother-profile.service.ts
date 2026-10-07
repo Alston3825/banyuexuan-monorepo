@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MotherProfile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { replaceRiskTags } from '../risk-tag.util';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
@@ -81,7 +82,25 @@ export class MotherProfileService {
   }
 
   async getRiskTags(entityType: 'MOTHER_PROFILE' | 'BABY_PROFILE', entityId: string) {
-    return this.prisma.tagBinding.findMany({ where: { entityType, entityId }, include: { tag: true } });
+    return this.prisma.tagBinding.findMany({ where: { entityType, entityId, revokedAt: null }, include: { tag: true } });
+  }
+
+  /** 编辑母婴档案的风险标签（整体替换；只允许母婴风险分类的标签，误选的客户分类/类型会被撤掉）。 */
+  async setRiskTags(id: string, tagIds: string[]) {
+    await this.findOneOrThrow(id);
+    const r = await replaceRiskTags(this.prisma, { tenantId: this.ctx.tenantId!, accountId: this.ctx.accountId!, entityType: 'MOTHER_PROFILE', entityId: id, tagIds });
+    await this.auditLogService.record({
+      action: 'UPDATE',
+      entityType: 'MotherProfile',
+      entityId: id,
+      remark: `修改风险标签：新增 ${r.added.length} 个，撤销 ${r.removed.length} 个`,
+      tenantId: this.ctx.tenantId,
+      accountId: this.ctx.accountId,
+      ip: this.ctx.ip,
+      userAgent: this.ctx.userAgent,
+      requestId: this.ctx.requestId,
+    });
+    return this.getRiskTags('MOTHER_PROFILE', id);
   }
 
   private async assertTagsExist(tagIds: string[]) {

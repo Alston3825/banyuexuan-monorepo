@@ -15,6 +15,7 @@ import type {
   Tag,
 } from '@prisma/client';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * P2 母婴履约深化 —— 护理域第一个切片端到端集成测试：护理字段/护理项目/护理方案
@@ -269,6 +270,31 @@ describe('P2 护理域：表单引擎+档案+计划+执行+异常 (e2e)', () => 
     expect(bindings).toHaveLength(1);
     expect(bindings[0].tagId).toBe(tagId);
     expect(bindings[0].entityType).toBe('MOTHER_PROFILE');
+  });
+
+  it('9b. 编辑风险标签：整体替换；误选的客户分类/类型标签被清掉；非母婴风险标签不能选；宝宝同理', async () => {
+    const prisma = app.get(PrismaService);
+    const tag2 = body<Tag>(await request(server).post('/api/v1/platform/tags').set(authed(adminToken)).send({ name: `E2E风险标签2-${runTag}`, category: 'CARE_RISK' }).expect(201));
+    const wrongTag = await prisma.tag.findFirstOrThrow({ where: { category: 'CUSTOMER_TYPE' } });
+    // 模拟历史上误选：把一个客户类型标签绑到母婴档案上
+    await prisma.tagBinding.create({ data: { tagId: wrongTag.id, entityType: 'MOTHER_PROFILE', entityId: motherProfileId, tenantId: wrongTag.tenantId, createdBy: 'E2E' } });
+    const before = body<{ tagId: string }[]>((await request(server).get(`/api/v1/care/mother-profiles/${motherProfileId}/risk-tags`).set(authed(adminToken)).expect(200)));
+    expect(before.map((b) => b.tagId)).toContain(wrongTag.id);
+
+    // 非母婴风险分类的标签不能选
+    const bad = await request(server).put(`/api/v1/care/mother-profiles/${motherProfileId}/risk-tags`).set(authed(adminToken)).send({ tagIds: [tagId, wrongTag.id] }).expect(400);
+    expect(bad.body.message).toContain('不是母婴风险标签');
+
+    const saved = body<{ tagId: string }[]>((await request(server).put(`/api/v1/care/mother-profiles/${motherProfileId}/risk-tags`).set(authed(adminToken)).send({ tagIds: [tagId, tag2.id] }).expect(200)));
+    expect(saved.map((b) => b.tagId).sort()).toEqual([tagId, tag2.id].sort()); // 误选的客户类型已被撤掉
+    expect(await prisma.tagBinding.count({ where: { entityType: 'MOTHER_PROFILE', entityId: motherProfileId, tagId: wrongTag.id, revokedAt: { not: null } } })).toBe(1); // 保留历史，不是物理删除
+
+    // 宝宝：清空
+    const cleared = body<unknown[]>((await request(server).put(`/api/v1/care/baby-profiles/${babyProfileAId}/risk-tags`).set(authed(adminToken)).send({ tagIds: [] }).expect(200)));
+    expect(cleared).toHaveLength(0);
+    // 恢复，不影响后面的用例
+    await request(server).put(`/api/v1/care/baby-profiles/${babyProfileAId}/risk-tags`).set(authed(adminToken)).send({ tagIds: [tagId] }).expect(200);
+    await request(server).put(`/api/v1/care/mother-profiles/${motherProfileId}/risk-tags`).set(authed(adminToken)).send({ tagIds: [tagId] }).expect(200);
   });
 
   it('10. 补建第三条宝宝档案：sequenceNo 自动递增为3', async () => {

@@ -108,6 +108,25 @@ function pickTab(name: string) {
   activeTab.value = name
   menuOpen.value = false
 }
+// ---------------- 编辑妈妈的风险标签 ----------------
+const mrtVisible = ref(false)
+const mrtSaving = ref(false)
+const mrtIds = ref<string[]>([])
+const motherWrongTags = computed(() => motherRiskTags.value.filter((b) => b.tag.category !== 'CARE_RISK'))
+function openMotherTags() {
+  mrtIds.value = motherRiskTags.value.filter((b) => b.tag.category === 'CARE_RISK').map((b) => b.tagId)
+  mrtVisible.value = true
+}
+async function saveMotherTags() {
+  mrtSaving.value = true
+  try {
+    motherRiskTags.value = await motherProfileApi.setRiskTags(motherProfileId, mrtIds.value)
+    mrtVisible.value = false
+    message.success('风险标签已更新')
+  } finally {
+    mrtSaving.value = false
+  }
+}
 const mother = ref<MotherProfile | null>(null)
 const motherRiskTags = ref<TagBinding[]>([])
 const babyRiskTags = ref<Record<string, TagBinding[]>>({})
@@ -260,9 +279,12 @@ function openEditBaby(baby: BabyProfile) {
     birthWeightGrams: baby.birthWeightGrams ?? undefined,
     apgarScore: baby.apgarScore ?? '',
     remark: baby.remark ?? '',
+    // 只带出母婴风险分类的标签；误选的客户分类/类型标签保存时会被清掉
+    riskTagIds: (babyRiskTags.value[baby.id] ?? []).filter((b) => b.tag.category === 'CARE_RISK').map((b) => b.tagId),
   }
   babyVisible.value = true
 }
+const babyWrongTags = computed(() => (editingBaby.value ? (babyRiskTags.value[editingBaby.value.id] ?? []).filter((b) => b.tag.category !== 'CARE_RISK') : []))
 
 async function handleBabySubmit() {
   babySubmitting.value = true
@@ -277,6 +299,7 @@ async function handleBabySubmit() {
         remark: babyModel.value.remark || undefined,
         version: editingBaby.value.version,
       })
+      await babyProfileApi.setRiskTags(editingBaby.value.id, babyModel.value.riskTagIds ?? [])
       message.success('宝宝档案已更新')
     } else {
       await babyProfileApi.create({ motherProfileId, ...babyModel.value })
@@ -652,6 +675,7 @@ onMounted(fetchAll)
           <n-space size="small">
             <n-tag v-for="b in motherRiskTags" :key="b.id" size="small" :color="{ color: b.tag.color ?? undefined }">{{ b.tag.name }}</n-tag>
             <span v-if="motherRiskTags.length === 0">-</span>
+            <a style="cursor: pointer; color: #2080f0; font-size: 12px" @click="openMotherTags">编辑风险标签</a>
           </n-space>
         </n-descriptions-item>
         <n-descriptions-item label="主责护理师" :span="2">
@@ -755,6 +779,22 @@ onMounted(fetchAll)
       </n-tab-pane>
     </n-tabs>
 
+    <!-- 编辑妈妈的风险标签 -->
+    <n-modal :show="mrtVisible" @update:show="(v) => (mrtVisible = v)">
+      <n-card title="编辑风险标签" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+        <p v-if="motherWrongTags.length" style="margin: 0 0 10px; color: #d9822b; font-size: 13px; line-height: 1.7">
+          这份档案上有不属于风险标签的标签：{{ motherWrongTags.map((b) => b.tag.name).join('、') }}（销售用的客户分类/客户类型，被误选进来了）。点“保存”后会自动清掉。
+        </p>
+        <n-select v-model:value="mrtIds" multiple :options="tagOptions" placeholder="早产 / 传染病 / 高敏 / 妈咪住院…（可多选，清空则没有风险标签）" />
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="mrtVisible = false">取消</n-button>
+            <n-button type="primary" :loading="mrtSaving" @click="saveMotherTags">保存</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
     <!-- 管理员：连同评估表/纸质资料一起删除宝宝档案 -->
     <n-modal :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
       <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
@@ -822,8 +862,9 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item label="出生体重(g)"><n-input-number v-model:value="babyModel.birthWeightGrams" style="width: 100%" /></n-form-item>
           <n-form-item label="Apgar评分"><n-input v-model:value="babyModel.apgarScore" placeholder="如 9-10" /></n-form-item>
-          <n-form-item v-if="!editingBaby" label="风险标签">
+          <n-form-item label="风险标签">
             <n-select v-model:value="babyModel.riskTagIds" multiple :options="tagOptions" placeholder="早产/住院/托管等" />
+            <template v-if="babyWrongTags.length" #feedback>以下标签不是风险标签，保存后会被清掉：{{ babyWrongTags.map((b) => b.tag.name).join('、') }}</template>
           </n-form-item>
           <n-form-item label="备注"><n-input v-model:value="babyModel.remark" type="textarea" /></n-form-item>
         </n-form>

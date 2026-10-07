@@ -66,6 +66,8 @@ export const motherProfileApi = {
   update: (id: string, body: UpdateMotherProfileDto) =>
     http.patch<MotherProfile>(`/care/mother-profiles/${id}`, body).then((r) => r.data),
   riskTags: (id: string) => http.get<TagBinding[]>(`/care/mother-profiles/${id}/risk-tags`).then((r) => r.data),
+  /** 编辑风险标签：整体改成 tagIds（只能是母婴风险分类的标签） */
+  setRiskTags: (id: string, tagIds: string[]) => http.put<TagBinding[]>(`/care/mother-profiles/${id}/risk-tags`, { tagIds }).then((r) => r.data),
   nurseOptions: (storeId?: string) =>
     http.get<{ id: string; name: string; roles: string[]; isNurse: boolean }[]>('/care/mother-profiles/nurse-options', { params: { storeId } }).then((r) => r.data),
 }
@@ -78,6 +80,7 @@ export const babyProfileApi = {
   update: (id: string, body: UpdateBabyProfileDto) =>
     http.patch<BabyProfile>(`/care/baby-profiles/${id}`, body).then((r) => r.data),
   riskTags: (id: string) => http.get<TagBinding[]>(`/care/baby-profiles/${id}/risk-tags`).then((r) => r.data),
+  setRiskTags: (id: string, tagIds: string[]) => http.put<TagBinding[]>(`/care/baby-profiles/${id}/risk-tags`, { tagIds }).then((r) => r.data),
   /** 删除前检查：名下有哪些数据、能不能删、当前账号能不能连数据一起删 */
   deleteCheck: (id: string) =>
     http.get<{ babyId: string; babyName: string; blockers: string[]; attached: string[]; canForceDelete: boolean }>(`/care/baby-profiles/${id}/delete-check`).then((r) => r.data),

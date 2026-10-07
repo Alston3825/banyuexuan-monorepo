@@ -1,10 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { IsArray, IsString } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { BabyProfileService } from './baby-profile.service';
 import { CreateBabyProfileDto } from './dto/create-baby-profile.dto';
 import { UpdateBabyProfileDto } from './dto/update-baby-profile.dto';
 import { QueryBabyProfileDto } from './dto/query-baby-profile.dto';
+
+class SetBabyRiskTagsDto {
+  @IsArray() @IsString({ each: true }) tagIds: string[];
+}
 
 @ApiTags('care/baby-profile')
 @Controller('care/baby-profiles')
@@ -27,6 +32,13 @@ export class BabyProfileController {
   @RequirePermission('care.profile.view')
   riskTags(@Param('id') id: string) {
     return this.babyProfileService.getRiskTags(id);
+  }
+
+  /** 编辑宝宝的风险标签：整体改成 tagIds（只能是母婴风险分类的标签） */
+  @Put(':id/risk-tags')
+  @RequirePermission('care.profile.update')
+  setRiskTags(@Param('id') id: string, @Body() dto: SetBabyRiskTagsDto) {
+    return this.babyProfileService.setRiskTags(id, dto.tagIds);
   }
 
   @Post()
