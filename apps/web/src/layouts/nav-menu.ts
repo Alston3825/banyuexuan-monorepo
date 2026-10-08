@@ -241,15 +241,6 @@ const navGroups: NavGroup[] = [
     items: [{ label: '知识库文档', to: '/ai/knowledge-documents', icon: LibraryOutline, perm: 'ai.knowledge-document' }],
   },
   {
-    label: '设备网关',
-    key: 'group-iot',
-    items: [
-      { label: '设备台账', to: '/iot/devices', icon: HardwareChipOutline, perm: 'iot.device-registry' },
-      { label: '事件与模拟', to: '/iot/device-events', icon: HardwareChipOutline, perm: 'iot.device-event' },
-      { label: '设备类型', to: '/iot/device-types', icon: HardwareChipOutline, perm: 'iot.device-type' },
-    ],
-  },
-  {
     label: '培训与考核',
     key: 'group-training',
     items: [
@@ -282,14 +273,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '基础资料',
-    key: 'group-base',
-    items: [
-      { label: '标签管理', to: '/base/tags', icon: Pricetags, perm: 'platform.tag' },
-      { label: '参数配置', to: '/base/parameters', icon: Options, perm: 'platform.parameter' },
-    ],
-  },
-  {
     label: '审批流程',
     key: 'group-workflow',
     items: [
@@ -297,10 +280,24 @@ const navGroups: NavGroup[] = [
       { label: '流程设置', to: '/workflow/settings', icon: List, perm: 'workflow.definition' },
     ],
   },
+  {
+    // 设备网关、基础资料（标签/参数）、审计日志都是超级管理员/总部才用的后台功能，合并成一个入口，
+    // 菜单里不再各占一个分组；权限不变（按各自权限点显示，没有权限的项自动隐藏）。
+    label: '系统管理',
+    key: 'group-system',
+    items: [
+      { label: '设备台账', to: '/iot/devices', icon: HardwareChipOutline, perm: 'iot.device-registry' },
+      { label: '设备事件与模拟', to: '/iot/device-events', icon: HardwareChipOutline, perm: 'iot.device-event' },
+      { label: '设备类型', to: '/iot/device-types', icon: HardwareChipOutline, perm: 'iot.device-type' },
+      { label: '标签管理', to: '/base/tags', icon: Pricetags, perm: 'platform.tag' },
+      { label: '参数配置', to: '/base/parameters', icon: Options, perm: 'platform.parameter' },
+      { label: '审计日志', to: '/audit-logs', icon: DocumentText, perm: 'audit.log' },
+    ],
+  },
 ]
 
 /** 不属于任何分组、直接挂在菜单最外层的单个入口 */
-const standaloneItems: NavLeaf[] = [{ label: '审计日志', to: '/audit-logs', icon: DocumentText, perm: 'audit.log' }]
+const standaloneItems: NavLeaf[] = []
 
 /** 全部菜单项的 (路由path -> 所需权限code) 映射，供路由守卫复用，跟这里的菜单显示逻辑
  *  保持完全一致——避免"菜单里看不到，但直接输URL还是能进"这种两套判断口径不一致的情况。 */
