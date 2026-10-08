@@ -110,6 +110,7 @@ export class RoleService {
    */
   async grantPermission(roleId: string, permissionPointId: string) {
     await this.assertMutable(roleId);
+    await this.assertCanGrant([permissionPointId]);
     const grant = await this.prisma.roleOnPermission.upsert({
       where: { roleId_permissionPointId: { roleId, permissionPointId } },
       update: {},
@@ -143,6 +144,7 @@ export class RoleService {
   async changePermissions(roleId: string, grant: string[], revoke: string[]) {
     await this.assertMutable(roleId);
     const g = [...new Set(grant)].filter((id) => !revoke.includes(id));
+    await this.assertCanGrant(g);
     const r = [...new Set(revoke)];
     if (g.length + r.length > 1000) throw new BadRequestException('一次最多调整 1000 个权限点');
     const known = await this.prisma.permissionPoint.findMany({ where: { id: { in: [...g, ...r] } }, select: { id: true } });
@@ -162,6 +164,15 @@ export class RoleService {
       ...this.auditCtx(),
     });
     return { granted: toCreate.length, revoked: r.length };
+  }
+
+  /** 防越权：只能授予自己已经拥有的权限点（否则有“角色管理”权限的人能给自己的角色加任意权限）。超级管理员拥有全部，不受影响。 */
+  private async assertCanGrant(permissionPointIds: string[]) {
+    if (permissionPointIds.length === 0) return;
+    const mine = await this.ctx.getPermissionCodes();
+    const points = await this.prisma.permissionPoint.findMany({ where: { id: { in: permissionPointIds } }, select: { code: true, name: true } });
+    const over = points.filter((p) => !mine.has(p.code));
+    if (over.length > 0) throw new ForbiddenException(`不能授予你自己都没有的权限（如「${over[0].name}」等共 ${over.length} 项），请联系管理员处理`);
   }
 
   /** 内置系统角色（如 SUPER_ADMIN）不可改名/删除/调整权限，保护平台最小可用性。 */

@@ -62,7 +62,9 @@ http.interceptors.response.use(
     if (status === 403) {
       showMessage(() => message.warning(msg ?? '无权限执行该操作'))
     } else if (status === 409) {
-      showMessage(() => message.error(msg ?? '数据已被他人修改，请刷新页面后重试'))
+      // “数据已被他人修改”：你打开编辑窗口之后，这条数据又被别人（或你在别的页面）改过了，系统不让旧数据覆盖新数据
+      const stale = !msg || msg.includes('数据已被他人修改') || msg.includes('数据并发修改')
+      showMessage(() => message.error(stale ? '这条数据刚刚被改过（可能是别人，也可能是你在另一个页面）。请点“取消”关掉窗口，刷新页面后再编辑一次' : msg, stale ? { duration: 8000, closable: true } : undefined))
     } else if (status === 422 || status === 400) {
       showMessage(() => message.error(msg ?? '请求参数有误'))
     } else if (status && status >= 500) {

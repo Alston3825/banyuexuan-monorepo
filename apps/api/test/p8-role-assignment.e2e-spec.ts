@@ -104,4 +104,23 @@ describe('P8 角色分配规则 (e2e)', () => {
     expect((await detail()).roleAssignments.some((x: Json) => x.id === target.id)).toBe(false);
     await assign(adminToken, { roleId: target.roleId, scopeType: target.scopeType, scopeIds: target.scopeId ? [target.scopeId] : [] }).expect(201);
   });
+  it('5. 防越权：有“角色管理”权限的人不能给角色加自己没有的权限；超级管理员不受限', async () => {
+    // 临时给店长账号的角色一个“角色管理”权限，模拟“部门负责人被勾了角色管理”的情况
+    const mgrRole = await prisma.role.findFirstOrThrow({ where: { code: 'STORE_MANAGER' } });
+    const upd = await prisma.permissionPoint.findFirstOrThrow({ where: { code: 'platform.role.update' } });
+    const view = await prisma.permissionPoint.findFirstOrThrow({ where: { code: 'platform.role.view' } });
+    const given = await prisma.roleOnPermission.createMany({ data: [upd, view].map((p) => ({ roleId: mgrRole.id, permissionPointId: p.id, createdBy: 'E2E' })), skipDuplicates: true });
+    try {
+      const mgr = ((await request(server).post('/api/v1/auth/login').send({ username: 'store_manager', password: 'Passw0rd!23' }).expect(201)).body as Json).accessToken as string;
+      const target = (await request(server).post('/api/v1/platform/roles').set(authed(adminToken)).send({ code: `ESC${Date.now().toString().slice(-6)}`, name: '越权测试角色' }).expect(201)).body as Json;
+      const notMine = await prisma.permissionPoint.findFirstOrThrow({ where: { code: 'platform.store.delete' } }); // 店长故意没有
+      const res = await request(server).put(`/api/v1/platform/roles/${target.id}/permissions`).set(authed(mgr)).send({ grant: [notMine.id], revoke: [] }).expect(403);
+      expect(res.body.message).toContain('不能授予你自己都没有的权限');
+      await request(server).put(`/api/v1/platform/roles/${target.id}/permissions`).set(authed(mgr)).send({ grant: [view.id], revoke: [] }).expect(200); // 自己有的可以
+      await request(server).put(`/api/v1/platform/roles/${target.id}/permissions`).set(authed(adminToken)).send({ grant: [notMine.id], revoke: [] }).expect(200); // 超管可以
+      await request(server).delete(`/api/v1/platform/roles/${target.id}`).set(authed(adminToken));
+    } finally {
+      if (given.count > 0) await prisma.roleOnPermission.deleteMany({ where: { roleId: mgrRole.id, permissionPointId: { in: [upd.id, view.id] }, createdBy: 'E2E' } });
+    }
+  });
 });
