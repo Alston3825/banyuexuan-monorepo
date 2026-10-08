@@ -53,10 +53,11 @@ onMounted(load)
           </div>
         </div>
         <n-space v-if="data" :wrap="true">
-          <n-button size="large" @click="linkDlg = true">发给客户确认</n-button>
+          <n-button size="large" @click="linkDlg = true">发给客户确认（最近 7 天）</n-button>
           <n-button type="primary" size="large" @click="open(data.today)">{{ todayRow?.filled ? '查看 / 修改今天' : '填写今天的记录' }}</n-button>
         </n-space>
       </div>
+      <div class="dl-sub" style="margin-top: 6px">“发给客户确认”发的是一个链接，不只是今天：客户打开后能看到<b>最近 7 天已填写</b>的服务报告，逐天确认并给护理师打分。没填的日期客户看不到，超过 7 天的不能再补确认。</div>
     </n-card>
 
     <div class="dl-list">
