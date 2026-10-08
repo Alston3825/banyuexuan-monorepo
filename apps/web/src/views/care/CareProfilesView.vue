@@ -15,6 +15,8 @@ import {
   NSelect,
   NDatePicker,
   NDynamicInput,
+  NRadioButton,
+  NRadioGroup,
   type DataTableColumns,
 } from 'naive-ui'
 import { motherProfileApi } from '../../api/modules/care.api'
@@ -27,6 +29,8 @@ import type { RoomOccupancy } from '../../api/types/room-occupancy'
 import type { Tag } from '../../api/types/tag'
 import { BABY_GENDER_LABEL_MAP, DELIVERY_METHOD_LABEL_MAP } from '../../utils/status-map'
 import { message } from '../../utils/discrete-api'
+import { useAuthStore } from '../../stores/auth'
+import RecordRemovalDialog from '../../components/crm/RecordRemovalDialog.vue'
 
 const router = useRouter()
 
@@ -82,10 +86,20 @@ async function onCustomerChange(customerId: string | null) {
     : []
 }
 
+const auth = useAuthStore()
+// 在用 / 已归档（有护理记录的档案不能删，只能归档；归档的默认不显示，可恢复）
+const view = ref<'active' | 'archived'>('active')
+const removal = ref<{ id: string; label: string } | null>(null)
+const removalShow = ref(false)
+function openRemoval(row: MotherProfile) {
+  removal.value = { id: row.id, label: nameOf(row) }
+  removalShow.value = true
+}
+
 async function fetchAll() {
   loading.value = true
   try {
-    const [profiles, customerList, tagList] = await Promise.all([motherProfileApi.list(), customerApi.list(), tagApi.list()])
+    const [profiles, customerList, tagList] = await Promise.all([motherProfileApi.list(view.value === 'archived' ? { archived: 'only' } : undefined), customerApi.list(), tagApi.list()])
     rows.value = profiles
     customers.value = customerList
     tags.value = tagList
@@ -184,8 +198,16 @@ const columns: DataTableColumns<MotherProfile> = [
   {
     key: 'actions',
     title: '操作',
-    width: 90,
-    render: (row) => h(NButton, { size: 'small', type: 'primary', onClick: () => router.push(`/care/profiles/${row.id}`) }, { default: () => '打开档案' }),
+    width: 190,
+    render: (row) =>
+      h(NSpace, null, {
+        default: () => [
+          h(NButton, { size: 'small', type: 'primary', onClick: () => router.push(`/care/profiles/${row.id}`) }, { default: () => '打开档案' }),
+          ...(auth.hasAccess('care.profile.update')
+            ? [h(NButton, { size: 'small', type: row.archivedAt ? 'primary' : 'warning', ghost: true, onClick: () => openRemoval(row) }, { default: () => (row.archivedAt ? '恢复/删除' : '归档/删除') })]
+            : []),
+        ],
+      }),
   },
 ]
 
@@ -195,7 +217,13 @@ onMounted(fetchAll)
 <template>
   <div>
     <n-space justify="space-between" :wrap="true" style="margin-bottom: 12px">
-      <n-input v-model:value="keyword" clearable placeholder="按房号 / 客户 / 手机 / 宝宝名搜索" style="width: min(320px, 94vw)" />
+      <n-space>
+        <n-input v-model:value="keyword" clearable placeholder="按房号 / 客户 / 手机 / 宝宝名搜索" style="width: min(320px, 94vw)" />
+        <n-radio-group v-model:value="view" @update:value="fetchAll">
+          <n-radio-button value="active">在用</n-radio-button>
+          <n-radio-button value="archived">已归档</n-radio-button>
+        </n-radio-group>
+      </n-space>
       <n-button type="primary" @click="openCreateModal">建立母婴档案</n-button>
     </n-space>
 
@@ -209,10 +237,15 @@ onMounted(fetchAll)
         </div>
         <div v-for="b in r.babies" :key="b.id" class="cp-baby">👶 {{ babyLine(b) }}</div>
         <div v-if="r.babies.length === 0" class="cp-baby cp-baby-none">尚未登记宝宝</div>
+        <div v-if="auth.hasAccess('care.profile.update')" style="margin-top: 6px" @click.stop>
+          <n-button size="tiny" :type="r.archivedAt ? 'primary' : 'warning'" ghost @click="openRemoval(r)">{{ r.archivedAt ? '恢复/删除' : '归档/删除' }}</n-button>
+        </div>
       </div>
       <n-empty v-if="!loading && filtered.length === 0" description="没有找到对应的母婴档案" />
     </div>
     <n-data-table v-else :columns="columns" :data="filtered" :loading="loading" :row-key="(r: MotherProfile) => r.id" :scroll-x="860" />
+
+    <record-removal-dialog v-if="removal" v-model:show="removalShow" kind="mother" :id="removal.id" :label="removal.label" @done="fetchAll" />
 
     <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="建立母婴档案" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">

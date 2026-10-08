@@ -8,6 +8,8 @@ export type CustomerServiceType = 'MATERNITY_ROOM' | 'CONFINEMENT_NANNY' | 'MEAL
 export type ReferrerType = 'CUSTOMER' | 'ACCOUNT'
 
 export interface Customer extends ScopedEntityBase {
+  /** 已归档的客户（用过的客户不删，只归档；可恢复） */
+  archivedAt?: string | null
   customerNo: string
   name: string
   phone: string
@@ -128,7 +130,26 @@ export interface CustomerChannel extends ScopedEntityBase {
   customerCount: number
 }
 
+/** 删除/归档前检查结果（客户、母婴档案共用） */
+export interface RemovalCheck {
+  customerName: string
+  /** 财务/医疗痕迹：不能删，只能归档 */
+  blockers: string[]
+  /** 录入类资料：管理员输入姓名确认后连同删除 */
+  attached: string[]
+  /** 客户：关联的线索数（删除时只解除关联） */
+  linkedLeads?: number
+  /** 客户：有没有“删除客户”权限 */
+  canDelete?: boolean
+  canForceDeleteCare?: boolean
+  /** 母婴档案：有没有“强制删除档案”权限 */
+  canForceDelete?: boolean
+  archived: boolean
+}
+
 export interface QueryCustomerParams {
+  /** 不传=只看在用；only=只看已归档；all=全部 */
+  archived?: 'only' | 'all'
   assignedToId?: string
   primaryStoreId?: string
   keyword?: string

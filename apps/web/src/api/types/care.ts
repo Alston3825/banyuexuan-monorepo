@@ -179,6 +179,7 @@ export interface UpdateBabyProfileDto {
 }
 
 export interface MotherProfile extends ScopedEntityBase {
+  archivedAt?: string | null
   storeId: string
   customerId: string
   occupancyId: string | null

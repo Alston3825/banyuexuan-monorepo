@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Customer, Prisma, ReferrerType } from '@prisma/client';
 import { pinyin } from 'pinyin-pro';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,6 +7,8 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { checkIdCard } from '../../common/utils/id-card.util';
+import { CareStorageService } from '../../care/care-document/care-storage.service';
+import { deleteMotherProfilesTx, motherProfilesDeleteCheck } from '../../care/profile-delete.util';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
@@ -22,6 +24,7 @@ export class CustomerService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly storage: CareStorageService,
   ) {}
 
   findMany(query: QueryCustomerDto): Promise<Customer[]> {
@@ -29,6 +32,8 @@ export class CustomerService {
       tenantId: this.ctx.tenantId,
       assignedToId: query.assignedToId,
       primaryStoreId: query.primaryStoreId,
+      // 已归档的默认不显示；archived=only 只看已归档，archived=all 全部
+      ...(query.archived === 'only' ? { archivedAt: { not: null } } : query.archived === 'all' ? {} : { archivedAt: null }),
       ...(query.keyword
         ? {
             OR: [
@@ -155,6 +160,129 @@ export class CustomerService {
   // ---------------- 校验 ----------------
 
   /** 手机号查重。"待补充"这类占位值不参与；再次入住的妈妈（二胎等）勾选 allow 后放行。 */
+  /** 新建预订/合同/母婴档案时用：已归档的客户不能再用，先恢复。 */
+  async assertActive(id: string): Promise<Customer> {
+    const customer = await this.findOneOrThrow(id);
+    if (customer.archivedAt) throw new ConflictException(`客户「${customer.name}」已归档，不能再新建业务；请先在客户管理里恢复该客户`);
+    return customer;
+  }
+
+  /**
+   * 删除前的检查：
+   * - blockers（有合同/入住预订/收款/会员账户/产康/用膳档案/护理痕迹）：财务和医疗痕迹，任何人都不能删，只能归档；
+   * - attached（母婴档案及其评估表资料、销售机会、跟进记录）：录入类资料，管理员输入客户姓名确认后连同删除；
+   * - linkedLeads：关联的线索不删，只解除关联。
+   */
+  async getDeleteCheck(id: string) {
+    const c = await this.findOneOrThrow(id);
+    if (c.tenantId !== this.ctx.tenantId) throw new NotFoundException(`Customer ${id} 不存在`);
+    const where = { customerId: id };
+    const [contracts, occupancies, payments, account, packages, appointments, diners, opportunities, linkedLeads, mothers] = await Promise.all([
+      this.prisma.contract.count({ where }),
+      this.prisma.roomOccupancy.count({ where }),
+      this.prisma.payment.count({ where }),
+      this.prisma.customerAccount.count({ where }),
+      this.prisma.customerServicePackage.count({ where }),
+      this.prisma.serviceAppointment.count({ where }),
+      this.prisma.dinerProfile.count({ where }),
+      this.prisma.salesOpportunity.findMany({ where, select: { id: true } }),
+      this.prisma.lead.count({ where }),
+      this.prisma.motherProfile.findMany({ where, select: { id: true } }),
+    ]);
+    const motherIds = mothers.map((m) => m.id);
+    const care = await motherProfilesDeleteCheck(this.prisma, motherIds);
+    const followUps = await this.prisma.followUpRecord.count({
+      where: { tenantId: this.ctx.tenantId, OR: [{ businessType: 'CUSTOMER', businessId: id }, { businessType: 'OPPORTUNITY', businessId: { in: opportunities.map((o) => o.id) } }] },
+    });
+    const blockers = [
+      contracts && `${contracts} 份合同`,
+      occupancies && `${occupancies} 条预订/入住记录`,
+      payments && `${payments} 笔收款`,
+      account && '会员账户',
+      packages && `${packages} 个已购服务包`,
+      appointments && `${appointments} 条产康预约`,
+      diners && `${diners} 个用膳档案`,
+      ...care.blockers,
+    ].filter(Boolean) as string[];
+    const attached = [
+      motherIds.length && `${motherIds.length} 份母婴档案`,
+      care.babyCount && `${care.babyCount} 个宝宝档案`,
+      ...care.attached,
+      opportunities.length && `${opportunities.length} 个销售机会`,
+      followUps && `${followUps} 条跟进记录`,
+    ].filter(Boolean) as string[];
+    return {
+      customerId: id,
+      customerName: c.name,
+      blockers,
+      attached,
+      linkedLeads,
+      canDelete: await this.ctx.hasPermission('crm.customer.delete'),
+      canForceDeleteCare: await this.ctx.hasPermission('care.profile.force-delete'),
+      archived: !!c.archivedAt,
+    };
+  }
+
+  /** 删除建错的客户：见 getDeleteCheck 的规则；需要 crm.customer.delete。 */
+  async remove(id: string, confirmName?: string): Promise<void> {
+    const check = await this.getDeleteCheck(id);
+    const before = await this.findOneOrThrow(id);
+    if (!check.canDelete) throw new ForbiddenException('删除客户需要管理员权限；不再使用的客户可以“归档”');
+    if (check.blockers.length > 0) {
+      throw new ConflictException(`该客户已有${check.blockers.join('、')}，属于财务/医疗痕迹，不能删除；不再使用请点“归档”`);
+    }
+    if (check.attached.length > 0) {
+      const hasCare = check.attached.some((a) => a.includes('母婴档案') || a.includes('宝宝'));
+      if (hasCare && !check.canForceDeleteCare) throw new ForbiddenException('该客户名下有母婴档案，连同删除需要“强制删除档案”权限，请联系管理员');
+      if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`该客户名下有${check.attached.join('、')}，删除会一并永久删除；请输入客户姓名「${check.customerName}」确认`);
+    }
+    const mothers = await this.prisma.motherProfile.findMany({ where: { customerId: id }, select: { id: true } });
+    const opps = await this.prisma.salesOpportunity.findMany({ where: { customerId: id }, select: { id: true } });
+    const docIds = await this.prisma.$transaction(async (tx) => {
+      const ids = await deleteMotherProfilesTx(tx, mothers.map((m) => m.id));
+      await tx.lead.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      await tx.followUpRecord.deleteMany({
+        where: { tenantId: this.ctx.tenantId, OR: [{ businessType: 'CUSTOMER', businessId: id }, { businessType: 'OPPORTUNITY', businessId: { in: opps.map((o) => o.id) } }] },
+      });
+      await tx.tagBinding.deleteMany({ where: { OR: [{ entityType: 'Customer', entityId: id }, { entityType: 'SalesOpportunity', entityId: { in: opps.map((o) => o.id) } }] } });
+      await tx.salesOpportunity.deleteMany({ where: { customerId: id } });
+      await tx.customer.updateMany({ where: { referrerType: 'CUSTOMER', referrerId: id }, data: { referrerType: null, referrerId: null } });
+      await tx.customer.delete({ where: { id } });
+      return ids;
+    });
+    for (const d of docIds) await this.storage.removeDocumentDir(d).catch(() => undefined);
+    await this.auditLogService.record({
+      action: 'DELETE',
+      entityType: 'Customer',
+      entityId: id,
+      beforeData: before,
+      remark: check.attached.length > 0 ? `管理员连同 ${check.attached.join('、')} 一起删除客户「${before.name}」` : `删除客户「${before.name}」`,
+      ...this.auditCtx(),
+    });
+  }
+
+  /** 归档客户（连同名下母婴档案一起归档）：列表默认隐藏、不能再新建预订/合同，可恢复。 */
+  async archive(id: string, reason?: string): Promise<void> {
+    const before = await this.findOneOrThrow(id);
+    if (before.archivedAt) throw new ConflictException('这个客户已经归档了');
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.customer.update({ where: { id }, data: { archivedAt: now, archivedBy: this.ctx.accountId, archiveReason: reason?.trim() || null, version: { increment: 1 } } }),
+      this.prisma.motherProfile.updateMany({ where: { customerId: id, archivedAt: null }, data: { archivedAt: now, archivedBy: this.ctx.accountId } }),
+    ]);
+    await this.auditLogService.record({ action: 'UPDATE', entityType: 'Customer', entityId: id, remark: `归档客户「${before.name}」${reason ? `：${reason}` : ''}`, ...this.auditCtx() });
+  }
+
+  async restore(id: string): Promise<void> {
+    const before = await this.findOneOrThrow(id);
+    if (!before.archivedAt) throw new ConflictException('这个客户没有归档');
+    await this.prisma.$transaction([
+      this.prisma.customer.update({ where: { id }, data: { archivedAt: null, archivedBy: null, archiveReason: null, version: { increment: 1 } } }),
+      this.prisma.motherProfile.updateMany({ where: { customerId: id }, data: { archivedAt: null, archivedBy: null } }),
+    ]);
+    await this.auditLogService.record({ action: 'UPDATE', entityType: 'Customer', entityId: id, remark: `恢复已归档客户「${before.name}」`, ...this.auditCtx() });
+  }
+
   private async assertPhoneAvailable(phone: string, allow: boolean | undefined, excludeId?: string): Promise<void> {
     if (allow) return;
     const dup = await this.prisma.customer.findFirst({

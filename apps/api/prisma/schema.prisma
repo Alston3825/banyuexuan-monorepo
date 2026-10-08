@@ -751,6 +751,10 @@ model Customer {
   region                   String?        @map("region") // 地区，自由文本（省市区），暂不做级联下拉
   address                  String?        @db.Text
   remark                   String?        @db.Text
+  /// 归档：用过的客户（有合同/入住/收款等）不能删，只能归档——列表默认隐藏、不能再新建预订/合同，可随时恢复
+  archivedAt               DateTime?      @map("archived_at")
+  archivedBy               String?        @map("archived_by")
+  archiveReason            String?        @map("archive_reason")
   createdBy                String         @map("created_by")
   createdAt                DateTime       @default(now()) @map("created_at")
   updatedAt                DateTime       @updatedAt @map("updated_at")
@@ -1467,6 +1471,9 @@ model MotherProfile {
   /// 主责护理师（责任护士）：从员工账号里选，在母婴档案里指派/更换；护理看板、房态看板展示。
   primaryNurseId       String?        @map("primary_nurse_id")
   remark               String?        @db.Text
+  /// 归档（结案）：有护理记录的档案不能删，归档后列表默认隐藏，可恢复
+  archivedAt           DateTime?      @map("archived_at")
+  archivedBy           String?        @map("archived_by")
   createdBy            String         @map("created_by")
   createdAt            DateTime       @default(now()) @map("created_at")
   updatedAt            DateTime       @updatedAt @map("updated_at")

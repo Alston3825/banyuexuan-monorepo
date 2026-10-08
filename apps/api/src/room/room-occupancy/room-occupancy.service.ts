@@ -179,7 +179,7 @@ export class RoomOccupancyService {
 
   /** 预订：创建一条 RESERVED 状态的占用记录。 */
   async create(dto: CreateRoomOccupancyDto): Promise<RoomOccupancy & { conflicts: ConflictBrief[] }> {
-    await this.customerService.findOneOrThrow(dto.customerId);
+    await this.customerService.assertActive(dto.customerId);
     if (new Date(dto.plannedCheckOut) <= new Date(dto.plannedCheckIn)) throw new BadRequestException('计划离店日期必须晚于计划入住日期');
     const conflicts = await this.softConflicts(dto.roomId, new Date(dto.plannedCheckIn), new Date(dto.plannedCheckOut));
     const created = await this.prisma.roomOccupancy.create({

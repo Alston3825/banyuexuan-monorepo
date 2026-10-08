@@ -1,4 +1,5 @@
 import { http } from '../client'
+import type { RemovalCheck } from '../types/customer'
 import type {
   BabyProfile,
   CareAbnormality,
@@ -59,8 +60,14 @@ export const carePlanTemplateApi = {
 }
 
 export const motherProfileApi = {
-  list: (params?: { customerId?: string; storeId?: string }) =>
+  list: (params?: { customerId?: string; storeId?: string; archived?: 'only' | 'all' }) =>
     http.get<MotherProfile[]>('/care/mother-profiles', { params }).then((r) => r.data),
+  deleteCheck: (id: string) => http.get<RemovalCheck>(`/care/mother-profiles/${id}/delete-check`).then((r) => r.data),
+  /** 删除建错的档案；名下有宝宝/评估表/资料时需 force + 输入客户姓名确认（管理员） */
+  remove: (id: string, opts?: { force?: boolean; confirmName?: string }) =>
+    http.delete(`/care/mother-profiles/${id}`, { params: opts?.force ? { force: true, confirmName: opts.confirmName } : undefined }).then(() => undefined),
+  archive: (id: string) => http.post(`/care/mother-profiles/${id}/archive`).then(() => undefined),
+  restore: (id: string) => http.post(`/care/mother-profiles/${id}/restore`).then(() => undefined),
   get: (id: string) => http.get<MotherProfile>(`/care/mother-profiles/${id}`).then((r) => r.data),
   create: (body: CreateMotherProfileDto) => http.post<MotherProfile>('/care/mother-profiles', body).then((r) => r.data),
   update: (id: string, body: UpdateMotherProfileDto) =>

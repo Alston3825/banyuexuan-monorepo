@@ -8,6 +8,7 @@ import type {
   IdCardCheck,
   ReferrerSearchResult,
   StaffOption,
+  RemovalCheck,
 } from '../types/customer'
 
 export const customerApi = {
@@ -26,6 +27,11 @@ export const customerApi = {
   // 客户分类(A-E)/客户类型(鹰派萌派等)标签：见后端 CustomerController 的 tags 系列接口，
   // 挂在客户模块下用 crm.customer.* 权限，不是 platform.tag.*。
   // tagCatalog 同理——查标签目录选项也不要求 platform.tag.view，销售/店长才能选得到标签。
+  /** 删除/归档前的检查：有哪些数据、能不能删、有没有删除权限 */
+  deleteCheck: (id: string) => http.get<RemovalCheck>(`/crm/customers/${id}/delete-check`).then((r) => r.data),
+  remove: (id: string, confirmName?: string) => http.delete(`/crm/customers/${id}`, { params: confirmName ? { confirmName } : undefined }).then(() => undefined),
+  archive: (id: string, reason?: string) => http.post(`/crm/customers/${id}/archive`, { reason }).then(() => undefined),
+  restore: (id: string) => http.post(`/crm/customers/${id}/restore`).then(() => undefined),
   tagCatalog: (category: string) =>
     http.get<{ id: string; name: string; category: string | null; color: string | null }[]>('/crm/customers/tag-catalog', { params: { category } }).then((r) => r.data),
   listTags: (id: string) => http.get<CustomerTagBinding[]>(`/crm/customers/${id}/tags`).then((r) => r.data),

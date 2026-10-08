@@ -348,7 +348,7 @@ export class ContractRecordService {
       });
       return created.id;
     }
-    const customer = await this.customerService.findOneOrThrow(chosenId);
+    const customer = await this.customerService.assertActive(chosenId);
     // 只补空缺，不覆盖客户档案里已有的信息
     // 合同上的号码是用户在核对页确认过的，即使和其他客户重复（二胎/家人共用号码）也放行
     const patch: Omit<UpdateCustomerDto, 'version'> = { allowDuplicatePhone: true };

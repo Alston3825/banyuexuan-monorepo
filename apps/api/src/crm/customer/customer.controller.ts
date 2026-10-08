@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { MaskEntity } from '../../common/decorators/mask-entity.decorator';
@@ -7,6 +7,7 @@ import { TagService } from '../../platform/tag/tag.service';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { ArchiveCustomerDto } from './dto/archive-customer.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { SetCustomerTagDto } from './dto/set-customer-tag.dto';
 
@@ -81,6 +82,35 @@ export class CustomerController {
   update(@Param('id') id: string, @Body() dto: UpdateCustomerDto) {
     const { version, ...data } = dto;
     return this.customerService.update(id, data, version);
+  }
+
+  @Get(':id/delete-check')
+  @RequirePermission('crm.customer.archive')
+  deleteCheck(@Param('id') id: string) {
+    return this.customerService.getDeleteCheck(id);
+  }
+
+  /** 删除建错的客户：有合同/入住/收款等的拒绝（只能归档）；有母婴档案/销售机会/跟进的要输入客户姓名确认。需要 crm.customer.delete。 */
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('crm.customer.delete')
+  remove(@Param('id') id: string, @Query('confirmName') confirmName?: string) {
+    return this.customerService.remove(id, confirmName);
+  }
+
+  /** 归档客户：用过的客户不删，列表默认隐藏、不能再新建预订/合同，可恢复 */
+  @Post(':id/archive')
+  @HttpCode(204)
+  @RequirePermission('crm.customer.archive')
+  archive(@Param('id') id: string, @Body() dto: ArchiveCustomerDto) {
+    return this.customerService.archive(id, dto.reason);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(204)
+  @RequirePermission('crm.customer.archive')
+  restore(@Param('id') id: string) {
+    return this.customerService.restore(id);
   }
 
   @Get(':id/tags')

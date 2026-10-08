@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { IsArray, IsString } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -57,5 +57,33 @@ export class MotherProfileController {
   @RequirePermission('care.profile.update')
   update(@Param('id') id: string, @Body() dto: UpdateMotherProfileDto) {
     return this.motherProfileService.update(id, dto);
+  }
+
+  @Get(':id/delete-check')
+  @RequirePermission('care.profile.update')
+  deleteCheck(@Param('id') id: string) {
+    return this.motherProfileService.getDeleteCheck(id);
+  }
+
+  /** 删除建错的母婴档案：有护理痕迹的拒绝（只能归档）；只有宝宝/评估表/资料的需要管理员权限 + 输入客户姓名确认。 */
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('care.profile.update')
+  remove(@Param('id') id: string, @Query('force') force?: string, @Query('confirmName') confirmName?: string) {
+    return this.motherProfileService.remove(id, force === 'true', confirmName);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(204)
+  @RequirePermission('care.profile.update')
+  archive(@Param('id') id: string) {
+    return this.motherProfileService.archive(id);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(204)
+  @RequirePermission('care.profile.update')
+  restore(@Param('id') id: string) {
+    return this.motherProfileService.restore(id);
   }
 }

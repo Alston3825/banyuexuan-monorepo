@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { MotherProfile } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { replaceRiskTags } from '../risk-tag.util';
@@ -6,6 +6,8 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
+import { CareStorageService } from '../care-document/care-storage.service';
+import { deleteMotherProfilesTx, motherProfilesDeleteCheck } from '../profile-delete.util';
 import { CreateMotherProfileDto } from './dto/create-mother-profile.dto';
 import { UpdateMotherProfileDto } from './dto/update-mother-profile.dto';
 import { QueryMotherProfileDto } from './dto/query-mother-profile.dto';
@@ -26,13 +28,20 @@ export class MotherProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customerService: CustomerService,
+    private readonly storage: CareStorageService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
   ) {}
 
   findMany(query: QueryMotherProfileDto = {}) {
     return this.prisma.motherProfile.findMany({
-      where: { tenantId: this.ctx.tenantId, customerId: query.customerId, storeId: query.storeId },
+      where: {
+        tenantId: this.ctx.tenantId,
+        customerId: query.customerId,
+        storeId: query.storeId,
+        // 已归档的默认不显示；archived=only 只看已归档，archived=all 全部
+        ...(query.archived === 'only' ? { archivedAt: { not: null } } : query.archived === 'all' ? {} : { archivedAt: null }),
+      },
       include: {
         ...includeProfile,
         // 列表要显示"房号 + 客户姓名"，工作人员一眼认出要找的人
@@ -47,6 +56,66 @@ export class MotherProfileService {
     const profile = await this.prisma.motherProfile.findUnique({ where: { id }, include: includeProfile });
     if (!profile) throw new NotFoundException(`MotherProfile ${id} 不存在`);
     return profile;
+  }
+
+  /** 删除前的检查：有哪些数据挂在这份档案下面，能不能删，当前账号有没有“连数据一起删”的权限。 */
+  async getDeleteCheck(id: string) {
+    const p = await this.findOneOrThrow(id);
+    if (p.tenantId !== this.ctx.tenantId) throw new NotFoundException(`MotherProfile ${id} 不存在`);
+    const customer = await this.prisma.customer.findUnique({ where: { id: p.customerId }, select: { name: true } });
+    const check = await motherProfilesDeleteCheck(this.prisma, [id]);
+    return {
+      profileId: id,
+      customerName: customer?.name ?? '',
+      blockers: check.blockers,
+      attached: [...(check.babyCount ? [`${check.babyCount} 个宝宝档案`] : []), ...check.attached],
+      canForceDelete: await this.ctx.hasPermission('care.profile.force-delete'),
+      archived: !!p.archivedAt,
+    };
+  }
+
+  /**
+   * 删除建错的母婴档案：有护理记录/计划/异常等护理痕迹的任何人都不能删（只能归档）；
+   * 只挂着宝宝档案、评估表、纸质资料的，需要管理员权限（care.profile.force-delete）并输入客户姓名确认，连同这些一起永久删除；
+   * 什么都没有的，care.profile.update 即可直接删。
+   */
+  async remove(id: string, force = false, confirmName?: string): Promise<void> {
+    const check = await this.getDeleteCheck(id);
+    const before = await this.findOneOrThrow(id);
+    if (check.blockers.length > 0) {
+      throw new ConflictException(`该档案已有${check.blockers.join('、')}，属于护理痕迹，不能删除；不再使用请点“归档”`);
+    }
+    if (check.attached.length > 0) {
+      if (!force) throw new ConflictException(`该档案名下已有${check.attached.join('、')}，直接删除会丢失这些数据；需要管理员确认后连同它们一起删除`);
+      if (!check.canForceDelete) throw new ForbiddenException('该档案名下已有宝宝/评估表/纸质资料，连同删除需要管理员权限，请联系管理员');
+      // （先验权限再验名字，没权限的人不用被要求输入名字）
+      if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`请输入客户姓名「${check.customerName}」确认删除`);
+    }
+    const docIds = await this.prisma.$transaction((tx) => deleteMotherProfilesTx(tx, [id]));
+    for (const d of docIds) await this.storage.removeDocumentDir(d).catch(() => undefined);
+    await this.auditLogService.record({
+      action: 'DELETE',
+      entityType: 'MotherProfile',
+      entityId: id,
+      beforeData: before,
+      remark: check.attached.length > 0 ? `管理员连同 ${check.attached.join('、')} 一起删除母婴档案（客户：${check.customerName}）` : `删除母婴档案（客户：${check.customerName}）`,
+      ...this.auditCtx(),
+    });
+  }
+
+  /** 归档（结案）：用过的档案不删，列表默认隐藏，可恢复。 */
+  async archive(id: string): Promise<void> {
+    const before = await this.findOneOrThrow(id);
+    if (before.archivedAt) throw new ConflictException('这份档案已经归档了');
+    await this.prisma.motherProfile.update({ where: { id }, data: { archivedAt: new Date(), archivedBy: this.ctx.accountId, version: { increment: 1 } } });
+    await this.auditLogService.record({ action: 'UPDATE', entityType: 'MotherProfile', entityId: id, remark: '归档母婴档案', ...this.auditCtx() });
+  }
+
+  async restore(id: string): Promise<void> {
+    const before = await this.findOneOrThrow(id);
+    if (!before.archivedAt) throw new ConflictException('这份档案没有归档');
+    await this.prisma.motherProfile.update({ where: { id }, data: { archivedAt: null, archivedBy: null, version: { increment: 1 } } });
+    await this.auditLogService.record({ action: 'UPDATE', entityType: 'MotherProfile', entityId: id, remark: '恢复已归档的母婴档案', ...this.auditCtx() });
   }
 
   /** 指派护理师时的候选人：本门店（或不限门店）的在职账号；职位/角色/部门里带“护理”的排前面。 */
@@ -112,7 +181,7 @@ export class MotherProfileService {
   }
 
   async create(dto: CreateMotherProfileDto): Promise<MotherProfile> {
-    await this.customerService.findOneOrThrow(dto.customerId);
+    await this.customerService.assertActive(dto.customerId);
     let storeId = this.ctx.homeStoreId ?? undefined;
     if (dto.occupancyId) {
       const occupancy = await this.prisma.roomOccupancy.findUnique({ where: { id: dto.occupancyId } });
