@@ -43,7 +43,7 @@ export class AuditLogService {
         storeId: params.storeId ?? null,
         accountId: params.accountId ?? null,
         ip: params.ip ?? null,
-        userAgent: params.userAgent ?? null,
+        userAgent: params.userAgent ? params.userAgent.slice(0, 190) : null, // 列宽 191，过长会让写审计日志失败
         requestId: params.requestId ?? null,
       },
     });

@@ -158,7 +158,8 @@ export class AuthService {
     const ttlDays = Number(this.configService.get<string>('JWT_REFRESH_TTL_DAYS') ?? 14);
     const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
     await this.prisma.refreshToken.create({
-      data: { accountId, tokenHash, expiresAt, ip: meta.ip, userAgent: meta.userAgent },
+      // 手机/微信内置浏览器的 User-Agent 可能很长，超过列宽(191)会让整个登录报“服务器内部错误”，这里截断
+      data: { accountId, tokenHash, expiresAt, ip: meta.ip, userAgent: meta.userAgent?.slice(0, 190) },
     });
     return raw;
   }

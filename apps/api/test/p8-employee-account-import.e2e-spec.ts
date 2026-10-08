@@ -208,6 +208,10 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
       const res = (await login(key, 'banyuexuan').expect(201)).body as Json;
       expect(res.account.id).toBe(acc.id);
     }
+    // 手机/微信内置浏览器的 User-Agent 很长（超过 191 字符）也必须能正常登录，不能报服务器内部错误
+    const longUa = 'Mozilla/5.0 (Linux; Android 13; PHONE) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36 XWEB/1160065 MMWEBSDK/20231201 MMWEBID/1234 MicroMessenger/8.0.47.2560(0x28002F35) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64 ' + 'x'.repeat(200);
+    expect(longUa.length).toBeGreaterThan(300);
+    await request(server).post('/api/v1/auth/login').set('User-Agent', longUa).send({ username: '19900000020', password: 'banyuexuan' }).expect(201);
     await login('19900000020', 'wrong-pass').expect(401);
     await login('19900000099', 'banyuexuan').expect(401); // 不存在的手机号
     await prisma.account.update({ where: { id: acc.id }, data: { status: 'DISABLED' } });
