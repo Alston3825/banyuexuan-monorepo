@@ -119,6 +119,48 @@ async function openPermissionDrawer(row: Role) {
   permDrawerRole.value = row
   checkedKeys.value = row.permissions.map((p) => p.permissionPointId)
   permDrawerVisible.value = true
+  loadDefaultsDiff(row.id)
+}
+
+// 与“默认权限清单”的差异（只有系统预设的岗位角色才有默认清单，如店长/部门负责人/护理长…）
+const defaultsDiff = ref<{ hasDefault: boolean; defaultCount: number; add: { name: string }[]; remove: { name: string }[] } | null>(null)
+const restoring = ref(false)
+async function loadDefaultsDiff(roleId: string) {
+  defaultsDiff.value = null
+  try {
+    const d = await roleApi.defaultsPreview(roleId)
+    if (permDrawerRole.value?.id === roleId) defaultsDiff.value = d
+  } catch {
+    defaultsDiff.value = null
+  }
+}
+function confirmRestoreDefaults() {
+  const role = permDrawerRole.value
+  const d = defaultsDiff.value
+  if (!role || !d) return
+  const names = (xs: { name: string }[]) => xs.slice(0, 6).map((x) => x.name).join('、') + (xs.length > 6 ? `…等 ${xs.length} 项` : '')
+  dialog.warning({
+    title: `把「${role.name}」恢复为默认权限？`,
+    content:
+      `默认清单共 ${d.defaultCount} 项权限。恢复后：新增 ${d.add.length} 项${d.add.length ? `（${names(d.add)}）` : ''}；撤销 ${d.remove.length} 项${d.remove.length ? `（${names(d.remove)}）` : ''}。` +
+      '已分配该角色的员工，重新登录后生效。',
+    positiveText: '确认恢复',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      restoring.value = true
+      try {
+        const res = await roleApi.restoreDefaults(role.id)
+        message.success(`已恢复默认权限（新增 ${res.granted}，撤销 ${res.revoked}）`)
+        const fresh = await roleApi.get(role.id)
+        permDrawerRole.value = fresh
+        checkedKeys.value = fresh.permissions.map((p) => p.permissionPointId)
+        loadDefaultsDiff(role.id)
+        fetchList()
+      } finally {
+        restoring.value = false
+      }
+    },
+  })
 }
 
 async function handleCheckedKeysChange(newKeys: (string | number)[]) {
@@ -208,6 +250,13 @@ onMounted(fetchList)
     <n-drawer v-model:show="permDrawerVisible" :width="420">
       <n-drawer-content :title="`权限设置 - ${permDrawerRole?.name ?? ''}`" :native-scrollbar="false">
         <p v-if="isSystemRole" style="color: #999; margin-bottom: 12px">系统内置角色不可修改权限</p>
+        <div v-if="defaultsDiff?.hasDefault" style="margin-bottom: 12px; padding: 8px 10px; background: #f6f8fa; border-radius: 6px; font-size: 13px">
+          <template v-if="defaultsDiff.add.length === 0 && defaultsDiff.remove.length === 0">已是推荐的默认权限（共 {{ defaultsDiff.defaultCount }} 项）。</template>
+          <template v-else>
+            与推荐的默认权限不同：缺 {{ defaultsDiff.add.length }} 项，多 {{ defaultsDiff.remove.length }} 项。
+            <n-button size="tiny" type="warning" :loading="restoring" style="margin-left: 8px" @click="confirmRestoreDefaults">恢复默认权限</n-button>
+          </template>
+        </div>
         <n-tree
           :data="permissionTree"
           key-field="id"

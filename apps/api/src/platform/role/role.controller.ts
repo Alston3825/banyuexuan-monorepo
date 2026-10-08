@@ -55,6 +55,20 @@ export class RoleController {
     return this.roleService.changePermissions(id, dto.grant, dto.revoke);
   }
 
+  /** 预览：与默认权限清单相比要新增/撤销哪些 */
+  @Get(':id/default-permissions')
+  @RequirePermission('platform.role.view')
+  defaultsPreview(@Param('id') id: string) {
+    return this.roleService.defaultsPreview(id);
+  }
+
+  /** 恢复默认权限 */
+  @Post(':id/restore-defaults')
+  @RequirePermission('platform.role.update')
+  restoreDefaults(@Param('id') id: string) {
+    return this.roleService.restoreDefaults(id);
+  }
+
   @Post(':id/permissions')
   @RequirePermission('platform.role.update')
   grantPermission(@Param('id') id: string, @Body() dto: GrantPermissionDto) {

@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
+import { resolveDefaultCodes } from './role-defaults';
 
 @Injectable()
 export class RoleService {
@@ -164,6 +165,36 @@ export class RoleService {
       ...this.auditCtx(),
     });
     return { granted: toCreate.length, revoked: r.length };
+  }
+
+  /** 这个角色与“默认权限清单”的差异：要新增哪些、要撤销哪些（没有默认清单的角色 hasDefault=false） */
+  async defaultsPreview(roleId: string) {
+    const role = await this.assertMutable(roleId);
+    const points = await this.prisma.permissionPoint.findMany({ select: { id: true, code: true, name: true } });
+    const wanted = resolveDefaultCodes(role.code, points.map((p) => p.code));
+    if (!wanted) return { hasDefault: false, add: [], remove: [], defaultCount: 0 };
+    const want = new Set(wanted);
+    const current = await this.prisma.roleOnPermission.findMany({ where: { roleId }, select: { permissionPointId: true } });
+    const have = new Set(current.map((c) => c.permissionPointId));
+    const byId = new Map(points.map((p) => [p.id, p]));
+    const add = points.filter((p) => want.has(p.code) && !have.has(p.id));
+    const remove = [...have].map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p && !want.has(p.code));
+    return { hasDefault: true, add, remove, defaultCount: want.size };
+  }
+
+  /** 把角色的权限一键还原成默认清单（多出来的撤销，缺的补上）。只有管理员手工触发，种子/发版不会自动撤销权限。 */
+  async restoreDefaults(roleId: string) {
+    const diff = await this.defaultsPreview(roleId);
+    if (!diff.hasDefault) throw new BadRequestException('这个角色没有默认权限清单（只有系统预设的岗位角色才有）');
+    const res = await this.changePermissions(roleId, diff.add.map((p) => p.id), diff.remove.map((p) => p.id));
+    await this.auditLogService.record({
+      action: 'UPDATE',
+      entityType: 'Role',
+      entityId: roleId,
+      remark: `恢复默认权限：新增 ${res.granted} 个，撤销 ${res.revoked} 个`,
+      ...this.auditCtx(),
+    });
+    return { ...res, defaultCount: diff.defaultCount };
   }
 
   /** 防越权：只能授予自己已经拥有的权限点（否则有“角色管理”权限的人能给自己的角色加任意权限）。超级管理员拥有全部，不受影响。 */

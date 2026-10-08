@@ -10,6 +10,13 @@ export const roleApi = {
   /** 批量调整权限（一次请求，勾选大模块也不会被限流） */
   changePermissions: (id: string, grant: string[], revoke: string[]) =>
     http.put<{ granted: number; revoked: number }>(`/platform/roles/${id}/permissions`, { grant, revoke }).then((r) => r.data),
+  /** 与默认权限清单对比：要新增/撤销哪些 */
+  defaultsPreview: (id: string) =>
+    http
+      .get<{ hasDefault: boolean; defaultCount: number; add: { id: string; code: string; name: string }[]; remove: { id: string; code: string; name: string }[] }>(`/platform/roles/${id}/default-permissions`)
+      .then((r) => r.data),
+  /** 恢复默认权限 */
+  restoreDefaults: (id: string) => http.post<{ granted: number; revoked: number; defaultCount: number }>(`/platform/roles/${id}/restore-defaults`).then((r) => r.data),
   grantPermission: (id: string, permissionPointId: string) =>
     http.post(`/platform/roles/${id}/permissions`, { permissionPointId }).then((r) => r.data),
   revokePermission: (id: string, permissionPointId: string) =>

@@ -14,6 +14,7 @@
  */
 import { PrismaClient, PermissionPointType, Account } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { DEFAULT_ROLES, resolveDefaultCodes } from '../src/platform/role/role-defaults';
 import { generateBusinessNo } from '../src/common/utils/business-no.util';
 
 const prisma = new PrismaClient();
@@ -589,34 +590,21 @@ async function main() {
     },
   });
 
-  const storeManagerRole = await prisma.role.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: 'STORE_MANAGER' } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      code: 'STORE_MANAGER',
-      name: '店长',
-      description: '门店日常管理与一级审批，无账号手机号查看权限、无门店删除权限',
-      createdBy: 'SEED',
-    },
-  });
+  // 各岗位角色（店长/普通员工/部门负责人/护理长/护理师/客服/采购员）及其默认权限清单：
+  // 见 src/platform/role/role-defaults.ts（唯一来源；“角色管理 → 恢复默认权限”也用它）。
+  // 种子只“补齐”权限、不撤销，不会动管理员后来手工加的权限；要还原成默认请用“恢复默认权限”。
+  const defaultRoleByCode = new Map<string, { id: string }>();
+  for (const r of DEFAULT_ROLES) {
+    const role = await prisma.role.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: r.code } },
+      update: {},
+      create: { tenantId: tenant.id, code: r.code, name: r.name, description: r.description, createdBy: 'SEED' },
+    });
+    defaultRoleByCode.set(r.code, role);
+  }
+  const storeManagerRole = defaultRoleByCode.get('STORE_MANAGER')!;
+  const storeStaffRole = defaultRoleByCode.get('STORE_STAFF')!;
 
-  // 普通员工/一线岗位：只做客户接待/护理/排餐/库存/审批这类日常业务操作，看不到
-  // 经营分析、设备网关、账号与权限、组织架构、基础资料、审计日志这几块"管理侧"功能——
-  // 见前端 layouts/nav-menu.ts 的导航菜单按权限动态显示逻辑。具体权限点集合是
-  // storeManagerCodes（下面定义）里刨掉 platform/audit/analytics/iot 四个前缀，
-  // 即"店长能操作的日常业务权限，一线员工也都能操作，只是看不到管理配置类页面"。
-  const storeStaffRole = await prisma.role.upsert({
-    where: { tenantId_code: { tenantId: tenant.id, code: 'STORE_STAFF' } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      code: 'STORE_STAFF',
-      name: '普通员工',
-      description: '门店一线日常业务操作，不含经营分析/设备网关/账号权限/组织架构/基础资料/审计日志',
-      createdBy: 'SEED',
-    },
-  });
 
   // SUPER_ADMIN 拥有全部权限点
   for (const permissionPointId of codeToId.values()) {
@@ -629,214 +617,11 @@ async function main() {
       .catch(() => undefined);
   }
 
-  // STORE_MANAGER：有意缺 platform.store.delete，用于验证 403；
-  // CRM 的 lose（线索/机会标记流失）、合同的 void（作废）同理有意缺失——影响统计口径/具有终局性的
-  // 操作先只给 SUPER_ADMIN。合同模板（法律文本主数据）也不开放给 STORE_MANAGER，与 Parameter/Tag/Region
-  // 这类主数据现在的处理口径一致。房型（room.type）同理是平台级主数据，不开放给 STORE_MANAGER；
-  // 房间与占用记录（room.room / room.occupancy）是前台/店长的日常操作，全部动作开放，不额外排除；
-  // 唯一例外是 room.room.force-delete（删除已有预订/入住记录的房间），会连带清掉历史占用记录，只留给 SUPER_ADMIN。
-  // 收款（payment.record）同理——退款的"提交申请"是前台日常操作，真正的审批权由通用工作流
-  // 引擎的审批人角色把关，不在这一层额外收紧，全部动作开放。
-  // 护理表单引擎配置（care.field / care.form-template / care.plan-template）是总部制定的
-  // 临床协议主数据，同 room.type/contract.template 口径不开放给 STORE_MANAGER；母婴档案
-  // （care.profile）是护理人员/前台的日常操作，全部动作开放。
-  // 月子餐同理：菜品/禁忌/膳食计划模板（meal.item/dietary-restriction/plan-template）是总部制定的
-  // 营养配餐主数据，不开放；用膳人与排餐记录（meal.diner-profile/record）是护理/膳食人员的日常
-  // 操作，全部动作开放。产康服务：项目/服务包/技师（service.product/package/therapist）是总部
-  // 定价与人力主数据，不开放；客户已购服务包与预约（service.customer-package/appointment）是
-  // 前台/技师的日常操作，全部动作开放。库存域：物品/供应商（inventory.item/supplier）是总部
-  // 制定的采购目录与供应商关系，同 room.type/meal.item 口径不开放；仓库（inventory.warehouse）
-  // 是各门店自行管理的经营容器，同 room.room 口径开放；库存查询与批次效期（只读）开放给店长
-  // 做日常盘点/预警巡查；五种单据（采购/入库/出库领用/调拨/盘点）是店长/仓管的日常操作，
-  // 全部动作开放——真正的审批权由通用工作流引擎的审批人角色把关，同 payment.record 口径。
-  // 人事域：员工档案/班次定义/排班/业绩提成/薪资单都是店长日常管理自己门店员工的操作
-  // （店长本身就是提成/薪资审批人），全部动作开放，不额外收紧。
-  // 财务结算-会员账户：充值/消费/退款是有实际业务凭证支撑的前台日常操作，开放给店长；
-  // "人工调整"(finance.customer-account.adjust)是脱离正常业务凭证、可任意改动余额的纠错
-  // 操作，风险等级同"作废/标记流失"，只留给 SUPER_ADMIN。
-  // 办公审批：请假/报销/签呈都是店长日常审批自己门店事务的操作（店长本身就是审批人），
-  // 全部动作开放，不额外收紧，同 hr.commission-record/payroll-record 口径。
-  // 后勤管理：车辆主数据(logistics.vehicle)新增/停用车辆属于总部决策，不开放
-  // create/update 给 STORE_MANAGER；但 view 需要开放——店长发起用车申请时要能看到
-  // 车辆列表去选择，与"总部主数据不可编辑但日常业务要能引用"这个诉求一致。用车申请
-  // (logistics.vehicle-booking)与水电费登记(logistics.utility-expense)是店长日常操作，
-  // 全部动作开放。
-  // AI助手：智能客服/护理异常建议都是帮员工日常工作的辅助工具（AI只生成建议、不代替
-  // 人工决策），全部动作开放给STORE_MANAGER，不额外收紧。知识库文档(ai.knowledge-document)
-  // 是被全租户共享的AI参考内容源，同 care.field/room.type 这类总部主数据口径，不开放给
-  // STORE_MANAGER编辑，避免多店各自维护导致AI回答口径不一致。
-  // 设备网关：设备类型(iot.device-type，协议/品类主数据)同 room.type/care.field 口径不开放
-  // create/update 给STORE_MANAGER；但view需要开放——店长登记设备台账时要选择设备类型，
-  // 同 logistics.vehicle 口径（车辆主数据不可编辑但用车申请要能引用）。设备台账
-  // (iot.device-registry)是各门店自己安装/更换的物理资产，同 room.room/warehouse口径，
-  // 店长可自行管理；事件与模拟(iot.device-event，含模拟上报/下发指令/确认指令)是日常
-  // 验证/排查设备联通性的操作，同样开放给店长。
-  // 经营分析：看板(analytics.dashboard)与AI经营分析解读(ai.business-analytics-agent)都开放给
-  // 店长——查询范围由BusinessReportService按DataScopeService强制收紧到店长自己门店，不依赖
-  // 权限点本身做门店隔离，同AiSuggestion其他两个Agent"辅助工具、全部动作开放"的口径一致。
-  // 培训与考核：试卷管理(training.exam)是总部统一培训标准，同room.type/care.field口径不开放
-  // 给STORE_MANAGER；我的考试(training.exam-attempt，含参加考试/查看自己成绩/批阅简答题)是
-  // 员工日常操作+店长审核自己门店员工的操作，全部动作开放。
-  // 离店后关怀跟踪：关怀模板(care.outreach-template)是总部统一制定的运营标准，同
-  // care.plan-template口径不开放给STORE_MANAGER；生成计划/查看/终止/完成任务
-  // (care.outreach-plan，含complete-task)是店长/护理人员日常跟进自己门店客户的操作，
-  // 全部动作开放。
-  const storeManagerExcluded = new Set([
-    'crm.channel.create',
-    'crm.channel.update',
-    'platform.store.delete',
-    'room.room.force-delete',
-    'care.profile.force-delete',
-    'hr.employee-profile.change-no',
-    'hr.employee-profile.restore',
-    'crm.lead.lose',
-    'crm.opportunity.lose',
-    'contract.record.void',
-    'finance.customer-account.adjust',
-    'logistics.vehicle.create',
-    'logistics.vehicle.update',
-    'iot.device-type.create',
-    'iot.device-type.update',
-  ]);
-  const storeManagerCodes = permSpecs
-    .map((p) => p.code)
-    .filter(
-      (code) =>
-        !storeManagerExcluded.has(code) &&
-        (code.startsWith('platform.store') ||
-          code.startsWith('platform.account') ||
-          code === 'workflow' ||
-          code.startsWith('workflow.instance') ||
-          code.startsWith('workflow.demo-approval') ||
-          code === 'audit' ||
-          code === 'audit.log' ||
-          code === 'audit.log.view' ||
-          code === 'platform' ||
-          code.startsWith('crm') ||
-          code.startsWith('contract.record') ||
-          code.startsWith('room.room') ||
-          code.startsWith('room.occupancy') ||
-          code.startsWith('room.call') ||
-          code.startsWith('room.outing') ||
-          code.startsWith('room.service-requisition') ||
-          code.startsWith('payment.record') ||
-          code.startsWith('care.board') ||
-          code.startsWith('care.profile') ||
-          code === 'care.plan' ||
-          code.startsWith('care.plan.') ||
-          code.startsWith('care.record') ||
-          code.startsWith('care.abnormality') ||
-          code.startsWith('meal.diner-profile') ||
-          code.startsWith('meal.record') ||
-          code.startsWith('service.customer-package') ||
-          code.startsWith('service.appointment') ||
-          code.startsWith('inventory.warehouse') ||
-          code.startsWith('inventory.stock-batch') ||
-          code.startsWith('inventory.purchase-request') ||
-          code.startsWith('inventory.purchase-order') ||
-          code.startsWith('inventory.goods-receipt') ||
-          code.startsWith('inventory.stock-issue') ||
-          code.startsWith('inventory.stock-transfer') ||
-          code.startsWith('inventory.stock-count') ||
-          code.startsWith('hr.employee-profile') ||
-          code.startsWith('hr.shift-definition') ||
-          code.startsWith('hr.schedule-entry') ||
-          code.startsWith('hr.commission-record') ||
-          code.startsWith('hr.payroll-record') ||
-          code.startsWith('finance.customer-account') ||
-          code.startsWith('office.leave-request') ||
-          code.startsWith('office.expense-claim') ||
-          code.startsWith('office.general-memo') ||
-          code.startsWith('logistics.vehicle') ||
-          code.startsWith('logistics.utility-expense') ||
-          code.startsWith('ai.customer-service-agent') ||
-          code.startsWith('ai.care-abnormality-agent') ||
-          code.startsWith('ai.suggestion') ||
-          code.startsWith('iot.device-type') ||
-          code.startsWith('iot.device-registry') ||
-          code.startsWith('iot.device-event') ||
-          code.startsWith('ai.business-analytics-agent') ||
-          code.startsWith('analytics.dashboard') ||
-          code.startsWith('training.exam-attempt') ||
-          code.startsWith('care.outreach-plan')),
-    );
-  for (const code of storeManagerCodes) {
-    const permissionPointId = codeToId.get(code);
-    if (!permissionPointId) continue;
-    await prisma.roleOnPermission
-      .upsert({
-        where: { roleId_permissionPointId: { roleId: storeManagerRole.id, permissionPointId } },
-        update: {},
-        create: { roleId: storeManagerRole.id, permissionPointId, createdBy: 'SEED' },
-      })
-      .catch(() => undefined);
-  }
-
-  // 普通员工 = 店长能操作的日常业务权限，刨掉四块"管理侧"配置（组织架构/账号权限/
-  // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
-  // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
-  // 另外"删除房间"(room.room.delete)是不可逆操作，只给店长/管理员，普通员工不开放。
-  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive']); // 审核护理计划只给店长/护理主任
-  const storeStaffCodes = storeManagerCodes.filter(
-    (code) =>
-      !storeStaffExcluded.has(code) &&
-      !code.startsWith('platform') &&
-      !code.startsWith('audit') &&
-      !code.startsWith('analytics') &&
-      !code.startsWith('iot'),
-  );
-  for (const code of storeStaffCodes) {
-    const permissionPointId = codeToId.get(code);
-    if (!permissionPointId) continue;
-    await prisma.roleOnPermission
-      .upsert({
-        where: { roleId_permissionPointId: { roleId: storeStaffRole.id, permissionPointId } },
-        update: {},
-        create: { roleId: storeStaffRole.id, permissionPointId, createdBy: 'SEED' },
-      })
-      .catch(() => undefined);
-  }
-
-  // ---------- 采购流程岗位角色：部门负责人 / 客服 / 采购员 ----------
-  // 采购流程：部门负责人填部门申购单 → 自动汇总到客服 → 客服汇总后提交店长审批 → 批准后生成采购单（不再审批）
-  // → 采购员采购完“确认采购”（自动生成入库单）→ 客服按快递逐项确认收货入库。
-  // 这几个角色只给各自岗位需要的权限；具体谁担任哪个岗位，在“账号管理 → 角色分配”里给员工分配（范围选“门店级”）。
-  const procurementRoles: { code: string; name: string; description: string; perms: string[] }[] = [
-    {
-      code: 'DEPT_HEAD',
-      name: '部门负责人',
-      description: '填写本部门申购单（提交后自动汇总给客服），只能看到自己提交的申购单',
-      perms: ['inventory.purchase-request.view', 'inventory.purchase-request.create', 'inventory.purchase-request.update', 'inventory.purchase-request.submit', 'inventory.purchase-request.cancel', 'inventory.item.view', 'workflow.instance.view'],
-    },
-    {
-      code: 'CUSTOMER_SERVICE',
-      name: '客服',
-      description: '汇总各部门申购单并提交店长审批；货到后逐项确认收货、入库',
-      perms: [
-        'inventory.purchase-request.view', 'inventory.purchase-request.create', 'inventory.purchase-request.update', 'inventory.purchase-request.submit', 'inventory.purchase-request.cancel', 'inventory.purchase-request.convert', 'inventory.purchase-request.collect',
-        'inventory.purchase-order.view', 'inventory.goods-receipt.view', 'inventory.goods-receipt.receive',
-        'inventory.item.view', 'inventory.warehouse.view', 'inventory.supplier.view', 'inventory.warehouse-stock.view', 'workflow.instance.view',
-      ],
-    },
-    {
-      code: 'PURCHASER',
-      name: '采购员',
-      description: '收到店长批准的申购单后生成采购单、去采购，采购完点“确认采购”',
-      perms: [
-        'inventory.purchase-request.view', 'inventory.purchase-request.convert',
-        'inventory.purchase-order.view', 'inventory.purchase-order.create', 'inventory.purchase-order.purchase', 'inventory.purchase-order.cancel',
-        'inventory.goods-receipt.view',
-        'inventory.supplier.view', 'inventory.supplier.create', 'inventory.supplier.update', 'inventory.item.view', 'inventory.warehouse.view', 'workflow.instance.view',
-      ],
-    },
-  ];
-  for (const r of procurementRoles) {
-    const role = await prisma.role.upsert({
-      where: { tenantId_code: { tenantId: tenant.id, code: r.code } },
-      update: {},
-      create: { tenantId: tenant.id, code: r.code, name: r.name, description: r.description, createdBy: 'SEED' },
-    });
-    for (const code of r.perms) {
+  // 把默认权限清单补齐到各角色
+  const allPermissionCodes = permSpecs.map((p) => p.code);
+  for (const r of DEFAULT_ROLES) {
+    const role = defaultRoleByCode.get(r.code)!;
+    for (const code of resolveDefaultCodes(r.code, allPermissionCodes) ?? []) {
       const permissionPointId = codeToId.get(code);
       if (!permissionPointId) continue;
       await prisma.roleOnPermission
@@ -848,6 +633,7 @@ async function main() {
         .catch(() => undefined);
     }
   }
+
 
   // ---------- 账号 ----------
   // 生产环境管理员密码必须来自 SEED_ADMIN_PASSWORD（已在文件顶部校验过强度），
