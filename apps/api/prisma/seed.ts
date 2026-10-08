@@ -1000,6 +1000,7 @@ async function main() {
     { key: 'platform.session.access_token_ttl_minutes', value: '30', description: 'Access Token 有效期（分钟）' },
     { key: 'platform.session.refresh_token_ttl_days', value: '14', description: 'Refresh Token 有效期（天）' },
     { key: 'workflow.archive_delay_seconds', value: '60', description: '工作流通过后自动归档延迟秒数' },
+    { key: 'room.turnover_buffer_days', value: '1', description: '房间整理间隔（天）：上一位离店后至少隔这么多天，下一位才能入住；不够会进“预订冲突”清单' },
   ];
   for (const p of parameters) {
     // Prisma 的复合唯一键在包含可空字段（storeId）时，where 里不接受 null，

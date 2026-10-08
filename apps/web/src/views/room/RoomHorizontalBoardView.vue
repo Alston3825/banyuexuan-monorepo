@@ -11,7 +11,7 @@ import { contractApi } from '../../api/modules/contract.api'
 import { CARE_MODE_LABEL, ORIENTATION_LABEL, type ContractListItem } from '../../api/types/contract'
 import type { Room } from '../../api/types/room'
 import type { RoomType } from '../../api/types/room-type'
-import type { RoomOccupancy } from '../../api/types/room-occupancy'
+import type { RoomConflict, RoomOccupancy } from '../../api/types/room-occupancy'
 import { message, dialog } from '../../utils/discrete-api'
 
 // ---------------- 基础配置：单元格宽度/两列固定表头宽度 ----------------
@@ -151,6 +151,9 @@ async function fetchStaticData() {
 // 不按当前查看年度过滤——一次性把这个门店全部未取消的占用记录都拉回来，切年份/滚动
 // 纯前端重新计算，不用重新请求；"超出当前窗口"的提示条也是从这份完整数据里筛出来的，
 // 不需要单独再查一次。这个门店的占用记录量级（几十~小几百条）拉全量没有性能问题。
+// 预订冲突：同一间房日期重叠（或间隔不够整理）的预订——色块画成红色斜纹并上下分两行，顶上有提示条
+const conflicts = ref<RoomConflict[]>([])
+const conflictIds = computed(() => new Set(conflicts.value.flatMap((c) => [c.a.id, c.b.id])))
 let initialScrolled = false
 async function fetchBoard() {
   if (!selectedStoreId.value) return
@@ -162,6 +165,7 @@ async function fetchBoard() {
     ])
     rooms.value = roomList
     occupancies.value = occList.filter((o) => o.status !== 'CANCELLED')
+    conflicts.value = await roomOccupancyApi.conflicts(selectedStoreId.value).catch(() => [])
   } finally {
     loading.value = false
   }
@@ -209,6 +213,10 @@ interface Bar {
   clippedLeft: boolean
   clippedRight: boolean
   label: string
+  /** 同一间房里重叠的色块分两行显示：0=上行（或独占整行），1=下行 */
+  lane: number
+  split: boolean
+  conflict: boolean
 }
 function barsForRoom(roomId: string): Bar[] {
   const list = occupanciesByRoom.value.get(roomId) ?? []
@@ -232,8 +240,21 @@ function barsForRoom(roomId: string): Bar[] {
       clippedLeft: rawStart < 0,
       clippedRight: rawEnd > dayCount.value,
       label: `${custName}，${diffDays(ci, co)}晚，${fmtMD(ci)}-${fmtMD(co)}`,
+      lane: 0,
+      split: false,
+      conflict: conflictIds.value.has(occ.id),
     })
   }
+  // 重叠的色块分上下两行，免得互相盖住
+  bars.sort((x, y) => x.left - y.left)
+  const laneEnd = [-1, -1]
+  for (const b of bars) {
+    const lane = b.left >= laneEnd[0] ? 0 : 1
+    b.lane = lane
+    laneEnd[lane] = b.left + b.width + CELL_WIDTH // 留出 1 天整理间隔
+  }
+  const hasLane1 = bars.some((b) => b.lane === 1)
+  if (hasLane1) for (const b of bars) b.split = true
   return bars
 }
 
@@ -360,7 +381,7 @@ async function handleCreate() {
   }
   createSubmitting.value = true
   try {
-    await roomOccupancyApi.create({
+    const created = await roomOccupancyApi.create({
       roomId: createTarget.value.room.id,
       storeId: createTarget.value.room.storeId,
       customerId: createModel.value.customerId,
@@ -370,6 +391,7 @@ async function handleCreate() {
       contractId: createModel.value.contractId ?? undefined,
     })
     message.success(createModel.value.contractId ? '已排房，合同已从待排房列表移出' : '预订已创建')
+    if (created.conflicts?.length) message.warning(`注意：和 ${created.conflicts.map((c) => c.customerName).join('、')} 的预订日期重叠（或间隔不够整理房间），已加入“预订冲突”待协调清单`, { duration: 8000, closable: true })
     createVisible.value = false
     if (createModel.value.contractId) activeContractId.value = null
     await Promise.all([fetchBoard(), fetchPendingContracts()])
@@ -404,6 +426,7 @@ async function handleReschedule() {
     )
     detailOcc.value = updated
     message.success('改期成功')
+    if (updated.conflicts?.length) message.warning(`注意：和 ${updated.conflicts.map((c) => c.customerName).join('、')} 的预订日期重叠（或间隔不够整理房间），已加入“预订冲突”待协调清单`, { duration: 8000, closable: true })
     await fetchBoard()
   } finally {
     detailSubmitting.value = false
@@ -518,6 +541,11 @@ onMounted(async () => {
       </n-space>
     </n-space>
 
+    <n-alert v-if="conflicts.length > 0" type="error" style="margin-bottom: 12px" :show-icon="false">
+      <b>有 {{ conflicts.length }} 处预订冲突</b>（同一间房日期重叠，或两位之间不够整理房间，色块已标成红色斜纹）。预订阶段允许这样排，入住前要协调好：
+      <router-link to="/room/conflicts" style="margin-left: 6px">去协调（可一键换空房 / 改日期）</router-link>
+    </n-alert>
+
     <div v-if="pendingContracts.length > 0" class="pending-panel">
       <div class="pending-title">
         待排房合同（{{ pendingContracts.length }}）<span class="pending-sub">按签单先后排序；点一份合同，再点下方房态图上的空档排房</span>
@@ -603,8 +631,8 @@ onMounted(async () => {
               v-for="bar in barsForRoom(room.id)"
               :key="bar.occ.id"
               class="occ-bar"
-              :class="[bar.occ.status.toLowerCase(), { 'clip-left': bar.clippedLeft, 'clip-right': bar.clippedRight }]"
-              :style="{ left: bar.left + 'px', width: bar.width + 'px' }"
+              :class="[bar.occ.status.toLowerCase(), { 'clip-left': bar.clippedLeft, 'clip-right': bar.clippedRight, conflict: bar.conflict, split: bar.split }]"
+              :style="{ left: bar.left + 'px', width: bar.width + 'px', ...(bar.split ? { top: 3 + bar.lane * 18 + 'px' } : {}) }"
               :title="bar.label"
               @click.stop="openDetail(bar.occ)"
             >
@@ -861,6 +889,20 @@ onMounted(async () => {
 }
 .occ-bar.checked_out {
   background: #b0b0b0;
+}
+.occ-bar.split {
+  height: 16px;
+  line-height: 16px;
+  font-size: 11px;
+}
+/* 预订冲突：红色斜纹 + 红边框 */
+.occ-bar.conflict {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.28) 5px, transparent 5px, transparent 10px);
+  outline: 2px solid #d03050;
+  outline-offset: -2px;
+}
+.occ-bar.conflict.reserved {
+  background-color: #e0566f;
 }
 .occ-bar.clip-left {
   border-top-left-radius: 0;

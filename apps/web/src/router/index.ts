@@ -52,6 +52,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'room/rooms', name: 'room-rooms', component: () => import('../views/room/RoomsView.vue'), meta: { title: '房间管理' } },
       { path: 'room/board', name: 'room-board', component: () => import('../views/room/RoomBoardView.vue'), meta: { title: '房态看板' } },
       { path: 'room/board-horizontal', name: 'room-board-horizontal', component: () => import('../views/room/RoomHorizontalBoardView.vue'), meta: { title: '房态横排' } },
+      { path: 'room/conflicts', name: 'room-conflicts', component: () => import('../views/room/RoomConflictsView.vue'), meta: { title: '预订冲突' } },
       { path: 'room/occupancies', name: 'room-occupancies', component: () => import('../views/room/RoomOccupanciesView.vue'), meta: { title: '预订记录' } },
       { path: 'care/board', name: 'care-board', component: () => import('../views/care/CareBoardView.vue'), meta: { title: '护理看板' } },
       { path: 'care/stats', name: 'care-stats', component: () => import('../views/care/CareStatsView.vue'), meta: { title: '护理统计' } },

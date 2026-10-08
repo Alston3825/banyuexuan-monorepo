@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { IsInt, IsString } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { RoomOccupancyService } from './room-occupancy.service';
@@ -9,6 +10,11 @@ import { CheckOutRoomOccupancyDto } from './dto/check-out-room-occupancy.dto';
 import { CancelRoomOccupancyDto } from './dto/cancel-room-occupancy.dto';
 import { RescheduleRoomOccupancyDto } from './dto/reschedule-room-occupancy.dto';
 
+class ChangeRoomDto {
+  @IsString() roomId: string;
+  @IsInt() version: number;
+}
+
 @ApiTags('room/occupancy')
 @Controller('room/occupancies')
 export class RoomOccupancyController {
@@ -18,6 +24,20 @@ export class RoomOccupancyController {
   @RequirePermission('room.occupancy.view')
   findAll(@Query() query: QueryRoomOccupancyDto) {
     return this.roomOccupancyService.findMany(query);
+  }
+
+  /** 预订冲突清单：同一间房日期重叠或间隔不足整理时间的两两组合 */
+  @Get('conflicts')
+  @RequirePermission('room.occupancy.view')
+  conflicts(@Query('storeId') storeId?: string) {
+    return this.roomOccupancyService.findConflicts(storeId);
+  }
+
+  /** 这条预订能换到的空房（同房型排前面） */
+  @Get(':id/free-rooms')
+  @RequirePermission('room.occupancy.view')
+  freeRooms(@Param('id') id: string) {
+    return this.roomOccupancyService.freeRooms(id);
   }
 
   @Get(':id')
@@ -48,6 +68,12 @@ export class RoomOccupancyController {
   @RequirePermission('room.occupancy.cancel')
   cancel(@Param('id') id: string, @Body() dto: CancelRoomOccupancyDto) {
     return this.roomOccupancyService.cancel(id, dto.cancelReason, dto.version);
+  }
+
+  @Post(':id/change-room')
+  @RequirePermission('room.occupancy.reschedule')
+  changeRoom(@Param('id') id: string, @Body() dto: ChangeRoomDto) {
+    return this.roomOccupancyService.changeRoom(id, dto.roomId, dto.version);
   }
 
   @Patch(':id/reschedule')

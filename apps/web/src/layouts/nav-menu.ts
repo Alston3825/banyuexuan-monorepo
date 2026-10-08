@@ -137,6 +137,7 @@ const navGroups: NavGroup[] = [
       { label: '房间管理', to: '/room/rooms', icon: Bed, perm: 'room.room' },
       { label: '房型管理', to: '/room/types', icon: Layers, perm: 'room.type' },
       { label: '预订记录', to: '/room/occupancies', icon: Calendar, perm: 'room.occupancy' },
+      { label: '预订冲突', to: '/room/conflicts', icon: WarningOutline, perm: 'room.occupancy' },
     ],
   },
   {

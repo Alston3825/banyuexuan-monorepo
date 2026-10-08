@@ -17,6 +17,40 @@ export interface RoomOccupancy extends ScopedEntityBase {
   remark: string | null
 }
 
+export interface ConflictBrief {
+  id: string
+  occupancyNo: string
+  customerName: string
+  status: 'RESERVED' | 'CHECKED_IN'
+  plannedCheckIn: string
+  plannedCheckOut: string
+  /** SIGNED=已签合同（优先保留）；INTENT=只有意向 */
+  priority: 'SIGNED' | 'INTENT'
+}
+
+/** 同一间房两条预订冲突（日期重叠，或间隔不够整理房间） */
+export interface RoomConflict {
+  roomId: string
+  roomNo: string
+  a: ConflictBrief
+  b: ConflictBrief
+  overlapDays: number
+  bufferOnly: boolean
+  startsInDays: number
+  suggestId: string
+}
+
+export interface FreeRoom {
+  id: string
+  roomNo: string
+  floor: string
+  roomTypeName: string
+  sameType: boolean
+}
+
+/** 新建/改期保存成功后，如果和别的预订冲突，会带上冲突提示（只提示不拦截） */
+export type WithConflicts<T> = T & { conflicts?: ConflictBrief[] }
+
 export interface CreateRoomOccupancyDto {
   roomId: string
   storeId: string

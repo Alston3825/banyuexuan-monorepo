@@ -101,7 +101,7 @@ async function handleSubmit() {
   }
   submitting.value = true
   try {
-    await roomOccupancyApi.create({
+    const created = await roomOccupancyApi.create({
       roomId: model.value.roomId,
       storeId: model.value.storeId,
       customerId: model.value.customerId,
@@ -109,6 +109,7 @@ async function handleSubmit() {
       plannedCheckOut: new Date(model.value.dateRange[1]).toISOString(),
     })
     message.success('预订已创建')
+    if (created.conflicts?.length) message.warning(`注意：和 ${created.conflicts.map((c) => c.customerName).join('、')} 的预订日期重叠（或间隔不够整理房间），已加入“预订冲突”待协调清单`, { duration: 8000, closable: true })
     formVisible.value = false
     await fetchList()
   } finally {

@@ -3,8 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RequestContextService } from '../common/context/request-context.service';
 import { DataScopeService } from '../common/scope/data-scope.service';
 import { WorkflowQueryService } from '../workflow/workflow-engine/workflow-query.service';
+import { computeConflicts } from '../room/room-occupancy/room-conflicts.util';
 
-export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE';
+export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE' | 'ROOM_CONFLICT';
 export type TodoLevel = 'danger' | 'warning' | 'info';
 
 export interface TodoItem {
@@ -147,6 +148,9 @@ export class WorkspaceService {
     // 5) 采购流程：客服待汇总的部门申购单 / 已批准待生成采购单 / 采购员待采购 / 客服待收货
     items.push(...(await this.procurementTodos()));
 
+    // 6) 房间预订冲突（同一间房日期重叠或间隔不够整理）：需要排房的人去协调
+    items.push(...(await this.roomConflictTodos()));
+
     items.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.sortAt - b.sortAt);
     const count = (k: TodoKind) => items.filter((i) => i.kind === k).length;
     return {
@@ -160,6 +164,7 @@ export class WorkspaceService {
         COLLECT: count('COLLECT'),
         PURCHASE: count('PURCHASE'),
         RECEIVE: count('RECEIVE'),
+        ROOM_CONFLICT: count('ROOM_CONFLICT'),
       },
       items,
     };
@@ -272,6 +277,51 @@ export class WorkspaceService {
       }
     }
     return out;
+  }
+
+  /** 房间预订冲突汇总成一条待办：几处冲突、最近的从什么时候开始。 */
+  private async roomConflictTodos(): Promise<TodoItem[]> {
+    if (!(await this.ctx.hasPermission('room.occupancy.reschedule'))) return [];
+    const tenantId = this.ctx.tenantId!;
+    const allowed = await this.dataScope.resolveAllowedStoreIds(this.ctx);
+    const rows = await this.prisma.roomOccupancy.findMany({
+      where: { tenantId, storeId: allowed === 'ALL' ? undefined : { in: allowed }, status: { in: ['RESERVED', 'CHECKED_IN'] }, plannedCheckOut: { gte: new Date(Date.now() - 3 * DAY) } },
+      include: { customer: { select: { name: true } }, room: { select: { roomNo: true } }, contract: { select: { status: true } } },
+    });
+    const bufParam = await this.prisma.parameter.findFirst({ where: { tenantId, storeId: null, key: 'room.turnover_buffer_days' } });
+    const buf = bufParam && Number.isFinite(Number(bufParam.value)) ? Math.max(0, Math.floor(Number(bufParam.value))) : 1;
+    const conflicts = computeConflicts(
+      rows.map((r) => ({
+        id: r.id,
+        roomId: r.roomId,
+        occupancyNo: r.occupancyNo,
+        status: r.status as 'RESERVED' | 'CHECKED_IN',
+        plannedCheckIn: r.plannedCheckIn,
+        plannedCheckOut: r.plannedCheckOut,
+        createdAt: r.createdAt,
+        contractId: r.contractId,
+        contractStatus: r.contract?.status ?? null,
+        customerName: r.customer.name,
+        roomNo: r.room.roomNo,
+      })),
+      buf,
+    );
+    if (conflicts.length === 0) return [];
+    const first = conflicts[0];
+    const soon = first.startsInDays <= 14;
+    return [
+      {
+        key: 'room-conflict',
+        kind: 'ROOM_CONFLICT',
+        title: `${conflicts.length} 处房间预订冲突待协调`,
+        desc: `最近的：${first.roomNo} 房 ${first.a.customerName} 与 ${first.b.customerName}，${first.bufferOnly ? '间隔不够整理房间' : `重叠 ${first.overlapDays} 天`}，${first.startsInDays <= 0 ? '已经开始' : `${first.startsInDays} 天后开始`}。点开可一键换房或改日期`,
+        link: '/room/conflicts',
+        dueAt: null,
+        overdue: first.startsInDays <= 0,
+        level: first.startsInDays <= 0 ? 'danger' : soon ? 'warning' : 'info',
+        sortAt: Date.now() + Math.max(0, first.startsInDays) * DAY,
+      },
+    ];
   }
 
   /** 顶栏小红点用：只数数量（轻量）。 */
