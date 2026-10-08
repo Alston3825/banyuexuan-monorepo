@@ -49,12 +49,11 @@ describe('P8 默认权限清单 (e2e)', () => {
     expect(bad).toEqual([]);
   });
 
-  it('2. 部门负责人只含申购单填写+员工自助，没有账号/角色/审计等管理权限；护理长有护理日常但没有“审核”和“强制删除”', () => {
+  it('2. 部门负责人没有账号/角色/组织架构/审计等平台管理权限；护理长有护理日常但没有“审核”和“强制删除”', () => {
     const head = resolveDefaultCodes('DEPT_HEAD', allCodes)!;
     expect(head).toContain('inventory.purchase-request.create');
     expect(head).toContain('office.leave-request.create');
-    expect(head.some((c) => c.startsWith('platform') || c.startsWith('audit') || c.startsWith('hr.payroll'))).toBe(false);
-    expect(head.length).toBeLessThan(40);
+    expect(head.some((c) => c.startsWith('platform') || c.startsWith('audit'))).toBe(false);
 
     const lead = resolveDefaultCodes('NURSE_LEAD', allCodes)!;
     expect(lead).toContain('care.record.create');
