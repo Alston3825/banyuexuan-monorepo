@@ -107,10 +107,16 @@ export class PurchaseRequestService {
   /** 部门负责人新建部门申购单：申请部门取自本人所在部门，申请人=本人；可直接“保存并提交”。 */
   async createDepartment(body: { storeId?: string; requestDate?: string; remark?: string; items: RequestLineBody[]; submit?: boolean }) {
     const me = await this.prisma.account.findUniqueOrThrow({ where: { id: this.ctx.accountId! }, include: { department: { select: { name: true } } } });
-    const storeId = body.storeId ?? me.storeId ?? this.ctx.homeStoreId ?? undefined;
-    if (!storeId) throw new BadRequestException('请选择门店');
+    // 门店：优先用账号所属门店；没设置时，如果管理范围只有一家门店就用它
+    let storeId = body.storeId ?? me.storeId ?? this.ctx.homeStoreId ?? undefined;
+    if (!storeId) {
+      const allowed = await this.dataScope.resolveAllowedStoreIds(this.ctx);
+      if (allowed !== 'ALL' && allowed.length === 1) storeId = allowed[0];
+    }
+    if (!storeId) throw new BadRequestException('您的账号还没有设置所属门店，请联系管理员在“账号管理 → 编辑”里补上门店，再填写申购单');
     await this.dataScope.assertStoreAccessible(this.ctx, storeId);
-    const departmentName = me.department?.name ?? '（未设置部门）';
+    if (!me.department?.name) throw new BadRequestException('您的账号还没有设置所属部门，申购单要写明申请部门。请联系管理员在“账号管理 → 编辑”里补上部门，再填写申购单');
+    const departmentName = me.department.name;
     if (!body.items?.length) throw new BadRequestException('请至少填写一项要申购的物品');
     const lines: Prisma.PurchaseRequestItemUncheckedCreateWithoutPurchaseRequestInput[] = [];
     for (const [i, raw] of body.items.entries()) {

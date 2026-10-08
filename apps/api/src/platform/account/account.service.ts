@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -160,31 +160,87 @@ export class AccountService {
     });
   }
 
+  /**
+   * 给员工分配角色。范围对象可以一次选多个（比如同时管 3 家门店）：每个对象生成一条分配记录，
+   * 已经分配过的自动跳过。校验：角色存在、范围对象存在且必填、不能分配比自己权限大的角色/管不到的范围、不重复。
+   */
   async assignRole(
     accountId: string,
     roleId: string,
     scopeType: 'TENANT' | 'REGION' | 'STORE' | 'DEPARTMENT' | 'TEAM' | 'SELF',
-    scopeId?: string,
+    scopeIds: string[] = [],
   ) {
     await this.findOneOrThrow(accountId);
-    const assignment = await this.prisma.accountRoleAssignment.create({
-      data: {
-        tenantId: this.ctx.tenantId!,
-        accountId,
-        roleId,
-        scopeType,
-        scopeId: scopeId ?? null,
-        grantedBy: this.ctx.accountId!,
-      },
-    });
-    await this.auditLogService.record({
-      action: 'CREATE',
-      entityType: 'AccountRoleAssignment',
-      entityId: assignment.id,
-      afterData: assignment,
-      ...this.auditCtx(),
-    });
-    return assignment;
+    const tenantId = this.ctx.tenantId!;
+
+    // 1) 角色必须存在
+    const role = await this.prisma.role.findFirst({ where: { id: roleId, tenantId }, include: { permissions: { select: { permissionPoint: { select: { code: true } } } } } });
+    if (!role) throw new BadRequestException('所选角色不存在（可能已被删除），请刷新页面后重选');
+
+    // 2) 范围：门店级/区域级/部门级/班组级必须选具体对象（可多选），租户级/仅本人不需要对象
+    const needsId = ['REGION', 'STORE', 'DEPARTMENT', 'TEAM'].includes(scopeType);
+    const ids = needsId ? [...new Set(scopeIds.filter(Boolean))] : [];
+    if (needsId && ids.length === 0) throw new BadRequestException('请选择范围对象（比如“门店级”要选具体是哪家门店，可以多选），不选的话这个角色不会生效');
+    const targets: (string | null)[] = needsId ? ids : [null];
+
+    // 每个范围对象必须存在，并记下它属于哪家门店（用来做越权检查）
+    const storeOf = new Map<string, string | null>();
+    for (const id of ids) {
+      if (scopeType === 'STORE') {
+        if (!(await this.prisma.store.findFirst({ where: { id, tenantId }, select: { id: true } }))) throw new BadRequestException('所选门店不存在');
+        storeOf.set(id, id);
+      } else if (scopeType === 'REGION') {
+        if (!(await this.prisma.region.findFirst({ where: { id, tenantId }, select: { id: true } }))) throw new BadRequestException('所选区域不存在');
+        storeOf.set(id, null);
+      } else if (scopeType === 'DEPARTMENT') {
+        const d = await this.prisma.department.findFirst({ where: { id, tenantId }, select: { storeId: true } });
+        if (!d) throw new BadRequestException('所选部门不存在');
+        storeOf.set(id, d.storeId);
+      } else if (scopeType === 'TEAM') {
+        const t = await this.prisma.team.findFirst({ where: { id, tenantId }, select: { storeId: true } });
+        if (!t) throw new BadRequestException('所选班组不存在');
+        storeOf.set(id, t.storeId);
+      }
+    }
+
+    // 3) 防越权：不能把比自己权限大的角色分给别人（否则有“账号管理”权限的店长能给自己分配超级管理员），
+    //    也不能把范围放大到自己管不到的门店/全公司
+    const myCodes = await this.ctx.getPermissionCodes();
+    const missing = role.permissions.map((p) => p.permissionPoint.code).filter((c) => !myCodes.has(c));
+    if (missing.length > 0) throw new ForbiddenException(`不能分配权限比自己大的角色「${role.name}」（它包含你自己都没有的 ${missing.length} 项权限）。请联系管理员处理`);
+    const allowedStores = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
+    if (allowedStores !== 'ALL') {
+      if (scopeType === 'TENANT') throw new ForbiddenException('只有管理员才能分配“全公司”范围');
+      if (scopeType === 'REGION') throw new ForbiddenException('只有管理员才能分配“区域级”范围');
+      for (const id of ids) {
+        const sid = storeOf.get(id);
+        if (sid && !allowedStores.includes(sid)) throw new ForbiddenException('不能分配到你自己管不到的门店');
+      }
+    }
+
+    // 4) 逐个生成分配记录；同一员工、同一角色、同一范围已经有的跳过
+    const created: Awaited<ReturnType<typeof this.prisma.accountRoleAssignment.create>>[] = [];
+    let skipped = 0;
+    for (const target of targets) {
+      const dup = await this.prisma.accountRoleAssignment.findFirst({ where: { accountId, roleId, scopeType, scopeId: target, revokedAt: null } });
+      if (dup) {
+        skipped++;
+        continue;
+      }
+      const assignment = await this.prisma.accountRoleAssignment.create({
+        data: { tenantId, accountId, roleId, scopeType, scopeId: target, grantedBy: this.ctx.accountId! },
+      });
+      await this.auditLogService.record({
+        action: 'CREATE',
+        entityType: 'AccountRoleAssignment',
+        entityId: assignment.id,
+        afterData: assignment,
+        ...this.auditCtx(),
+      });
+      created.push(assignment);
+    }
+    if (created.length === 0) throw new ConflictException(`这位员工已经有「${role.name}」这个角色（所选范围都已分配过），不需要重复分配`);
+    return { ...created[0], createdCount: created.length, skippedCount: skipped };
   }
 
   /**
@@ -263,7 +319,10 @@ export class AccountService {
     });
   }
 
-  async revokeRoleAssignment(assignmentId: string) {
+  async revokeRoleAssignment(accountId: string, assignmentId: string) {
+    // 必须是这位员工名下的分配记录（以前只按分配编号撤销，路径里的员工编号被忽略）
+    const found = await this.prisma.accountRoleAssignment.findFirst({ where: { id: assignmentId, accountId, tenantId: this.ctx.tenantId } });
+    if (!found) throw new NotFoundException('找不到这条角色分配');
     const assignment = await this.prisma.accountRoleAssignment.update({
       where: { id: assignmentId },
       data: { revokedAt: new Date() },

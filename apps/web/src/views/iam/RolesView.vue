@@ -97,7 +97,19 @@ const permDrawerRole = ref<Role | null>(null)
 const permissionCatalog = ref<PermissionPoint[]>([])
 const checkedKeys = ref<string[]>([])
 
-const permissionTree = computed(() => buildPermissionTree(permissionCatalog.value) as unknown as TreeOption[])
+// 权限点名字里的英文动作（view/create…）翻成中文，勾选时一眼能看懂
+const ACTION_ZH: Record<string, string> = {
+  view: '查看', create: '新建', update: '修改', delete: '删除', submit: '提交', cancel: '取消', approve: '审批', reject: '驳回',
+  execute: '执行', convert: '生成采购单', collect: '汇总', purchase: '确认采购', receive: '收货确认', archive: '归档', restore: '恢复',
+  'change-no': '修改工号', withdraw: '撤回', reassign: '转交', 'add-approver': '加签', cc: '抄送', checkin: '办理入住', checkout: '办理离店',
+  reschedule: '改期/换房', void: '作废', adjust: '调整', lose: '标记流失', import: '导入', 'force-delete': '强制删除', grade: '批阅', publish: '发布',
+}
+function zhName(p: PermissionPoint): string {
+  const last = p.code.split('.').pop() ?? ''
+  const zh = ACTION_ZH[last]
+  return zh && p.name.endsWith(`-${last}`) ? `${p.name.slice(0, -last.length - 1)}-${zh}` : p.name
+}
+const permissionTree = computed(() => buildPermissionTree(permissionCatalog.value.map((p) => ({ ...p, name: zhName(p) }))) as unknown as TreeOption[])
 const isSystemRole = computed(() => permDrawerRole.value?.isSystem === true)
 
 async function openPermissionDrawer(row: Role) {

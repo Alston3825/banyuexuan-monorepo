@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
 
 const SCOPE_TYPES = ['TENANT', 'REGION', 'STORE', 'DEPARTMENT', 'TEAM', 'SELF'] as const;
 
@@ -12,4 +12,9 @@ export class AssignRoleDto {
   @IsOptional()
   @IsString()
   scopeId?: string;
+  @ApiProperty({ required: false, description: '范围对象可多选（如同时管多家门店），每个对象生成一条分配' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scopeIds?: string[];
 }

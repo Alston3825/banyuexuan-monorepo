@@ -81,13 +81,13 @@ export class AccountController {
   @Post(':id/role-assignments')
   @RequirePermission('platform.account.update')
   assignRole(@Param('id') id: string, @Body() dto: AssignRoleDto) {
-    return this.accountService.assignRole(id, dto.roleId, dto.scopeType, dto.scopeId);
+    return this.accountService.assignRole(id, dto.roleId, dto.scopeType, dto.scopeIds?.length ? dto.scopeIds : dto.scopeId ? [dto.scopeId] : []);
   }
 
   @Delete(':id/role-assignments/:assignmentId')
   @RequirePermission('platform.account.update')
-  revokeRoleAssignment(@Param('assignmentId') assignmentId: string) {
-    return this.accountService.revokeRoleAssignment(assignmentId);
+  revokeRoleAssignment(@Param('id') id: string, @Param('assignmentId') assignmentId: string) {
+    return this.accountService.revokeRoleAssignment(id, assignmentId);
   }
 
   @Delete(':id')

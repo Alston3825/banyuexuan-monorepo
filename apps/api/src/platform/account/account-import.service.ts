@@ -291,7 +291,7 @@ export class AccountImportService {
           hireDate: new Date(`${r.hireDate ?? new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10)}T00:00:00.000Z`).toISOString(),
         });
         if (input.importProfileDetails) await this.writeProfileDetails(account.id, r);
-        if (input.roleId) await this.accountService.assignRole(account.id, input.roleId, 'STORE', storeId);
+        if (input.roleId) await this.accountService.assignRole(account.id, input.roleId, 'STORE', [storeId]);
         results.push({ rowNo: r.rowNo, name: r.name, ok: true, employeeNo: r.employeeNo! });
       } catch (e) {
         results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: (e as { response?: { message?: string } }).response?.message ?? (e as Error).message });

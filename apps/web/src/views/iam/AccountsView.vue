@@ -17,6 +17,8 @@ import {
   NThing,
   NDivider,
   NDatePicker,
+  NRadio,
+  NRadioGroup,
   type DataTableColumns,
   type FormInst,
 } from 'naive-ui'
@@ -26,6 +28,7 @@ import { departmentApi } from '../../api/modules/department.api'
 import { teamApi } from '../../api/modules/team.api'
 import { positionApi } from '../../api/modules/position.api'
 import { roleApi } from '../../api/modules/role.api'
+import { regionApi } from '../../api/modules/region.api'
 import { employeeProfileApi } from '../../api/modules/hr.api'
 import type { EmployeeProfile } from '../../api/types/hr'
 import type { Account, DataScopeType } from '../../api/types/account'
@@ -59,18 +62,18 @@ async function fetchList() {
 }
 
 async function fetchPickerOptions() {
-  const [stores, departments, teams, positions, roles] = await Promise.all([
-    storeApi.list(),
-    departmentApi.list(),
-    teamApi.list(),
-    positionApi.list(),
-    roleApi.list(),
+  // 每一项单独兜底：没有“角色/区域”查看权限的店长打开页面时，门店/部门等下拉也要能正常加载
+  const soft = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[])
+  const [stores, departments, teams, positions, roles, regions] = await Promise.all([
+    soft(storeApi.list()),
+    soft(departmentApi.list()),
+    soft(teamApi.list()),
+    soft(positionApi.list()),
+    soft(roleApi.list()),
+    soft(regionApi.list()),
   ])
   storeOptions.value = stores.map((s) => ({ label: s.name, value: s.id }))
-  regionOptions.value = Array.from(new Map(stores.map((s) => [s.regionId, s.regionId])).keys()).map((id) => ({
-    label: id,
-    value: id,
-  }))
+  regionOptions.value = regions.map((r) => ({ label: r.name, value: r.id }))
   departmentOptions.value = departments.map((d) => ({ label: d.name, value: d.id }))
   teamOptions.value = teams.map((t) => ({ label: t.name, value: t.id }))
   positionOptions.value = positions.map((p) => ({ label: p.name, value: p.id }))
@@ -277,7 +280,7 @@ async function handleResetPassword() {
 // ---------------- 角色分配 ----------------
 const roleDrawerVisible = ref(false)
 const roleDrawerAccount = ref<Account | null>(null)
-const assignModel = ref({ roleId: '', scopeType: 'STORE' as DataScopeType, scopeId: undefined as string | undefined })
+const assignModel = ref({ roleId: '', scopeType: 'STORE' as DataScopeType, scopeIds: [] as string[] })
 const assignSubmitting = ref(false)
 
 const scopeIdOptions = computed(() => {
@@ -295,28 +298,54 @@ const scopeIdOptions = computed(() => {
   }
 })
 
+// 范围对象的名字（以前直接显示一串编号）
+function scopeName(a: { scopeType: DataScopeType; scopeId: string | null }): string {
+  if (!a.scopeId) return ''
+  const pool = a.scopeType === 'STORE' ? storeOptions.value : a.scopeType === 'REGION' ? regionOptions.value : a.scopeType === 'DEPARTMENT' ? departmentOptions.value : teamOptions.value
+  return pool.find((o) => o.value === a.scopeId)?.label ?? '（已删除或无权查看）'
+}
+
 async function openRoleDrawer(row: Account) {
   const fresh = await accountApi.get(row.id)
   roleDrawerAccount.value = fresh
-  assignModel.value = { roleId: '', scopeType: 'STORE', scopeId: undefined }
+  // 默认：门店级 + 这位员工所在的门店，少点一下也不容易选错
+  assignModel.value = { roleId: '', scopeType: 'STORE', scopeIds: fresh.storeId ? [fresh.storeId] : [] }
   roleDrawerVisible.value = true
 }
+// 换了“范围”类型，原来选的对象就不适用了
+function onScopeTypeChange() {
+  assignModel.value.scopeIds = assignModel.value.scopeType === 'STORE' && roleDrawerAccount.value?.storeId ? [roleDrawerAccount.value.storeId] : []
+}
+// 这位员工已经有的“同角色 + 同范围”，选了也不会重复添加，提前在界面上提示
+const alreadyHas = computed(() => {
+  const m = assignModel.value
+  if (!m.roleId) return []
+  return (roleDrawerAccount.value?.roleAssignments ?? [])
+    .filter((a) => a.roleId === m.roleId && a.scopeType === m.scopeType && (!a.scopeId || m.scopeIds.includes(a.scopeId)))
+    .map((a) => scopeName(a) || SCOPE_TYPE_LABEL_MAP[a.scopeType])
+})
 
 async function handleAssignRole() {
   if (!roleDrawerAccount.value || !assignModel.value.roleId) {
     message.error('请选择角色')
     return
   }
+  const needsObj = !['TENANT', 'SELF'].includes(assignModel.value.scopeType)
+  if (needsObj && assignModel.value.scopeIds.length === 0) {
+    message.error('请选择范围对象（比如具体是哪几家门店，可以多选），不选的话这个角色不会生效')
+    return
+  }
   assignSubmitting.value = true
   try {
-    await accountApi.assignRole(roleDrawerAccount.value.id, {
+    const res = await accountApi.assignRole(roleDrawerAccount.value.id, {
       roleId: assignModel.value.roleId,
       scopeType: assignModel.value.scopeType,
-      scopeId: ['TENANT', 'SELF'].includes(assignModel.value.scopeType) ? undefined : assignModel.value.scopeId,
+      scopeIds: needsObj ? assignModel.value.scopeIds : undefined,
     })
-    message.success('已分配角色')
+    const r = res as unknown as { createdCount?: number; skippedCount?: number }
+    message.success(`已分配角色${r.createdCount && r.createdCount > 1 ? `（${r.createdCount} 个范围）` : ''}${r.skippedCount ? `，另有 ${r.skippedCount} 个范围本来就有，已跳过` : ''}。员工重新登录后生效`)
     roleDrawerAccount.value = await accountApi.get(roleDrawerAccount.value.id)
-    assignModel.value = { roleId: '', scopeType: 'STORE', scopeId: undefined }
+    assignModel.value = { roleId: '', scopeType: 'STORE', scopeIds: roleDrawerAccount.value.storeId ? [roleDrawerAccount.value.storeId] : [] }
   } finally {
     assignSubmitting.value = false
   }
@@ -478,7 +507,7 @@ onMounted(async () => {
             <n-thing :title="a.role?.name ?? a.roleId">
               <template #description>
                 {{ SCOPE_TYPE_LABEL_MAP[a.scopeType] }}
-                <span v-if="a.scopeId">（{{ a.scopeId }}）</span>
+                <b v-if="a.scopeId">：{{ scopeName(a) }}</b>
               </template>
             </n-thing>
             <template #suffix>
@@ -493,22 +522,20 @@ onMounted(async () => {
           <n-form-item label="角色">
             <n-select v-model:value="assignModel.roleId" :options="roleOptions" />
           </n-form-item>
-          <n-form-item label="范围">
-            <n-select
-              v-model:value="assignModel.scopeType"
-              :options="[
-                { label: '租户级', value: 'TENANT' },
-                { label: '区域级', value: 'REGION' },
-                { label: '门店级', value: 'STORE' },
-                { label: '部门级', value: 'DEPARTMENT' },
-                { label: '班组级', value: 'TEAM' },
-                { label: '仅本人', value: 'SELF' },
-              ]"
-            />
+          <!-- 现在只有门店这一层需要区分（区域/部门/班组/仅本人用不上，已从这里隐藏；以前分配过的仍会正常显示和生效） -->
+          <n-form-item label="管哪些门店">
+            <n-radio-group v-model:value="assignModel.scopeType" @update:value="onScopeTypeChange">
+              <n-space vertical :size="4">
+                <n-radio value="STORE">指定门店（可多选，推荐：员工只能看到所选门店的数据）</n-radio>
+                <n-radio value="TENANT">全部门店（含以后新开的店，一般只给管理员/总部人员）</n-radio>
+              </n-space>
+            </n-radio-group>
           </n-form-item>
-          <n-form-item v-if="!['TENANT', 'SELF'].includes(assignModel.scopeType)" label="范围对象">
-            <n-select v-model:value="assignModel.scopeId" :options="scopeIdOptions" />
+          <n-form-item v-if="!['TENANT', 'SELF'].includes(assignModel.scopeType)" label="选择门店">
+            <n-select v-model:value="assignModel.scopeIds" :options="scopeIdOptions" multiple filterable clearable placeholder="点选门店，可以多选" />
           </n-form-item>
+          <p v-if="alreadyHas.length" style="color: #d9822b; font-size: 12px; margin: -6px 0 8px 80px">这位员工已经有这个角色的：{{ alreadyHas.join('、') }}（重复的会自动跳过）</p>
+          <p style="color: #999; font-size: 12px; margin: 0 0 8px 80px">分配后，员工需要重新登录（最多 30 分钟内自动刷新）才会生效。</p>
           <n-button type="primary" :loading="assignSubmitting" @click="handleAssignRole">添加分配</n-button>
         </n-form>
       </n-drawer-content>

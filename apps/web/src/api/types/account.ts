@@ -117,4 +117,6 @@ export interface AssignRoleDto {
   roleId: string
   scopeType: DataScopeType
   scopeId?: string
+  /** 范围对象可多选（如同时管多家门店），每个对象生成一条分配 */
+  scopeIds?: string[]
 }
