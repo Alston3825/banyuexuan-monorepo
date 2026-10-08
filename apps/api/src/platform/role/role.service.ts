@@ -15,8 +15,9 @@ export class RoleService {
     private readonly ctx: RequestContextService,
   ) {}
 
-  findMany(): Promise<Role[]> {
-    return this.prisma.role.findMany({ include: { permissions: { include: { permissionPoint: true } } } });
+  /** 列表只带每个权限点的编号（不展开权限点详情）：线上一个大角色有几百项，展开后整张列表近 1MB，网络慢时会请求失败 */
+  findMany() {
+    return this.prisma.role.findMany({ include: { permissions: { select: { id: true, roleId: true, permissionPointId: true } } } });
   }
 
   async findOneOrThrow(id: string) {
@@ -167,19 +168,22 @@ export class RoleService {
     return { granted: toCreate.length, revoked: r.length };
   }
 
-  /** 这个角色与“默认权限清单”的差异：要新增哪些、要撤销哪些（没有默认清单的角色 hasDefault=false） */
+  /**
+   * 这个角色与“默认权限清单”的差异：要新增哪些、要撤销哪些（没有默认清单的角色 hasDefault=false）。
+   * 只比较具体操作权限（BUTTON）：模块/页面这类“上级节点”是勾选树在子项全勾上时自动带上的，不算多余也不用补。
+   */
   async defaultsPreview(roleId: string) {
     const role = await this.assertMutable(roleId);
-    const points = await this.prisma.permissionPoint.findMany({ select: { id: true, code: true, name: true } });
+    const points = await this.prisma.permissionPoint.findMany({ select: { id: true, code: true, name: true, type: true } });
     const wanted = resolveDefaultCodes(role.code, points.map((p) => p.code));
     if (!wanted) return { hasDefault: false, add: [], remove: [], defaultCount: 0 };
+    const buttons = points.filter((p) => p.type === 'BUTTON');
     const want = new Set(wanted);
     const current = await this.prisma.roleOnPermission.findMany({ where: { roleId }, select: { permissionPointId: true } });
     const have = new Set(current.map((c) => c.permissionPointId));
-    const byId = new Map(points.map((p) => [p.id, p]));
-    const add = points.filter((p) => want.has(p.code) && !have.has(p.id));
-    const remove = [...have].map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p && !want.has(p.code));
-    return { hasDefault: true, add, remove, defaultCount: want.size };
+    const add = buttons.filter((p) => want.has(p.code) && !have.has(p.id));
+    const remove = buttons.filter((p) => have.has(p.id) && !want.has(p.code));
+    return { hasDefault: true, add, remove, defaultCount: buttons.filter((p) => want.has(p.code)).length };
   }
 
   /** 把角色的权限一键还原成默认清单（多出来的撤销，缺的补上）。只有管理员手工触发，种子/发版不会自动撤销权限。 */

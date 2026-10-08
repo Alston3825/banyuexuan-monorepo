@@ -5,7 +5,8 @@ export interface RoleOnPermission {
   id: string
   roleId: string
   permissionPointId: string
-  permissionPoint: PermissionPoint
+  /** 角色列表接口不带详情，只有单个角色详情接口才带 */
+  permissionPoint?: PermissionPoint
 }
 
 export interface Role {

@@ -86,8 +86,9 @@ describe('P8 默认权限清单 (e2e)', () => {
     const res = (await request(server).post(`/api/v1/platform/roles/${role.id}/restore-defaults`).set(authed(adminToken)).expect(201)).body as Json;
     expect(res.granted).toBeGreaterThanOrEqual(1);
     expect(res.revoked).toBe(1);
-    const now = (await prisma.roleOnPermission.findMany({ where: { roleId: role.id }, include: { permissionPoint: true } })).map((x) => x.permissionPoint.code).sort();
-    expect(now).toEqual([...resolveDefaultCodes('DEPT_HEAD', allCodes)!].sort());
+    const buttons = new Set((await prisma.permissionPoint.findMany({ where: { type: 'BUTTON' }, select: { code: true } })).map((x) => x.code));
+    const now = (await prisma.roleOnPermission.findMany({ where: { roleId: role.id }, include: { permissionPoint: true } })).map((x) => x.permissionPoint.code).filter((c) => buttons.has(c)).sort();
+    expect(now).toEqual(resolveDefaultCodes('DEPT_HEAD', allCodes)!.filter((c) => buttons.has(c)).sort());
 
     // 没有默认清单的自定义角色
     const custom = (await request(server).post('/api/v1/platform/roles').set(authed(adminToken)).send({ code: `DFT${Date.now().toString().slice(-6)}`, name: '默认清单测试' }).expect(201)).body as Json;

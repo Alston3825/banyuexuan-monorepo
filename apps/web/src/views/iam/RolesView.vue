@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import {
   NButton,
   NSpace,
@@ -176,19 +176,40 @@ async function handleCheckedKeysChange(newKeys: (string | number)[]) {
   // 如果等接口都返回了才更新，勾选一个大模块要cascade并发十几个请求，这段等待期间
   // 界面上checkbox看起来跟点之前一样没变化，很容易被当成"权限点不动/选不上"。
   checkedKeys.value = [...newKeySet]
-  try {
-    // 一次请求批量保存（以前一个权限点一个请求，勾选大模块几百个请求会超过限流，表现成“保存失败”）
-    await roleApi.changePermissions(roleId, added, removed)
-  } catch (err) {
-    checkedKeys.value = [...oldKeySet] // 接口失败要把勾选状态退回去，不能让界面显示的跟后端实际保存的对不上
-    message.error('权限保存失败，请重试')
-    throw err
-  }
-  // 后台悄悄刷新表格缓存的角色列表，但不重新赋值 permDrawerRole——如果把它换成一个新的
-  // 对象引用，权限树会因为props整体变化被迫完整重新渲染，在勾选项很多时会有一瞬间空白，
-  // 这跟上面"没有乐观更新导致看起来点不动"是同一类问题的另一半成因，两处一起改。
-  fetchList()
+  // 保存请求排队一个接一个发（快速连点时不会同时发好几个，网络差时也不会互相抢）；
+  // 网络没通（没拿到任何回应）时自动重试，这个接口重复提交是安全的。
+  saveQueue = saveQueue.then(async () => {
+    try {
+      await saveWithRetry(roleId, added, removed)
+    } catch {
+      // 接口失败要把这次改动在界面上退回去，不能让界面显示的跟后端实际保存的对不上
+      const cur = new Set(checkedKeys.value)
+      added.forEach((k) => cur.delete(k))
+      removed.forEach((k) => cur.add(k))
+      checkedKeys.value = [...cur]
+      message.error('权限保存失败，请重试')
+    }
+  })
+  await saveQueue
 }
+
+let saveQueue: Promise<void> = Promise.resolve()
+async function saveWithRetry(roleId: string, added: string[], removed: string[]) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      // 一次请求批量保存（以前一个权限点一个请求，勾选大模块几百个请求会超过限流，表现成“保存失败”）
+      return await roleApi.changePermissions(roleId, added, removed)
+    } catch (err) {
+      const noResponse = !(err as { response?: unknown }).response
+      if (!noResponse || attempt >= 2) throw err
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)))
+    }
+  }
+}
+// 关闭抽屉后再刷新表格里的角色列表（以前每勾一下就整张列表重新下载一次）
+watch(permDrawerVisible, (v) => {
+  if (!v) fetchList()
+})
 
 const columns: DataTableColumns<Role> = [
   { key: 'name', title: '名称' },
