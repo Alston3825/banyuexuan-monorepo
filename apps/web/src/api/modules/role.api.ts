@@ -7,6 +7,9 @@ export const roleApi = {
   create: (body: CreateRoleDto) => http.post<Role>('/platform/roles', body).then((r) => r.data),
   update: (id: string, body: UpdateRoleDto) => http.patch<Role>(`/platform/roles/${id}`, body).then((r) => r.data),
   remove: (id: string) => http.delete(`/platform/roles/${id}`).then((r) => r.data),
+  /** 批量调整权限（一次请求，勾选大模块也不会被限流） */
+  changePermissions: (id: string, grant: string[], revoke: string[]) =>
+    http.put<{ granted: number; revoked: number }>(`/platform/roles/${id}/permissions`, { grant, revoke }).then((r) => r.data),
   grantPermission: (id: string, permissionPointId: string) =>
     http.post(`/platform/roles/${id}/permissions`, { permissionPointId }).then((r) => r.data),
   revokePermission: (id: string, permissionPointId: string) =>

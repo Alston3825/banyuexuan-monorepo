@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
@@ -134,6 +134,34 @@ export class RoleService {
       remark: `roleId=${roleId} permissionPointId=${permissionPointId}`,
       ...this.auditCtx(),
     });
+  }
+
+  /**
+   * 批量调整权限：一次请求同时授予 grant、撤销 revoke（勾选一个大模块可能是几百个权限点，
+   * 逐个发请求会超过全局限流，只保存了一部分还提示“保存失败”）。整体在一个事务里，要么全成功要么全不变。
+   */
+  async changePermissions(roleId: string, grant: string[], revoke: string[]) {
+    await this.assertMutable(roleId);
+    const g = [...new Set(grant)].filter((id) => !revoke.includes(id));
+    const r = [...new Set(revoke)];
+    if (g.length + r.length > 1000) throw new BadRequestException('一次最多调整 1000 个权限点');
+    const known = await this.prisma.permissionPoint.findMany({ where: { id: { in: [...g, ...r] } }, select: { id: true } });
+    if (known.length !== g.length + r.length) throw new BadRequestException('存在不存在的权限点');
+    const existing = await this.prisma.roleOnPermission.findMany({ where: { roleId, permissionPointId: { in: g } }, select: { permissionPointId: true } });
+    const have = new Set(existing.map((e) => e.permissionPointId));
+    const toCreate = g.filter((id) => !have.has(id));
+    await this.prisma.$transaction([
+      this.prisma.roleOnPermission.createMany({ data: toCreate.map((permissionPointId) => ({ roleId, permissionPointId, createdBy: this.ctx.accountId! })) }),
+      this.prisma.roleOnPermission.deleteMany({ where: { roleId, permissionPointId: { in: r } } }),
+    ]);
+    await this.auditLogService.record({
+      action: 'UPDATE',
+      entityType: 'Role',
+      entityId: roleId,
+      remark: `批量调整权限：新增 ${toCreate.length} 个，撤销 ${r.length} 个`,
+      ...this.auditCtx(),
+    });
+    return { granted: toCreate.length, revoked: r.length };
   }
 
   /** 内置系统角色（如 SUPER_ADMIN）不可改名/删除/调整权限，保护平台最小可用性。 */

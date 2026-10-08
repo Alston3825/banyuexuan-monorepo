@@ -123,10 +123,8 @@ async function handleCheckedKeysChange(newKeys: (string | number)[]) {
   // 界面上checkbox看起来跟点之前一样没变化，很容易被当成"权限点不动/选不上"。
   checkedKeys.value = [...newKeySet]
   try {
-    await Promise.all([
-      ...added.map((id) => roleApi.grantPermission(roleId, id)),
-      ...removed.map((id) => roleApi.revokePermission(roleId, id)),
-    ])
+    // 一次请求批量保存（以前一个权限点一个请求，勾选大模块几百个请求会超过限流，表现成“保存失败”）
+    await roleApi.changePermissions(roleId, added, removed)
   } catch (err) {
     checkedKeys.value = [...oldKeySet] // 接口失败要把勾选状态退回去，不能让界面显示的跟后端实际保存的对不上
     message.error('权限保存失败，请重试')

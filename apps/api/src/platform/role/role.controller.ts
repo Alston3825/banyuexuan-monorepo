@@ -1,10 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { IsArray, IsString } from 'class-validator';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { RoleService } from './role.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
+
+class ChangePermissionsDto {
+  @IsArray() @IsString({ each: true }) grant: string[];
+  @IsArray() @IsString({ each: true }) revoke: string[];
+}
 
 @ApiTags('platform/role')
 @Controller('platform/roles')
@@ -40,6 +46,13 @@ export class RoleController {
   @RequirePermission('platform.role.delete')
   remove(@Param('id') id: string) {
     return this.roleService.delete(id);
+  }
+
+  /** 批量调整权限：一次请求授予 grant、撤销 revoke（勾选大模块时用，避免触发限流） */
+  @Put(':id/permissions')
+  @RequirePermission('platform.role.update')
+  changePermissions(@Param('id') id: string, @Body() dto: ChangePermissionsDto) {
+    return this.roleService.changePermissions(id, dto.grant, dto.revoke);
   }
 
   @Post(':id/permissions')
