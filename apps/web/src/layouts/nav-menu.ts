@@ -224,6 +224,9 @@ const navGroups: NavGroup[] = [
       { label: '请假申请', to: '/office/leave-requests', icon: Calendar, perm: 'office.leave-request' },
       { label: '报销申请', to: '/office/expense-claims', icon: Card, perm: 'office.expense-claim' },
       { label: '日常签呈', to: '/office/general-memos', icon: DocumentText, perm: 'office.general-memo' },
+      // 原“审批流程”分组并入办公审批：示例审批单、流程设置（谁来审批、几级审批、处理时限）
+      { label: '示例审批单', to: '/workflow/demo-approvals', icon: DocumentText, perm: 'workflow.demo-approval' },
+      { label: '流程设置', to: '/workflow/settings', icon: List, perm: 'workflow.definition' },
     ],
   },
   {
@@ -270,14 +273,6 @@ const navGroups: NavGroup[] = [
       { label: '角色管理', to: '/iam/roles', icon: Key, perm: 'platform.role' },
       { label: '权限目录', to: '/iam/permissions', icon: Shield, perm: 'platform.permission' },
       { label: '应用管理', to: '/iam/applications', icon: Apps, perm: 'platform.application' },
-    ],
-  },
-  {
-    label: '审批流程',
-    key: 'group-workflow',
-    items: [
-      { label: '示例审批单', to: '/workflow/demo-approvals', icon: DocumentText, perm: 'workflow.demo-approval' },
-      { label: '流程设置', to: '/workflow/settings', icon: List, perm: 'workflow.definition' },
     ],
   },
   {
