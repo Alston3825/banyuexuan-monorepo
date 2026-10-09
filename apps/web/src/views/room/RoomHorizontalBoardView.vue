@@ -151,7 +151,8 @@ async function fetchStaticData() {
 // 不按当前查看年度过滤——一次性把这个门店全部未取消的占用记录都拉回来，切年份/滚动
 // 纯前端重新计算，不用重新请求；"超出当前窗口"的提示条也是从这份完整数据里筛出来的，
 // 不需要单独再查一次。这个门店的占用记录量级（几十~小几百条）拉全量没有性能问题。
-// 预订冲突：同一间房日期重叠（或间隔不够整理）的预订——色块画成红色斜纹并上下分两行，顶上有提示条
+// 预订冲突：同一间房日期重叠（或间隔不够整理）的预订——两个客户的色条都标成红色（保持原宽度），
+// 真正重叠的那几天另外用醒目的斜线图案盖在上面标出来，顶上有提示条
 const conflicts = ref<RoomConflict[]>([])
 const conflictIds = computed(() => new Set(conflicts.value.flatMap((c) => [c.a.id, c.b.id])))
 let initialScrolled = false
@@ -213,11 +214,36 @@ interface Bar {
   clippedLeft: boolean
   clippedRight: boolean
   label: string
-  /** 同一间房里重叠的色块分两行显示：0=上行（或独占整行），1=下行 */
-  lane: number
-  split: boolean
   conflict: boolean
 }
+interface OverlapMark {
+  key: string
+  left: number
+  width: number
+  label: string
+}
+/** 同一间房里两个预订真正重叠的那几天：算出区间，画成斜线图案盖在两条红色色条上 */
+function overlapsForRoom(roomId: string): OverlapMark[] {
+  const winStart = startOfDay(new Date(windowStart.value))
+  const marks: OverlapMark[] = []
+  for (const c of conflicts.value) {
+    if (c.roomId !== roomId || c.bufferOnly) continue
+    const from = Math.max(startOfDay(new Date(c.a.plannedCheckIn)).getTime(), startOfDay(new Date(c.b.plannedCheckIn)).getTime())
+    const to = Math.min(startOfDay(new Date(c.a.plannedCheckOut)).getTime(), startOfDay(new Date(c.b.plannedCheckOut)).getTime())
+    if (from >= to) continue
+    const startIdx = Math.max(0, diffDays(winStart, new Date(from)))
+    const endIdx = Math.min(dayCount.value, diffDays(winStart, new Date(to)))
+    if (endIdx <= startIdx) continue
+    marks.push({
+      key: `${c.a.id}-${c.b.id}`,
+      left: startIdx * CELL_WIDTH,
+      width: (endIdx - startIdx) * CELL_WIDTH - 2,
+      label: `日期重叠 ${fmtMD(new Date(from))}-${fmtMD(new Date(to))}（${c.overlapDays}晚）：${c.a.customerName} 与 ${c.b.customerName}`,
+    })
+  }
+  return marks
+}
+
 function barsForRoom(roomId: string): Bar[] {
   const list = occupanciesByRoom.value.get(roomId) ?? []
   const winStart = startOfDay(new Date(windowStart.value))
@@ -240,21 +266,9 @@ function barsForRoom(roomId: string): Bar[] {
       clippedLeft: rawStart < 0,
       clippedRight: rawEnd > dayCount.value,
       label: `${custName}，${diffDays(ci, co)}晚，${fmtMD(ci)}-${fmtMD(co)}`,
-      lane: 0,
-      split: false,
       conflict: conflictIds.value.has(occ.id),
     })
   }
-  // 重叠的色块分上下两行，免得互相盖住
-  bars.sort((x, y) => x.left - y.left)
-  const laneEnd = [-1, -1]
-  for (const b of bars) {
-    const lane = b.left >= laneEnd[0] ? 0 : 1
-    b.lane = lane
-    laneEnd[lane] = b.left + b.width + CELL_WIDTH // 留出 1 天整理间隔
-  }
-  const hasLane1 = bars.some((b) => b.lane === 1)
-  if (hasLane1) for (const b of bars) b.split = true
   return bars
 }
 
@@ -542,7 +556,7 @@ onMounted(async () => {
     </n-space>
 
     <n-alert v-if="conflicts.length > 0" type="error" style="margin-bottom: 12px" :show-icon="false">
-      <b>有 {{ conflicts.length }} 处预订冲突</b>（同一间房日期重叠，或两位之间不够整理房间，色块已标成红色斜纹）。预订阶段允许这样排，入住前要协调好：
+      <b>有 {{ conflicts.length }} 处预订冲突</b>（同一间房日期重叠，或两位之间不够整理房间，两个客户的色条标成红色、重叠的日期用斜线标出）。预订阶段允许这样排，入住前要协调好：
       <router-link to="/room/conflicts" style="margin-left: 6px">去协调（可一键换空房 / 改日期）</router-link>
     </n-alert>
 
@@ -631,13 +645,20 @@ onMounted(async () => {
               v-for="bar in barsForRoom(room.id)"
               :key="bar.occ.id"
               class="occ-bar"
-              :class="[bar.occ.status.toLowerCase(), { 'clip-left': bar.clippedLeft, 'clip-right': bar.clippedRight, conflict: bar.conflict, split: bar.split }]"
-              :style="{ left: bar.left + 'px', width: bar.width + 'px', ...(bar.split ? { top: 3 + bar.lane * 18 + 'px' } : {}) }"
+              :class="[bar.occ.status.toLowerCase(), { 'clip-left': bar.clippedLeft, 'clip-right': bar.clippedRight, conflict: bar.conflict }]"
+              :style="{ left: bar.left + 'px', width: bar.width + 'px' }"
               :title="bar.label"
               @click.stop="openDetail(bar.occ)"
             >
               <span class="bar-label" :style="{ left: TYPE_COL_WIDTH + ROOM_COL_WIDTH + 6 + 'px' }">{{ bar.label }}</span>
             </div>
+            <div
+              v-for="m in overlapsForRoom(room.id)"
+              :key="m.key"
+              class="overlap-mark"
+              :style="{ left: m.left + 'px', width: m.width + 'px' }"
+              :title="m.label"
+            />
           </div>
         </div>
       </div>
@@ -890,19 +911,24 @@ onMounted(async () => {
 .occ-bar.checked_out {
   background: #b0b0b0;
 }
-.occ-bar.split {
-  height: 16px;
-  line-height: 16px;
-  font-size: 11px;
+/* 预订冲突：两个客户的色条都标红（保持原宽度，不缩窄） */
+.occ-bar.conflict,
+.occ-bar.conflict.reserved,
+.occ-bar.conflict.checked_in {
+  background: #d9364f;
 }
-/* 预订冲突：红色斜纹 + 红边框 */
-.occ-bar.conflict {
-  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.28) 5px, transparent 5px, transparent 10px);
-  outline: 2px solid #d03050;
-  outline-offset: -2px;
-}
-.occ-bar.conflict.reserved {
-  background-color: #e0566f;
+/* 真正重叠的那几天：深红底 + 白色粗斜线，盖在两条红色色条上 */
+.overlap-mark {
+  position: absolute;
+  top: 5px;
+  height: 30px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(45deg, #7a0f22 0, #7a0f22 5px, #ffffff 5px, #ffffff 9px);
+  opacity: 0.9;
+  outline: 2px solid #7a0f22;
+  outline-offset: -1px;
+  z-index: 3;
+  pointer-events: none;
 }
 .occ-bar.clip-left {
   border-top-left-radius: 0;
