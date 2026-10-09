@@ -26,6 +26,7 @@ import { AiModule } from './ai/ai.module';
 import { IotModule } from './iot/iot.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TrainingModule } from './training/training.module';
+import { RecycleBinModule } from './common/recycle/recycle-bin.module';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -47,6 +48,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     WorkflowModule,
     WorkspaceModule,
     CrmModule,
+    RecycleBinModule,
     ContractModule,
     RoomModule,
     PaymentModule,

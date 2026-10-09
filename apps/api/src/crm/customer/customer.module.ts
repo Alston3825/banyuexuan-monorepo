@@ -4,8 +4,10 @@ import { TagModule } from '../../platform/tag/tag.module';
 import { CustomerController } from './customer.controller';
 import { CustomerService } from './customer.service';
 
+import { RecycleBinModule } from '../../common/recycle/recycle-bin.module';
+
 @Module({
-  imports: [TagModule, CareArchiveModule],
+  imports: [RecycleBinModule, TagModule, CareArchiveModule],
   controllers: [CustomerController],
   providers: [CustomerService],
   exports: [CustomerService],

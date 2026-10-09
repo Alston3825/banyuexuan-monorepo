@@ -7,7 +7,8 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { CareStorageService } from '../care-document/care-storage.service';
-import { deleteMotherProfilesTx, motherProfilesDeleteCheck } from '../profile-delete.util';
+import { addProfileExtras, motherProfilesDeleteCheck } from '../profile-delete.util';
+import { RecycleBinService } from '../../common/recycle/recycle-bin.service';
 import { CreateMotherProfileDto } from './dto/create-mother-profile.dto';
 import { UpdateMotherProfileDto } from './dto/update-mother-profile.dto';
 import { QueryMotherProfileDto } from './dto/query-mother-profile.dto';
@@ -29,6 +30,7 @@ export class MotherProfileService {
     private readonly prisma: PrismaService,
     private readonly customerService: CustomerService,
     private readonly storage: CareStorageService,
+    private readonly recycleBin: RecycleBinService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
   ) {}
@@ -82,17 +84,25 @@ export class MotherProfileService {
   async remove(id: string, force = false, confirmName?: string): Promise<void> {
     const check = await this.getDeleteCheck(id);
     const before = await this.findOneOrThrow(id);
-    if (check.blockers.length > 0) {
+    // 护理痕迹：普通人不能删，只有超级管理员（crm.customer.force-delete）带 force 才能连同删
+    const superAdmin = await this.ctx.hasPermission('crm.customer.force-delete');
+    if (check.blockers.length > 0 && !(force && superAdmin)) {
       throw new ConflictException(`该档案已有${check.blockers.join('、')}，属于护理痕迹，不能删除；不再使用请点“归档”`);
     }
-    if (check.attached.length > 0) {
+    if (check.attached.length > 0 || check.blockers.length > 0) {
       if (!force) throw new ConflictException(`该档案名下已有${check.attached.join('、')}，直接删除会丢失这些数据；需要管理员确认后连同它们一起删除`);
       if (!check.canForceDelete) throw new ForbiddenException('该档案名下已有宝宝/评估表/纸质资料，连同删除需要管理员权限，请联系管理员');
       // （先验权限再验名字，没权限的人不用被要求输入名字）
       if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`请输入客户姓名「${check.customerName}」确认删除`);
     }
-    const docIds = await this.prisma.$transaction((tx) => deleteMotherProfilesTx(tx, [id]));
-    for (const d of docIds) await this.storage.removeDocumentDir(d).catch(() => undefined);
+    // 进回收站（保留30天可还原），纸质资料文件到期清除时才真正删除
+    await this.recycleBin.deleteToBin({
+      entityType: 'MOTHER_PROFILE',
+      rootTable: 'mother_profiles',
+      rootId: id,
+      title: `${check.customerName} 的母婴档案`,
+      addExtras: addProfileExtras,
+    });
     await this.auditLogService.record({
       action: 'DELETE',
       entityType: 'MotherProfile',

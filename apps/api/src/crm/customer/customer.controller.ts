@@ -7,6 +7,7 @@ import { TagService } from '../../platform/tag/tag.service';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { MergeCustomerDto } from './dto/merge-customer.dto';
 import { ArchiveCustomerDto } from './dto/archive-customer.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
 import { SetCustomerTagDto } from './dto/set-customer-tag.dto';
@@ -64,6 +65,12 @@ export class CustomerController {
     return this.customerService.checkIdCard(idCardNo);
   }
 
+  @Get('merge-preview')
+  @RequirePermission('crm.customer.merge')
+  mergePreview(@Query('sourceId') sourceId: string, @Query('targetId') targetId: string) {
+    return this.customerService.mergePreview(sourceId, targetId);
+  }
+
   @Get(':id')
   @RequirePermission('crm.customer.view')
   @AuditSensitiveQuery()
@@ -96,6 +103,14 @@ export class CustomerController {
   @RequirePermission('crm.customer.delete')
   remove(@Param('id') id: string, @Query('confirmName') confirmName?: string) {
     return this.customerService.remove(id, confirmName);
+  }
+
+  /** 合并重复客户：source 的所有数据并入 target，source 进回收站 */
+  @Post('merge')
+  @HttpCode(204)
+  @RequirePermission('crm.customer.merge')
+  merge(@Body() dto: MergeCustomerDto) {
+    return this.customerService.merge(dto.sourceId, dto.targetId);
   }
 
   /** 归档客户：用过的客户不删，列表默认隐藏、不能再新建预订/合同，可恢复 */

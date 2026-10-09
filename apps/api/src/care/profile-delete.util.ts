@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import { TreeCollector } from '../common/recycle/recycle-tree.util';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -67,4 +68,10 @@ export async function deleteMotherProfilesTx(tx: Prisma.TransactionClient, mothe
   await tx.babyProfile.deleteMany({ where: { motherProfileId: { in: motherIds } } });
   await tx.motherProfile.deleteMany({ where: { id: { in: motherIds } } });
   return docs.map((d) => d.id);
+}
+
+/** 回收站用：母婴档案/宝宝上没有外键的标签绑定，当作档案的数据一并收集。 */
+export async function addProfileExtras(c: TreeCollector): Promise<void> {
+  await c.collectByIdColumn('tag_bindings', 'entity_id', c.idsOf('mother_profiles'), "entity_type = 'MOTHER_PROFILE'");
+  await c.collectByIdColumn('tag_bindings', 'entity_id', c.idsOf('baby_profiles'), "entity_type = 'BABY_PROFILE'");
 }

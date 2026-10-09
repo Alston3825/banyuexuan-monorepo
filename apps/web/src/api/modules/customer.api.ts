@@ -1,5 +1,6 @@
 import { http } from '../client'
 import type {
+  MergePreview,
   Customer,
   CreateCustomerDto,
   UpdateCustomerDto,
@@ -32,6 +33,10 @@ export const customerApi = {
   remove: (id: string, confirmName?: string) => http.delete(`/crm/customers/${id}`, { params: confirmName ? { confirmName } : undefined }).then(() => undefined),
   archive: (id: string, reason?: string) => http.post(`/crm/customers/${id}/archive`, { reason }).then(() => undefined),
   restore: (id: string) => http.post(`/crm/customers/${id}/restore`).then(() => undefined),
+  /** 合并重复客户：预览会转走哪些数据、有没有冲突 */
+  mergePreview: (sourceId: string, targetId: string) =>
+    http.get<MergePreview>('/crm/customers/merge-preview', { params: { sourceId, targetId } }).then((r) => r.data),
+  merge: (sourceId: string, targetId: string) => http.post('/crm/customers/merge', { sourceId, targetId }).then(() => undefined),
   tagCatalog: (category: string) =>
     http.get<{ id: string; name: string; category: string | null; color: string | null }[]>('/crm/customers/tag-catalog', { params: { category } }).then((r) => r.data),
   listTags: (id: string) => http.get<CustomerTagBinding[]>(`/crm/customers/${id}/tags`).then((r) => r.data),

@@ -8,7 +8,9 @@ import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { checkIdCard } from '../../common/utils/id-card.util';
 import { CareStorageService } from '../../care/care-document/care-storage.service';
-import { deleteMotherProfilesTx, motherProfilesDeleteCheck } from '../../care/profile-delete.util';
+import { addProfileExtras, motherProfilesDeleteCheck } from '../../care/profile-delete.util';
+import { RecycleBinService } from '../../common/recycle/recycle-bin.service';
+import { TABLE_LABELS, TreeCollector } from '../../common/recycle/recycle-tree.util';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { QueryCustomerDto } from './dto/query-customer.dto';
@@ -25,6 +27,7 @@ export class CustomerService {
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
     private readonly storage: CareStorageService,
+    private readonly recycleBin: RecycleBinService,
   ) {}
 
   findMany(query: QueryCustomerDto): Promise<Customer[]> {
@@ -219,46 +222,138 @@ export class CustomerService {
       linkedLeads,
       canDelete: await this.ctx.hasPermission('crm.customer.delete'),
       canForceDeleteCare: await this.ctx.hasPermission('care.profile.force-delete'),
+      canForceDelete: await this.ctx.hasPermission('crm.customer.force-delete'),
       archived: !!c.archivedAt,
     };
   }
 
-  /** 删除建错的客户：见 getDeleteCheck 的规则；需要 crm.customer.delete。 */
+  /**
+   * 删除客户：见 getDeleteCheck 的规则；需要 crm.customer.delete。
+   * 删除都先进回收站（保留30天，超级管理员可还原），不是立刻永久删除。
+   * 有合同/入住/收款等“用过”的客户，只有持 crm.customer.force-delete（超级管理员）的人输入客户姓名后才能连同全部数据一起删。
+   */
   async remove(id: string, confirmName?: string): Promise<void> {
     const check = await this.getDeleteCheck(id);
     const before = await this.findOneOrThrow(id);
     if (!check.canDelete) throw new ForbiddenException('删除客户需要管理员权限；不再使用的客户可以“归档”');
+    const everything = [...check.blockers, ...check.attached];
     if (check.blockers.length > 0) {
-      throw new ConflictException(`该客户已有${check.blockers.join('、')}，属于财务/医疗痕迹，不能删除；不再使用请点“归档”`);
-    }
-    if (check.attached.length > 0) {
+      if (!check.canForceDelete) throw new ConflictException(`该客户已有${check.blockers.join('、')}，属于财务/医疗痕迹，不能删除；不再使用请点“归档”`);
+      if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`该客户名下有${everything.join('、')}，删除会连同这些一并删除（进回收站，30天内可还原）；请输入客户姓名「${check.customerName}」确认`);
+    } else if (check.attached.length > 0) {
       const hasCare = check.attached.some((a) => a.includes('母婴档案') || a.includes('宝宝'));
       if (hasCare && !check.canForceDeleteCare) throw new ForbiddenException('该客户名下有母婴档案，连同删除需要“强制删除档案”权限，请联系管理员');
-      if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`该客户名下有${check.attached.join('、')}，删除会一并永久删除；请输入客户姓名「${check.customerName}」确认`);
+      if (confirmName?.trim() !== check.customerName) throw new BadRequestException(`该客户名下有${check.attached.join('、')}，删除会一并删除（进回收站，30天内可还原）；请输入客户姓名「${check.customerName}」确认`);
     }
-    const mothers = await this.prisma.motherProfile.findMany({ where: { customerId: id }, select: { id: true } });
-    const opps = await this.prisma.salesOpportunity.findMany({ where: { customerId: id }, select: { id: true } });
-    const docIds = await this.prisma.$transaction(async (tx) => {
-      const ids = await deleteMotherProfilesTx(tx, mothers.map((m) => m.id));
-      await tx.lead.updateMany({ where: { customerId: id }, data: { customerId: null } });
-      await tx.followUpRecord.deleteMany({
-        where: { tenantId: this.ctx.tenantId, OR: [{ businessType: 'CUSTOMER', businessId: id }, { businessType: 'OPPORTUNITY', businessId: { in: opps.map((o) => o.id) } }] },
-      });
-      await tx.tagBinding.deleteMany({ where: { OR: [{ entityType: 'Customer', entityId: id }, { entityType: 'SalesOpportunity', entityId: { in: opps.map((o) => o.id) } }] } });
-      await tx.salesOpportunity.deleteMany({ where: { customerId: id } });
-      await tx.customer.updateMany({ where: { referrerType: 'CUSTOMER', referrerId: id }, data: { referrerType: null, referrerId: null } });
-      await tx.customer.delete({ where: { id } });
-      return ids;
+    const { summary } = await this.recycleBin.deleteToBin({
+      entityType: 'CUSTOMER',
+      rootTable: 'customers',
+      rootId: id,
+      title: before.name,
+      collectOptions: { keepNullables: ['leads.customer_id'] },
+      addExtras: (c) => this.addCustomerExtras(c, id),
     });
-    for (const d of docIds) await this.storage.removeDocumentDir(d).catch(() => undefined);
     await this.auditLogService.record({
       action: 'DELETE',
       entityType: 'Customer',
       entityId: id,
       beforeData: before,
-      remark: check.attached.length > 0 ? `管理员连同 ${check.attached.join('、')} 一起删除客户「${before.name}」` : `删除客户「${before.name}」`,
+      remark: summary ? `连同 ${summary} 一起删除客户「${before.name}」（已进回收站）` : `删除客户「${before.name}」（已进回收站）`,
       ...this.auditCtx(),
     });
+  }
+
+  /** 没有外键的多态关联：标签绑定、跟进记录、其他客户的“推荐人”指向。 */
+  private async addCustomerExtras(c: TreeCollector, id: string): Promise<void> {
+    const oppIds = c.idsOf('sales_opportunities');
+    await c.collectByIdColumn('tag_bindings', 'entity_id', [id], "entity_type = 'Customer'");
+    await c.collectByIdColumn('tag_bindings', 'entity_id', oppIds, "entity_type = 'SalesOpportunity'");
+    await c.collectByIdColumn('follow_up_records', 'business_id', [id], "business_type = 'CUSTOMER'");
+    await c.collectByIdColumn('follow_up_records', 'business_id', oppIds, "business_type = 'OPPORTUNITY'");
+    await addProfileExtras(c);
+    // 别的客户若把它当“推荐人”：只清空推荐人，还原时接回
+    const refs = await this.prisma.customer.findMany({ where: { referrerType: 'CUSTOMER', referrerId: id }, select: { id: true, referrerType: true, referrerId: true } });
+    if (refs.length > 0) {
+      c.nulls.push({ table: 'customers', column: 'referrer_type', items: refs.map((r) => ({ id: r.id, value: r.referrerType })) });
+      c.nulls.push({ table: 'customers', column: 'referrer_id', items: refs.map((r) => ({ id: r.id, value: r.referrerId })) });
+    }
+  }
+
+  /** 合并预览：把 sourceId 的哪些数据转到 targetId 名下，有没有冲突。 */
+  async mergePreview(sourceId: string, targetId: string) {
+    const { source, target } = await this.loadMergePair(sourceId, targetId);
+    const refs = await new TreeCollector(this.prisma).referrers('customers');
+    const moves: { label: string; count: number }[] = [];
+    for (const r of refs) {
+      const rows = await this.prisma.$queryRawUnsafe<{ n: number | bigint }[]>(`SELECT COUNT(*) AS n FROM \`${r.table}\` WHERE \`${r.column}\` = ?`, sourceId);
+      const n = Number(rows[0]?.n ?? 0);
+      if (n > 0) moves.push({ label: TABLE_LABELS[r.table] ?? r.table, count: n });
+    }
+    const conflicts: string[] = [];
+    const [sAcc, tAcc] = await Promise.all([this.prisma.customerAccount.count({ where: { customerId: sourceId } }), this.prisma.customerAccount.count({ where: { customerId: targetId } })]);
+    if (sAcc > 0 && tAcc > 0) conflicts.push('两位客户都有会员账户，余额需要先人工处理后才能合并');
+    return { source: { id: source.id, name: source.name, customerNo: source.customerNo }, target: { id: target.id, name: target.name, customerNo: target.customerNo }, moves, conflicts };
+  }
+
+  /**
+   * 合并重复客户：把 source 名下的合同/入住/收款/档案/线索/标签/跟进等全部转到 target，
+   * target 缺的资料用 source 的补上，source 本身进回收站（30天内可还原成独立客户，但已转走的数据不会自动回去）。
+   */
+  async merge(sourceId: string, targetId: string): Promise<void> {
+    const preview = await this.mergePreview(sourceId, targetId);
+    if (preview.conflicts.length > 0) throw new ConflictException(preview.conflicts.join('；'));
+    const { source, target } = await this.loadMergePair(sourceId, targetId);
+    const refs = await new TreeCollector(this.prisma).referrers('customers');
+    const fillable = ['wechat', 'serviceTypes', 'hospital', 'idCardNo', 'emergencyContactName', 'emergencyContactRelation', 'emergencyContactPhone', 'birthday', 'zone', 'hisNo', 'passportNo', 'expectedDueDate', 'region', 'address', 'assignedToId', 'phoneSalesId', 'channelTypeId', 'channelId', 'primaryStoreId'] as const;
+    const patch: Record<string, unknown> = {};
+    for (const f of fillable) {
+      const tv = (target as Record<string, unknown>)[f];
+      const sv = (source as Record<string, unknown>)[f];
+      if ((tv === null || tv === undefined || tv === '') && sv !== null && sv !== undefined && sv !== '') patch[f] = sv;
+    }
+    if (!target.referrerType && source.referrerType && source.referrerId !== targetId) {
+      patch.referrerType = source.referrerType;
+      patch.referrerId = source.referrerId;
+    }
+    try {
+      await this.recycleBin.deleteToBin({
+        entityType: 'CUSTOMER',
+        rootTable: 'customers',
+        rootId: sourceId,
+        title: `${source.name}（已合并到 ${target.name}）`,
+        reason: 'MERGE',
+        collectOptions: { keepNullables: ['leads.customer_id'] },
+        beforeDelete: async (tx) => {
+          for (const r of refs) {
+            await tx.$executeRawUnsafe(`UPDATE \`${r.table}\` SET \`${r.column}\` = ? WHERE \`${r.column}\` = ?`, targetId, sourceId);
+          }
+          await tx.$executeRawUnsafe("UPDATE `follow_up_records` SET `business_id` = ? WHERE `business_type` = 'CUSTOMER' AND `business_id` = ?", targetId, sourceId);
+          await tx.$executeRawUnsafe("UPDATE `tag_bindings` SET `entity_id` = ? WHERE `entity_type` = 'Customer' AND `entity_id` = ?", targetId, sourceId);
+          await tx.$executeRawUnsafe("UPDATE `customers` SET `referrer_id` = ? WHERE `referrer_type` = 'CUSTOMER' AND `referrer_id` = ?", targetId, sourceId);
+          await tx.customer.update({ where: { id: targetId }, data: { ...(patch as Prisma.CustomerUpdateInput), version: { increment: 1 } } });
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/Duplicate entry|1062/.test(msg)) throw new ConflictException('合并失败：两位客户在某类记录上有互相冲突的数据（唯一性限制），请先人工处理后再合并');
+      throw e;
+    }
+    await this.auditLogService.record({
+      action: 'UPDATE',
+      entityType: 'Customer',
+      entityId: targetId,
+      remark: `合并客户：把「${source.name}」(${source.customerNo}) 的${preview.moves.map((m) => `${m.count} ${m.label}`).join('、') || '资料'}并入「${target.name}」(${target.customerNo})`,
+      ...this.auditCtx(),
+    });
+  }
+
+  private async loadMergePair(sourceId: string, targetId: string) {
+    if (sourceId === targetId) throw new BadRequestException('不能把客户合并到自己');
+    const [source, target] = await Promise.all([this.findOneOrThrow(sourceId), this.findOneOrThrow(targetId)]);
+    if (source.tenantId !== this.ctx.tenantId || target.tenantId !== this.ctx.tenantId) throw new NotFoundException('客户不存在');
+    if (source.archivedAt) throw new ConflictException(`客户「${source.name}」已归档，请先恢复再合并`);
+    if (target.archivedAt) throw new ConflictException(`客户「${target.name}」已归档，不能作为合并目标`);
+    return { source, target };
   }
 
   /** 归档客户（连同名下母婴档案一起归档）：列表默认隐藏、不能再新建预订/合同，可恢复。 */

@@ -8,6 +8,7 @@ import { storeApi } from '../../api/modules/store.api'
 import type { Customer, StaffOption } from '../../api/types/customer'
 import { useAuthStore } from '../../stores/auth'
 import RecordRemovalDialog from '../../components/crm/RecordRemovalDialog.vue'
+import CustomerMergeDialog from '../../components/crm/CustomerMergeDialog.vue'
 
 const router = useRouter()
 const rows = ref<Customer[]>([])
@@ -18,6 +19,12 @@ const auth = useAuthStore()
 const view = ref<'active' | 'archived'>('active')
 const removal = ref<{ id: string; label: string } | null>(null)
 const removalShow = ref(false)
+const merging = ref<{ id: string; label: string } | null>(null)
+const mergeShow = ref(false)
+function openMerge(row: Customer) {
+  merging.value = { id: row.id, label: `${row.name}（${row.customerNo}）` }
+  mergeShow.value = true
+}
 function openRemoval(row: Customer) {
   removal.value = { id: row.id, label: row.name }
   removalShow.value = true
@@ -74,13 +81,14 @@ const columns: DataTableColumns<Customer> = [
   {
     key: 'actions',
     title: '操作',
-    width: 230,
+    width: 290,
     fixed: 'right',
     render: (row) =>
       h(NSpace, null, {
         default: () => [
           h(NButton, { size: 'small', onClick: () => router.push(`/crm/customers/${row.id}/edit`) }, { default: () => '编辑' }),
           h(NButton, { size: 'small', onClick: () => router.push(`/crm/customers/${row.id}`) }, { default: () => '查看详情' }),
+          ...(auth.hasAccess('crm.customer.merge') && !row.archivedAt ? [h(NButton, { size: 'small', onClick: () => openMerge(row) }, { default: () => '合并' })] : []),
           ...(auth.hasAccess('crm.customer.archive')
             ? [h(NButton, { size: 'small', type: row.archivedAt ? 'primary' : 'warning', ghost: true, onClick: () => openRemoval(row) }, { default: () => (row.archivedAt ? '恢复/删除' : '归档/删除') })]
             : []),
@@ -108,5 +116,6 @@ onMounted(async () => {
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Customer) => r.id" :scroll-x="1320" />
     <record-removal-dialog v-if="removal" v-model:show="removalShow" kind="customer" :id="removal.id" :label="removal.label" @done="fetchList" />
+    <customer-merge-dialog v-if="merging" v-model:show="mergeShow" :source-id="merging.id" :source-label="merging.label" @done="fetchList" />
   </div>
 </template>

@@ -142,7 +142,7 @@ export interface RemovalCheck {
   /** 客户：有没有“删除客户”权限 */
   canDelete?: boolean
   canForceDeleteCare?: boolean
-  /** 母婴档案：有没有“强制删除档案”权限 */
+  /** 客户：有没有“强制删除（连同合同/收款等）”权限；母婴档案：有没有“强制删除档案”权限 */
   canForceDelete?: boolean
   archived: boolean
 }
@@ -165,4 +165,11 @@ export interface CustomerTagBinding {
   createdAt: string
   revokedAt: string | null
   tag: { id: string; name: string; category: string | null; color: string | null }
+}
+
+export interface MergePreview {
+  source: { id: string; name: string; customerNo: string }
+  target: { id: string; name: string; customerNo: string }
+  moves: { label: string; count: number }[]
+  conflicts: string[]
 }

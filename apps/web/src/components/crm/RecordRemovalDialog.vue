@@ -25,13 +25,16 @@ const canDelete = computed(() => {
   if (!c) return false
   return props.kind === 'customer' ? !!c.canDelete : true
 })
-const needsConfirm = computed(() => (check.value?.attached.length ?? 0) > 0)
+// 客户：超级管理员（强制删除权限）可以连同合同/收款等一起删（进回收站）；其他人用过的只能归档
+const forceMode = computed(() => props.kind === 'customer' && (check.value?.blockers.length ?? 0) > 0 && !!check.value?.canForceDelete && !!check.value?.canDelete)
+const needsConfirm = computed(() => (check.value?.attached.length ?? 0) > 0 || forceMode.value)
+const everything = computed(() => [...(check.value?.blockers ?? []), ...(check.value?.attached ?? [])])
 const careForceMissing = computed(() => {
   const c = check.value
   if (!c || !needsConfirm.value) return false
   return props.kind === 'customer' ? c.attached.some((a) => a.includes('母婴档案') || a.includes('宝宝')) && !c.canForceDeleteCare : !c.canForceDelete
 })
-const blocked = computed(() => (check.value?.blockers.length ?? 0) > 0)
+const blocked = computed(() => (check.value?.blockers.length ?? 0) > 0 && !forceMode.value)
 const subject = computed(() => (props.kind === 'customer' ? '客户' : '母婴档案'))
 
 async function load() {
@@ -70,7 +73,7 @@ const doDelete = () =>
       props.kind === 'customer'
         ? customerApi.remove(props.id, needsConfirm.value ? confirm.value.trim() : undefined)
         : motherProfileApi.remove(props.id, needsConfirm.value ? { force: true, confirmName: confirm.value.trim() } : undefined),
-    `已永久删除${subject.value}`,
+    `已删除${subject.value}，放入回收站（30天内可还原）`,
   )
 </script>
 
@@ -91,11 +94,13 @@ const doDelete = () =>
         <!-- 录错的：可以删 -->
         <template v-else>
           <p v-if="!needsConfirm" style="margin: 0 0 10px; line-height: 1.7">
-            没有任何关联数据，可以直接<b>删除</b>（永久删除，不能恢复，操作会记入审计日志）。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
+            没有任何关联数据，可以直接<b>删除</b>（会放入回收站保留 30 天，操作会记入审计日志）。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
           </p>
           <div v-else style="margin-bottom: 10px; line-height: 1.7">
-            名下有：<b style="color: #c0392b">{{ check.attached.join('、') }}</b>。<br />
-            删除会把它们<b>一起永久删除</b>（含纸质原件照片），不能恢复，操作会记入审计日志。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
+            名下有：<b style="color: #c0392b">{{ everything.join('、') }}</b>。<br />
+            <template v-if="forceMode">这个{{ subject }}已经用过（有合同/入住/收款等），<b>只有超级管理员能强制删除</b>，会把上面这些<b>全部一起删除</b>。</template>
+            <template v-else>删除会把它们<b>一起删除</b>（含纸质原件照片）。</template>
+            删除后放入<b>回收站</b>，保留 30 天，期内可在“系统管理 → 回收站”还原；操作会记入审计日志。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
             <n-input v-if="canDelete && !careForceMissing" v-model:value="confirm" style="margin-top: 8px" :placeholder="`请输入客户姓名“${check.customerName}”确认删除`" />
           </div>
           <p v-if="!canDelete" style="color: #d9822b; margin: 0 0 10px">删除{{ subject }}需要管理员权限；你可以先<b>归档</b>，让管理员来删。</p>
@@ -117,7 +122,7 @@ const doDelete = () =>
               :disabled="!canDelete || careForceMissing || (needsConfirm && confirm.trim() !== check.customerName)"
               @click="doDelete"
             >
-              永久删除
+              {{ forceMode ? '强制删除（放入回收站）' : '删除（放入回收站）' }}
             </n-button>
           </template>
         </n-space>

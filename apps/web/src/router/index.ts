@@ -121,6 +121,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'workflow/approvals', name: 'workflow-approvals', component: () => import('../views/workflow/ApprovalCenterView.vue'), meta: { title: '审批中心' } },
       { path: 'workflow/settings', name: 'workflow-settings', component: () => import('../views/workflow/WorkflowSettingsView.vue'), meta: { title: '审批流程设置' } },
       { path: 'workflow/definitions', redirect: '/workflow/settings' },
+      { path: 'recycle-bin', name: 'recycle-bin', component: () => import('../views/RecycleBinView.vue'), meta: { title: '回收站' } },
       { path: 'audit-logs', name: 'audit-logs', component: () => import('../views/AuditLogView.vue'), meta: { title: '审计日志' } },
     ],
   },

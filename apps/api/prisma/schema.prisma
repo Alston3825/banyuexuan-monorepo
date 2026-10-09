@@ -4158,3 +4158,22 @@ model ExamAnswer {
   @@index([tenantId, attemptId])
   @@map("exam_answers")
 }
+
+/// 回收站：删除客户/母婴档案时，把它和名下所有数据存成一份快照（保留30天），期内可原样还原；到期自动清除
+model RecycleBinItem {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id")
+  entityType String    @map("entity_type") // CUSTOMER / MOTHER_PROFILE
+  entityId   String    @map("entity_id")
+  title      String // 显示名，如客户姓名
+  summary    String?   @db.Text // 一并删除了什么，如“2 份合同、1 笔收款”
+  payload    String    @db.LongText // 快照（JSON 文本）：各表被删除的行 + 被置空的关联
+  fileDocIds Json?     @map("file_doc_ids") // 到期清除时要一并删掉磁盘文件的资料 id
+  reason     String? // 删除原因 / 来源（如 合并客户）
+  deletedBy  String    @map("deleted_by")
+  deletedAt  DateTime  @default(now()) @map("deleted_at")
+  expiresAt  DateTime  @map("expires_at")
+
+  @@index([tenantId, entityType, expiresAt])
+  @@map("recycle_bin_items")
+}

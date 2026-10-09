@@ -308,7 +308,7 @@ async function main() {
   }
   permSpecs.push({ code: 'audit.log.view', name: '审计日志-查询-view', type: 'BUTTON', parentCode: 'audit.log' });
 
-  for (const action of ['view', 'create', 'update', 'archive', 'delete']) {
+  for (const action of ['view', 'create', 'update', 'archive', 'delete', 'merge', 'force-delete', 'restore']) {
     permSpecs.push({ code: `crm.customer.${action}`, name: `CRM-客户-${action}`, type: 'BUTTON', parentCode: 'crm.customer' });
   }
   // 具体渠道资料：所有人可查看（新建客户要选），新增/改名/停用只给 SUPER_ADMIN（见下方 storeManagerExcluded）
@@ -477,7 +477,7 @@ async function main() {
   for (const action of ['view', 'create', 'submit', 'cancel']) {
     permSpecs.push({ code: `hr.commission-record.${action}`, name: `人事-业绩提成-${action}`, type: 'BUTTON', parentCode: 'hr.commission-record' });
   }
-  for (const action of ['view', 'create', 'submit', 'mark-paid', 'cancel']) {
+  for (const action of ['view', 'view-all', 'create', 'submit', 'mark-paid', 'cancel']) {
     permSpecs.push({ code: `hr.payroll-record.${action}`, name: `人事-薪资单-${action}`, type: 'BUTTON', parentCode: 'hr.payroll-record' });
   }
   for (const action of ['view', 'recharge', 'consume', 'refund', 'adjust']) {

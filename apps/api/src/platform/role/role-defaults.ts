@@ -236,7 +236,9 @@ function storeManagerCodes(allCodes: string[]): string[] {
   const storeManagerExcluded = new Set([
     'crm.channel.create',
     'crm.channel.update',
-    'crm.customer.delete', // 永久删除客户只给超级管理员；店长只能归档
+    'crm.customer.delete', // 删除客户只给超级管理员；店长只能归档
+    'crm.customer.force-delete', // 连同合同/收款等一并删除：只给超级管理员
+    'crm.customer.restore', // 回收站（还原/彻底删除）：只给超级管理员
     'platform.store.delete',
     'room.room.force-delete',
     'care.profile.force-delete',
@@ -322,7 +324,7 @@ function storeStaffCodes(allCodes: string[]): string[] {
   // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
   // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
   // 另外"删除房间"(room.room.delete)是不可逆操作，只给店长/管理员，普通员工不开放。
-  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive', 'crm.customer.archive']); // 审核护理计划只给店长/护理主任
+  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive', 'crm.customer.archive', 'crm.customer.merge', 'hr.payroll-record.view-all']); // 审核护理计划只给店长/护理主任
   return storeManagerCodes_.filter(
     (code) =>
       !storeStaffExcluded.has(code) &&

@@ -291,6 +291,7 @@ const navGroups: NavGroup[] = [
       { label: '设备类型', to: '/iot/device-types', icon: HardwareChipOutline, perm: 'iot.device-type' },
       { label: '标签管理', to: '/base/tags', icon: Pricetags, perm: 'platform.tag' },
       { label: '参数配置', to: '/base/parameters', icon: Options, perm: 'platform.parameter' },
+      { label: '回收站', to: '/recycle-bin', icon: DocumentText, perm: 'crm.customer.restore' },
       { label: '审计日志', to: '/audit-logs', icon: DocumentText, perm: 'audit.log' },
     ],
   },

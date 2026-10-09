@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PayrollRecord } from '@prisma/client';
+import { PayrollRecord, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -42,9 +42,34 @@ export class PayrollRecordService {
     private readonly ctx: RequestContextService,
   ) {}
 
+  /**
+   * 薪资可见范围：持有 hr.payroll-record.view-all（店长/管理员）看全部；
+   * 其他人（如部门负责人）只能看自己所在部门（含下级部门）以及被授予 DEPARTMENT 范围的部门，外加自己的薪资单。
+   * 返回 null 表示不限制。
+   */
+  private async scopeFilter(): Promise<Prisma.PayrollRecordWhereInput | null> {
+    if (await this.ctx.hasPermission('hr.payroll-record.view-all')) return null;
+    const me = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId! }, select: { departmentId: true } });
+    const grants = await this.ctx.getScopeGrants();
+    let frontier = [...new Set([me?.departmentId, ...grants.filter((g) => g.scopeType === 'DEPARTMENT').map((g) => g.scopeId)].filter((x): x is string => !!x))];
+    const all = new Set(frontier);
+    while (frontier.length > 0) {
+      const children = await this.prisma.department.findMany({ where: { parentId: { in: frontier } }, select: { id: true } });
+      frontier = children.map((c) => c.id).filter((id) => !all.has(id));
+      frontier.forEach((id) => all.add(id));
+    }
+    return {
+      OR: [
+        ...(all.size > 0 ? [{ employeeProfile: { account: { departmentId: { in: [...all] } } } }] : []),
+        { employeeProfile: { accountId: this.ctx.accountId! } },
+      ],
+    };
+  }
+
   async findMany(query: QueryPayrollRecordDto = {}): Promise<PayrollRecord[]> {
+    const scope = await this.scopeFilter();
     const records = await this.prisma.payrollRecord.findMany({
-      where: { tenantId: this.ctx.tenantId, storeId: query.storeId, employeeProfileId: query.employeeProfileId, period: query.period, status: query.status },
+      where: { tenantId: this.ctx.tenantId, storeId: query.storeId, employeeProfileId: query.employeeProfileId, period: query.period, status: query.status, ...(scope ? { AND: [scope] } : {}) },
       include: includeRecord,
       orderBy: { createdAt: 'desc' },
     });
@@ -52,7 +77,8 @@ export class PayrollRecordService {
   }
 
   async findOneOrThrow(id: string): Promise<PayrollRecord> {
-    const record = await this.prisma.payrollRecord.findUnique({ where: { id }, include: includeRecord });
+    const scope = await this.scopeFilter();
+    const record = await this.prisma.payrollRecord.findFirst({ where: { id, ...(scope ? { AND: [scope] } : {}) }, include: includeRecord });
     if (!record) throw new NotFoundException(`PayrollRecord ${id} 不存在`);
     return this.reconcileStatus(record);
   }
