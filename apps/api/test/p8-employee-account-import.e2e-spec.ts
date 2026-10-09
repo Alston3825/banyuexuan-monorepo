@@ -32,7 +32,7 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
     expect(r.status).toBe(code);
     return r;
   };
-  const PHONES = ['19900000001', '19900000002', '19900000003', '19900000006', '19900000008', '19900000011', '19900000012', '19900000020'];
+  const PHONES = ['19900000001', '19900000002', '19900000003', '19900000006', '19900000008', '19900000011', '19900000012', '19900000020', '19900000031', '19900000032'];
 
   async function cleanup() {
     const accounts = await prisma.account.findMany({ where: { phone: { in: PHONES } }, select: { id: true } });
@@ -137,8 +137,10 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
   it('3. 手机号唯一：再导入同一张表，已开通的手机号提示“已经是某某的账号”；手工新建/修改手机号撞号返回 409', async () => {
     const again = (await upload().expect(201)).body as Json;
     const r2 = again.rows.find((r: Json) => r.rowNo === 2);
-    expect(r2.issues.filter((i: Json) => i.level === 'error').map((i: Json) => i.text).join()).toContain('已经是「导入测试甲」的账号');
-    expect(again.rows.find((r: Json) => r.rowNo === 2).issues.map((i: Json) => i.text).join()).toContain('工号 IMP-001 已经分配给「导入测试甲」');
+    // 手机号已是系统里的账号：不再报错，提示“已有账号，不新建、不改动”（表里工号和现有相同）
+    expect(r2.issues.filter((i: Json) => i.level === 'error')).toHaveLength(0);
+    expect(r2.issues.map((i: Json) => i.text).join()).toContain('已有账号「导入测试甲」，不新建、不改动');
+    expect(r2.existingAccountId).toBeTruthy();
 
     const dup = await request(server).post('/api/v1/platform/accounts').set(authed(adminToken)).send({ username: 'dup_phone_x', realName: '撞号', password: 'banyuexuan', phone: '19900000001', storeId }).expect(409);
     expect(dup.body.message).toContain('同一个手机号只能开一个账号');
@@ -216,5 +218,54 @@ describe('P8 员工信息表开通账号 / 手机号工号唯一 / 离职归档 
     await login('19900000099', 'banyuexuan').expect(401); // 不存在的手机号
     await prisma.account.update({ where: { id: acc.id }, data: { status: 'DISABLED' } });
     await login('19900000020', 'banyuexuan').expect(401);
+  });
+
+  it('8. 已有账号按表里的工号改号（含互换）；门店有工号规则时必须按前缀；新建预填也按前缀', async () => {
+    const base = (name: string, phone: string, employeeNo: string) => ({ rowNo: 1, employeeNo, name, phone, storeName: null, teamName: null, departmentName: null, positionName: null, hireDate: '2026-01-01', contractType: null, socialInsurance: null, idCardNo: null, bankAccountNo: null, bankName: null, remark: null });
+    const commit = (rows: Json[], token = adminToken) => request(server).post('/api/v1/platform/accounts/import/commit').set(authed(token)).send({ rows, storeId, createMissing: true, importProfileDetails: false });
+    const noOf = async (phone: string) => (await prisma.employeeProfile.findFirstOrThrow({ where: { account: { phone } } })).activeEmployeeNo;
+    const a = await noOf('19900000001');
+    const b = await noOf('19900000002');
+
+    // 店长没有“修改工号”权限：改不了
+    const denied = (await commit([base('导入测试甲', '19900000001', 'IMP-801')], managerToken).expect(201)).body as Json;
+    expect(denied.renumbered).toBe(0);
+    expect(denied.failed[0].error).toContain('权限');
+    expect(await noOf('19900000001')).toBe(a);
+
+    // 管理员：改号 + 两人互换
+    const r1 = (await commit([base('导入测试甲', '19900000001', 'IMP-801')]).expect(201)).body as Json;
+    expect(r1).toMatchObject({ created: 0, renumbered: 1 });
+    expect(await noOf('19900000001')).toBe('IMP-801');
+    const swap = (await commit([{ ...base('导入测试甲', '19900000001', b!), rowNo: 1 }, { ...base('导入测试乙', '19900000002', 'IMP-801'), rowNo: 2 }]).expect(201)).body as Json;
+    expect(swap.renumbered).toBe(2);
+    expect(await noOf('19900000001')).toBe(b);
+    expect(await noOf('19900000002')).toBe('IMP-801');
+    // 撞到表外别人的工号：拒绝
+    const other = await prisma.employeeProfile.findFirstOrThrow({ where: { activeEmployeeNo: { not: null }, account: { phone: { notIn: ['19900000001', '19900000002'] } } } });
+    const clash = (await commit([base('导入测试甲', '19900000001', other.activeEmployeeNo!)]).expect(201)).body as Json;
+    expect(clash.renumbered).toBe(0);
+    expect(clash.failed[0].error).toContain('已经分配给');
+    // 还原
+    await commit([{ ...base('导入测试甲', '19900000001', a!), rowNo: 1 }, { ...base('导入测试乙', '19900000002', b!), rowNo: 2 }]).expect(201);
+    expect(await noOf('19900000001')).toBe(a);
+    expect(await noOf('19900000002')).toBe(b);
+
+    // 门店工号规则：该门店工号必须以前缀开头
+    await prisma.store.update({ where: { id: storeId }, data: { employeeNoPrefix: '7' } });
+    try {
+      const bad = (await commit([base('导入测试前缀', '19900000031', '8001')]).expect(201)).body as Json;
+      expect(bad.created).toBe(0);
+      expect(bad.failed[0].error).toContain('必须以 7 开头');
+      const next = (await request(server).get('/api/v1/hr/employee-profiles/next-no').query({ storeId }).set(authed(adminToken)).expect(200)).body as Json;
+      expect(next.employeeNo).toBe('701');
+      const okRes = (await commit([base('导入测试前缀', '19900000031', '701')]).expect(201)).body as Json;
+      expect(okRes.created).toBe(1);
+      const next2 = (await request(server).get('/api/v1/hr/employee-profiles/next-no').query({ storeId }).set(authed(adminToken)).expect(200)).body as Json;
+      expect(next2.employeeNo).toBe('702');
+      await request(server).post('/api/v1/platform/accounts').set(authed(adminToken)).send({ username: 'prefix_x', realName: '前缀', password: 'banyuexuan', phone: '19900000032', storeId, employeeNo: '9001', hireDate: '2026-01-01' }).expect(400);
+    } finally {
+      await prisma.store.update({ where: { id: storeId }, data: { employeeNoPrefix: null } });
+    }
   });
 });

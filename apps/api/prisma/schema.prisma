@@ -67,6 +67,8 @@ model Store {
   code      String
   name      String
   address   String?
+  /// 工号规则：该门店员工工号必须以此开头（如 高新店 1、枣园店 2）；空 = 不限制
+  employeeNoPrefix String? @map("employee_no_prefix")
   status    StoreStatus @default(PENDING)
   createdBy String      @map("created_by")
   createdAt DateTime    @default(now()) @map("created_at")

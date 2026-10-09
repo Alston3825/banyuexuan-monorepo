@@ -44,6 +44,10 @@ export interface ImportPreviewRow extends ImportRow {
   newPosition: boolean;
   /** 备注里写了“离职”：默认不勾选 */
   resigned: boolean;
+  /** 手机号已经是系统里的账号：不会新建；表里的工号和现有不同时，导入会把现有员工的工号改成表里的 */
+  existingAccountId: string | null;
+  existingNo: string | null;
+  willRenumber: boolean;
   issues: ImportIssue[];
 }
 
@@ -171,16 +175,22 @@ export class AccountImportService {
   }
 
   /** 逐行检查：问题分“错误”（这一行不能开通）和“提醒”（可以开通，但请留意） */
-  async check(rows: ImportRow[]): Promise<ImportPreviewRow[]> {
+  async check(rows: ImportRow[], defaultStoreId?: string): Promise<ImportPreviewRow[]> {
     const [stores, departments, positions, accounts, profiles] = await Promise.all([
-      this.prisma.store.findMany({ where: { tenantId: this.tenantId }, select: { id: true, name: true } }),
+      this.prisma.store.findMany({ where: { tenantId: this.tenantId }, select: { id: true, name: true, employeeNoPrefix: true } }),
       this.prisma.department.findMany({ where: { tenantId: this.tenantId }, select: { name: true, storeId: true } }),
       this.prisma.position.findMany({ where: { tenantId: this.tenantId }, select: { name: true } }),
-      this.prisma.account.findMany({ where: { tenantId: this.tenantId, phone: { not: null } }, select: { phone: true, realName: true } }),
-      this.prisma.employeeProfile.findMany({ where: { tenantId: this.tenantId, activeEmployeeNo: { not: null } }, select: { activeEmployeeNo: true, account: { select: { realName: true } } } }),
+      this.prisma.account.findMany({ where: { tenantId: this.tenantId, phone: { not: null } }, select: { id: true, phone: true, realName: true, employeeProfile: { select: { id: true, activeEmployeeNo: true } } } }),
+      this.prisma.employeeProfile.findMany({ where: { tenantId: this.tenantId, activeEmployeeNo: { not: null } }, select: { activeEmployeeNo: true, account: { select: { realName: true, phone: true } } } }),
     ]);
-    const phoneOwner = new Map(accounts.map((a) => [a.phone as string, a.realName]));
-    const noOwner = new Map(profiles.map((p) => [p.activeEmployeeNo as string, p.account.realName]));
+    const phoneOwner = new Map(accounts.map((a) => [a.phone as string, a]));
+    const noOwner = new Map(profiles.map((p) => [p.activeEmployeeNo as string, p.account]));
+    // 表里写了新工号、会被改号的现有员工（手机号 → 新工号）：他们原来的工号可以被表里别人（互换）使用
+    const sheetNoByPhone = new Map<string, string>();
+    for (const r of rows) {
+      const ph = r.phone ? normalizeMobile(r.phone) : null;
+      if (ph && r.employeeNo && phoneOwner.has(ph)) sheetNoByPhone.set(ph, r.employeeNo);
+    }
     const sheetNos = new Set(rows.map((r) => r.employeeNo).filter((x): x is string => !!x));
     const assigned = new Set<string>();
     const seenPhone = new Map<string, number>();
@@ -198,25 +208,41 @@ export class AccountImportService {
       if (!r.phone) err('缺手机号（手机号是登录名，必须填）');
       else if (!phone) err(`手机号“${r.phone}”不是 11 位手机号`);
       else {
-        if (phoneOwner.has(phone)) err(`手机号已经是「${phoneOwner.get(phone)}」的账号`);
         if (seenPhone.has(phone)) err(`和表里第 ${seenPhone.get(phone)} 行手机号重复`);
         else seenPhone.set(phone, r.rowNo);
       }
 
+      // 手机号已是系统里的账号：不新建，只在工号不同时按表里的工号改号
+      const existing = phone ? phoneOwner.get(phone) : undefined;
+      const existingNo = existing?.employeeProfile?.activeEmployeeNo ?? null;
+      let willRenumber = false;
+
       // 工号：表里有就用（不能重复）；没有就按顺序预分配
       let employeeNo = r.employeeNo;
       let suggested = false;
-      if (employeeNo) {
-        if (noOwner.has(employeeNo)) err(`工号 ${employeeNo} 已经分配给「${noOwner.get(employeeNo)}」`);
+      const store = r.storeName ? (stores.find((s) => s.name === r.storeName) ?? stores.find((s) => s.name.includes(r.storeName!) || r.storeName!.includes(s.name))) : null;
+      const rowStore = store ?? stores.find((s) => s.id === defaultStoreId) ?? null;
+      if (existing) {
+        if (!existing.employeeProfile) warn(`已有账号「${existing.realName}」，但没有员工档案，不处理`);
+        else if (employeeNo && employeeNo !== existingNo) {
+          willRenumber = true;
+          warn(`已有账号「${existing.realName}」，不新建；工号将由 ${existingNo} 改为 ${employeeNo}`);
+        } else warn(`已有账号「${existing.realName}」，不新建、不改动`);
+      }
+      if (employeeNo && (!existing || willRenumber)) {
+        const holder = noOwner.get(employeeNo);
+        if (holder && holder.phone !== phone && !(holder.phone && sheetNoByPhone.has(holder.phone) && sheetNoByPhone.get(holder.phone) !== employeeNo)) {
+          err(`工号 ${employeeNo} 已经分配给「${holder.realName}」`);
+        }
         if (seenNo.has(employeeNo)) err(`和表里第 ${seenNo.get(employeeNo)} 行工号重复`);
         else seenNo.set(employeeNo, r.rowNo);
-      } else {
-        employeeNo = await nextEmployeeNo(this.prisma, this.tenantId, [...sheetNos, ...assigned]);
+        if (rowStore?.employeeNoPrefix && !employeeNo.startsWith(rowStore.employeeNoPrefix)) err(`${rowStore.name}的工号必须以 ${rowStore.employeeNoPrefix} 开头`);
+      } else if (!employeeNo) {
+        employeeNo = await nextEmployeeNo(this.prisma, this.tenantId, [...sheetNos, ...assigned], rowStore?.id);
         assigned.add(employeeNo);
         suggested = true;
       }
 
-      const store = r.storeName ? (stores.find((s) => s.name === r.storeName) ?? stores.find((s) => s.name.includes(r.storeName!) || r.storeName!.includes(s.name))) : null;
       if (r.storeName && !store) warn(`找不到门店“${r.storeName}”，将使用你在上面选的门店`);
       const dept = r.departmentName ? departments.some((d) => d.name === r.departmentName && (!store || d.storeId === store.id || !d.storeId)) : true;
       const pos = r.positionName ? positions.some((p) => p.name === r.positionName) : true;
@@ -228,7 +254,7 @@ export class AccountImportService {
       const resigned = /离职/.test(r.remark ?? '');
       if (resigned) warn('备注里写了“离职”，默认不开通账号（需要的话手动勾选）');
 
-      out.push({ ...r, phone: phone ?? r.phone, employeeNo, storeId: store?.id ?? null, employeeNoSuggested: suggested, newDepartment: !dept, newPosition: !pos, resigned, issues });
+      out.push({ ...r, phone: phone ?? r.phone, employeeNo, storeId: store?.id ?? null, employeeNoSuggested: suggested, existingAccountId: existing?.id ?? null, existingNo, willRenumber, newDepartment: !dept, newPosition: !pos, resigned, issues });
     }
     return out;
   }
@@ -241,8 +267,8 @@ export class AccountImportService {
     if (input.rows.length > 300) throw new BadRequestException('一次最多开通 300 人');
     if (input.roleId && !(await this.prisma.role.findFirst({ where: { id: input.roleId, tenantId: this.tenantId }, select: { id: true } }))) throw new BadRequestException('所选角色不存在');
 
-    const checked = await this.check(input.rows);
-    const results: { rowNo: number; name: string; ok: boolean; employeeNo?: string; error?: string }[] = [];
+    const checked = await this.check(input.rows, store.id);
+    const results: { rowNo: number; name: string; ok: boolean; employeeNo?: string; error?: string; action?: 'created' | 'renumbered' | 'skipped' }[] = [];
     const deptCache = new Map<string, string>();
     const posCache = new Map<string, string>();
 
@@ -268,7 +294,45 @@ export class AccountImportService {
       return id;
     };
 
+    // 已有账号：不新建；表里工号和现有不同的，按表里的工号改号（需要“修改员工工号”权限，一次事务内完成，支持互换）
+    const canRenumber = await this.ctx.hasPermission('hr.employee-profile.change-no');
+    const toRenumber: ImportPreviewRow[] = [];
     for (const r of checked) {
+      if (!r.existingAccountId) continue;
+      const errors = r.issues.filter((i) => i.level === 'error');
+      if (errors.length > 0) results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: errors.map((e) => e.text).join('；') });
+      else if (r.willRenumber && !canRenumber) results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: '修改已有员工的工号需要“修改员工工号”权限' });
+      else if (r.willRenumber) toRenumber.push(r);
+      else results.push({ rowNo: r.rowNo, name: r.name, ok: true, action: 'skipped', employeeNo: r.existingNo ?? undefined });
+    }
+    if (toRenumber.length > 0) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const ids = toRenumber.map((r) => r.existingAccountId!);
+          await tx.employeeProfile.updateMany({ where: { accountId: { in: ids } }, data: { activeEmployeeNo: null } }); // 先全部腾出来，互换工号才不冲突
+          for (const r of toRenumber) {
+            await tx.employeeProfile.update({ where: { accountId: r.existingAccountId! }, data: { employeeNo: r.employeeNo!, activeEmployeeNo: r.employeeNo!, version: { increment: 1 } } });
+            await this.auditLogService.record({
+              action: 'UPDATE',
+              entityType: 'EmployeeProfile',
+              entityId: r.existingAccountId!,
+              remark: `批量导入：「${r.name}」工号 ${r.existingNo} → ${r.employeeNo}`,
+              tenantId: this.tenantId,
+              accountId: this.ctx.accountId,
+              ip: this.ctx.ip,
+              userAgent: this.ctx.userAgent,
+              requestId: this.ctx.requestId,
+            });
+          }
+        });
+        for (const r of toRenumber) results.push({ rowNo: r.rowNo, name: r.name, ok: true, action: 'renumbered', employeeNo: r.employeeNo! });
+      } catch (e) {
+        for (const r of toRenumber) results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: `改工号失败：${(e as Error).message.slice(0, 120)}` });
+      }
+    }
+
+    for (const r of checked) {
+      if (r.existingAccountId) continue;
       const errors = r.issues.filter((i) => i.level === 'error');
       if (errors.length > 0) {
         results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: errors.map((e) => e.text).join('；') });
@@ -292,18 +356,20 @@ export class AccountImportService {
         });
         if (input.importProfileDetails) await this.writeProfileDetails(account.id, r);
         if (input.roleId) await this.accountService.assignRole(account.id, input.roleId, 'STORE', [storeId]);
-        results.push({ rowNo: r.rowNo, name: r.name, ok: true, employeeNo: r.employeeNo! });
+        results.push({ rowNo: r.rowNo, name: r.name, ok: true, action: 'created', employeeNo: r.employeeNo! });
       } catch (e) {
         results.push({ rowNo: r.rowNo, name: r.name, ok: false, error: (e as { response?: { message?: string } }).response?.message ?? (e as Error).message });
       }
     }
-    const created = results.filter((x) => x.ok).length;
+    const created = results.filter((x) => x.ok && x.action === 'created').length;
+    const renumbered = results.filter((x) => x.action === 'renumbered').length;
+    const skipped = results.filter((x) => x.action === 'skipped').length;
     await this.auditLogService.record({
       action: 'CREATE',
       entityType: 'Account',
       entityId: 'IMPORT',
-      afterData: { created, failed: results.length - created, names: results.filter((x) => x.ok).map((x) => x.name) } as Prisma.InputJsonValue,
-      remark: `员工信息表批量开通账号：成功 ${created}，失败/跳过 ${results.length - created}`,
+      afterData: { created, renumbered, skipped, failed: results.filter((x) => !x.ok).length, names: results.filter((x) => x.action === 'created').map((x) => x.name) } as Prisma.InputJsonValue,
+      remark: `员工信息表批量开通账号：新开通 ${created}，改工号 ${renumbered}，已有未动 ${skipped}，失败 ${results.filter((x) => !x.ok).length}`,
       tenantId: this.tenantId,
       storeId: store.id,
       accountId: this.ctx.accountId,
@@ -311,7 +377,7 @@ export class AccountImportService {
       userAgent: this.ctx.userAgent,
       requestId: this.ctx.requestId,
     });
-    return { created, failed: results.filter((x) => !x.ok), results };
+    return { created, renumbered, skipped, failed: results.filter((x) => !x.ok), results };
   }
 
   /** 把表里的合同类型、社保、身份证、工资卡、开户行、备注写进刚建好的员工档案（对不上/不合法的项目跳过，不影响开通账号） */

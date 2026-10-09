@@ -68,12 +68,12 @@ async function submit() {
   if (!preview.value || !storeId.value) return void message.error('请选择开通到哪个门店')
   const rows = preview.value.rows
     .filter((r) => checked.value.includes(r.rowNo))
-    .map(({ issues: _i, storeId: _s, employeeNoSuggested: _e, newDepartment: _d, newPosition: _p, resigned: _r, ...base }) => base)
+    .map(({ issues: _i, storeId: _s, employeeNoSuggested: _e, newDepartment: _d, newPosition: _p, resigned: _r, existingAccountId: _x, existingNo: _n, willRenumber: _w, ...base }) => base)
   if (rows.length === 0) return void message.error('请先勾选要开通的员工')
   submitting.value = true
   try {
     result.value = await accountApi.importCommit({ rows, storeId: storeId.value, createMissing: createMissing.value, roleId: roleId.value ?? undefined, importProfileDetails: importProfileDetails.value })
-    if (result.value.created > 0) emit('done')
+    if (result.value.created > 0 || result.value.renumbered > 0) emit('done')
   } finally {
     submitting.value = false
   }
@@ -115,7 +115,7 @@ const close = () => emit('update:show', false)
         <!-- 开通结果 -->
         <template v-if="result">
           <p style="font-size: 15px">
-            已开通 <b style="color: #18a058">{{ result.created }}</b> 个账号<span v-if="result.failed.length">，<b style="color: #d03050">{{ result.failed.length }}</b> 个没有开通</span>。
+            新开通 <b style="color: #18a058">{{ result.created }}</b> 个账号<span v-if="result.renumbered">，改了 <b style="color: #18a058">{{ result.renumbered }}</b> 位已有员工的工号</span><span v-if="result.skipped">，<b>{{ result.skipped }}</b> 位已有账号未改动</span><span v-if="result.failed.length">，<b style="color: #d03050">{{ result.failed.length }}</b> 个没有开通</span>。
           </p>
           <p style="color: #666; font-size: 13px">登录方式：用户名 = 手机号，初始密码 <b>{{ DEFAULT_PASSWORD }}</b>。</p>
           <div v-if="result.failed.length" style="margin-top: 8px">

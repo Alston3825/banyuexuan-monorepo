@@ -5,7 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { checkIdCard } from '../../common/utils/id-card.util';
-import { nextEmployeeNo } from '../../common/utils/employee-no.util';
+import { assertEmployeeNoForStore, nextEmployeeNo } from '../../common/utils/employee-no.util';
 import { CreateEmployeeProfileDto } from './dto/create-employee-profile.dto';
 import { UpdateEmployeeProfileDto } from './dto/update-employee-profile.dto';
 import { QueryEmployeeProfileDto } from './dto/query-employee-profile.dto';
@@ -176,6 +176,7 @@ export class EmployeeProfileService {
     const existing = await this.prisma.employeeProfile.findUnique({ where: { accountId: dto.accountId } });
     if (existing) throw new BadRequestException('该账号已建立员工档案');
     await this.assertEmployeeNoFree(dto.employeeNo);
+    await assertEmployeeNoForStore(this.prisma, account.storeId, dto.employeeNo);
     const idCard = await this.idCardFields(dto.idCardNo);
 
     const created = await this.prisma.employeeProfile.create({
@@ -222,6 +223,8 @@ export class EmployeeProfileService {
         // 工号是员工的主要识别方式，一旦分配不能随便改：只有拥有“修改员工工号”权限的人（默认仅管理员）才可以
         if (!(await this.ctx.hasPermission('hr.employee-profile.change-no'))) throw new ForbiddenException('工号一旦分配，只有管理员才能修改');
         await this.assertEmployeeNoFree(rest.employeeNo, id);
+        const acc = await this.prisma.account.findUnique({ where: { id: before.accountId }, select: { storeId: true } });
+        await assertEmployeeNoForStore(this.prisma, acc?.storeId, rest.employeeNo);
       }
     }
     const idCard = await this.idCardFields(rest.idCardNo, id);
@@ -262,8 +265,8 @@ export class EmployeeProfileService {
   }
 
   /** 下一个可用工号（新建账号/员工档案时预填） */
-  nextNo() {
-    return nextEmployeeNo(this.prisma, this.ctx.tenantId!).then((employeeNo) => ({ employeeNo }));
+  nextNo(storeId?: string) {
+    return nextEmployeeNo(this.prisma, this.ctx.tenantId!, [], storeId).then((employeeNo) => ({ employeeNo }));
   }
 
   /**

@@ -132,8 +132,24 @@ function openCreateModal() {
     hireDate: Date.now(),
   }
   formVisible.value = true
-  employeeProfileApi.nextNo().then((no) => !editingRow.value && !model.value.employeeNo && (model.value.employeeNo = no)).catch(() => {})
+  fillNextNo()
 }
+
+// 工号按门店规则预填（高新店 1 开头、枣园店 2 开头）；换门店时，如果工号还是系统自动填的，就跟着重新预填
+let autoNo = ''
+function fillNextNo() {
+  employeeProfileApi
+    .nextNo(model.value.storeId)
+    .then((no) => {
+      if (editingRow.value) return
+      if (!model.value.employeeNo || model.value.employeeNo === autoNo) {
+        model.value.employeeNo = no
+        autoNo = no
+      }
+    })
+    .catch(() => {})
+}
+watch(() => model.value.storeId, () => !editingRow.value && formVisible.value && fillNextNo())
 
 // 用户名默认跟着手机号走（手动改过用户名后就不再跟）
 watch(

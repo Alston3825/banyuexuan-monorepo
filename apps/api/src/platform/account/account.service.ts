@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { assertEmployeeNoForStore } from '../../common/utils/employee-no.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -67,7 +68,10 @@ export class AccountService {
     const { password, employeeNo, hireDate, ...restRaw } = data;
     const rest = { ...restRaw, phone: restRaw.phone?.trim() || undefined, email: restRaw.email?.trim() || undefined };
     await this.assertPhoneFree(rest.phone);
-    if (employeeNo && hireDate) await this.assertEmployeeNoFree(employeeNo);
+    if (employeeNo && hireDate) {
+      await this.assertEmployeeNoFree(employeeNo);
+      await assertEmployeeNoForStore(this.prisma, rest.storeId, employeeNo);
+    }
     const passwordHash = await this.passwordService.hash(password);
     // 账号与员工档案一一对应（EmployeeProfile.accountId是唯一外键）：员工的工号/入职日期
     // 一起传了，就在同一个事务里把账号和员工档案一起建好，不需要再单独跑一遍"员工档案"

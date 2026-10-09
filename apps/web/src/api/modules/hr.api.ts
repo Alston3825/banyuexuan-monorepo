@@ -21,7 +21,7 @@ export const employeeProfileApi = {
   list: (params?: { storeId?: string; status?: string; departmentId?: string; keyword?: string; archived?: 'only' | 'all' }) =>
     http.get<EmployeeProfile[]>('/hr/employee-profiles', { params }).then((r) => r.data),
   /** 系统建议的下一个工号 */
-  nextNo: () => http.get<{ employeeNo: string }>('/hr/employee-profiles/next-no').then((r) => r.data.employeeNo),
+  nextNo: (storeId?: string) => http.get<{ employeeNo: string }>('/hr/employee-profiles/next-no', { params: { storeId } }).then((r) => r.data.employeeNo),
   archive: (id: string, body: { terminationDate?: string; reason?: string; version: number }) =>
     http.post<EmployeeProfile>(`/hr/employee-profiles/${id}/archive`, body).then((r) => r.data),
   restore: (id: string, body: { employeeNo?: string; version: number }) =>

@@ -31,8 +31,8 @@ export class EmployeeProfileController {
   /** 下一个可用工号（新建账号时预填） */
   @Get('next-no')
   @RequirePermission('hr.employee-profile.view')
-  nextNo() {
-    return this.employeeProfileService.nextNo();
+  nextNo(@Query('storeId') storeId?: string) {
+    return this.employeeProfileService.nextNo(storeId || undefined);
   }
 
   @Get('expiry-alerts')

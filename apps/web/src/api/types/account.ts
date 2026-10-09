@@ -89,6 +89,9 @@ export interface ImportPreviewRow extends ImportRow {
   newDepartment: boolean
   newPosition: boolean
   resigned: boolean
+  existingAccountId: string | null
+  existingNo: string | null
+  willRenumber: boolean
   issues: { level: 'error' | 'warn'; text: string }[]
 }
 
@@ -109,6 +112,8 @@ export interface ImportCommitDto {
 
 export interface ImportCommitResult {
   created: number
+  renumbered: number
+  skipped: number
   failed: { rowNo: number; name: string; error?: string }[]
   results: { rowNo: number; name: string; ok: boolean; employeeNo?: string; error?: string }[]
 }
