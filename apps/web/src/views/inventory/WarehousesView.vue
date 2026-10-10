@@ -32,7 +32,8 @@ const model = ref({
 async function fetchAll() {
   loading.value = true
   try {
-    const [warehouses, storeList] = await Promise.all([warehouseApi.list(), storeApi.list()])
+    // 门店下拉和仓库列表分开取：门店取不到也不影响仓库列表显示
+    const [warehouses, storeList] = await Promise.all([warehouseApi.list(), storeApi.list().catch(() => [] as Store[])])
     rows.value = warehouses
     stores.value = storeList
   } finally {

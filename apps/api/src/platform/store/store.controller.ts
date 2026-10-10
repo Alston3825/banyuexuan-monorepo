@@ -11,8 +11,8 @@ import { CloseStoreDto } from './dto/close-store.dto';
 export class StoreController {
   constructor(private readonly storeService: StoreService) {}
 
+  /** 门店列表是各业务页（新建仓库/预订/用车等）选“所属门店”都要用的下拉数据：登录即可查看，范围仍按账号的数据范围收窄，不再要求“门店管理”权限 */
   @Get()
-  @RequirePermission('platform.store.view')
   findAll() {
     return this.storeService.findMany();
   }

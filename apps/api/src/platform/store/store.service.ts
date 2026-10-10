@@ -18,8 +18,10 @@ export class StoreService {
 
   async findMany(): Promise<Store[]> {
     const allowed = await this.dataScopeService.resolveAllowedStoreIds(this.ctx);
+    // 范围里一家都没有时（如只有“本人”范围），至少能选到自己所在的门店
+    const ids = allowed === 'ALL' ? null : [...new Set([...allowed, ...(this.ctx.homeStoreId ? [this.ctx.homeStoreId] : [])])];
     return this.prisma.store.findMany({
-      where: allowed === 'ALL' ? {} : { id: { in: allowed } },
+      where: ids ? { id: { in: ids } } : {},
     });
   }
 
