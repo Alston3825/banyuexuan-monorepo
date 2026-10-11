@@ -16,7 +16,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { CareDocType } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 import type { Response } from 'express';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CareDocumentService } from './care-document.service';
@@ -31,6 +31,7 @@ class UploadCareDocumentDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() title?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() docDate?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() remark?: string;
+  @ApiProperty({ required: false, description: "识别范围：BABY_FEEDING=只认宝宝单页（体征+24小时喂养记录单）" }) @IsOptional() @IsIn(['BABY_FEEDING']) scope?: string;
   @ApiProperty({ required: false, description: "传 'false' 表示只留档、不自动识别（手工录入后补传原件时用）" }) @IsOptional() @IsString() autoExtract?: string;
 }
 

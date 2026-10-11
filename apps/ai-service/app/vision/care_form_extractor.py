@@ -188,6 +188,10 @@ def _merge_table(f: Dict[str, Any], reads: List[Dict[str, Any]], data: Dict[str,
             other = tables[0][i]
             for ck, c in cols.items():
                 a, b = other.get(ck), row.get(ck)
+                if c.get("kind") in ("int", "decimal"):
+                    # 数字格：空格 和 0 是一回事（亲喂/母乳/喂水整列空着时，一次读成 0、一次读成空，不该标黄）
+                    a = None if a in (0, 0.0) else a
+                    b = None if b in (0, 0.0) else b
                 if (a is not None or b is not None) and not _same(a, b):
                     diff += 1
                     warnings.append({"field": "%s.%d.%s" % (key, i, ck), "level": "warn", "message": "第 %d 行「%s」两次识别不一致（%s / %s），请核对" % (i + 1, c["label"], _show(c, a), _show(c, b))})

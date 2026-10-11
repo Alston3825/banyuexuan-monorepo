@@ -15,6 +15,7 @@ export interface UploadMeta {
   docDate?: string;
   remark?: string;
   autoExtract?: string;
+  scope?: string;
 }
 
 const filesSelect = { orderBy: { sortOrder: 'asc' as const }, select: { id: true, fileName: true, mimeType: true, sizeBytes: true, sortOrder: true } };
@@ -70,6 +71,7 @@ export class CareDocumentService {
         remark: meta.remark?.trim() || null,
         status: structured ? 'DRAFT' : 'CONFIRMED',
         extractStatus: extract ? 'PENDING' : 'NONE', // 先标成排队中，前端马上就能看到“识别中”
+        extractScope: meta.docType === 'DAILY_RECORD' && meta.scope === 'BABY_FEEDING' ? 'BABY_FEEDING' : null,
         confirmedBy: structured ? null : this.ctx.accountId,
         confirmedAt: structured ? null : new Date(),
         createdBy: this.ctx.accountId!,

@@ -39,3 +39,11 @@ def test_table_out_of_range_cell_warns_and_blank_rows_dropped():
     data, warnings = merge_reads(FIELDS, [r, r])
     assert len(data["feedings"]) == 1
     assert any(w["field"] == "feedings.0.formulaMl" for w in warnings)
+
+
+def test_empty_number_cell_and_zero_are_the_same():
+    # 整列空着的数字格：一次读成 0、一次读成空，不该标黄
+    r1 = {"feedings": [{"time": "02:00", "formulaMl": 0}]}
+    r2 = {"feedings": [{"time": "02:00", "formulaMl": None}]}
+    _, warnings = merge_reads(FIELDS, [r1, r2])
+    assert warnings == []

@@ -72,6 +72,7 @@ export interface CareDocument {
   extractError: string | null
   extractData: Record<string, unknown> | null
   extractWarnings: ExtractWarning[] | null
+  extractScope?: string | null
   extractedAt: string | null
   createdAt: string
   version: number

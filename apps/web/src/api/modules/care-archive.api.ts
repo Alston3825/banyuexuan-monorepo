@@ -10,6 +10,8 @@ export interface UploadDocumentMeta {
   remark?: string
   /** false = 只留档不识别（手工录入后补传原件） */
   autoExtract?: boolean
+  /** BABY_FEEDING = 只识别宝宝单页（宝宝体征 + 24小时喂养记录单），不读妈妈栏 */
+  scope?: 'BABY_FEEDING'
 }
 
 const form = (files: File[], meta?: UploadDocumentMeta) => {

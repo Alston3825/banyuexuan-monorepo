@@ -1591,6 +1591,8 @@ model CareDocument {
   extractData     Json?                 @map("extract_data") // AI 识别出的字段（key 同评估表字段）
   extractWarnings Json?                 @map("extract_warnings") // 需要人工核对的提醒
   extractModel    String?               @map("extract_model")
+  /// 识别范围：空=整张纸；BABY_FEEDING=只认宝宝单页（宝宝体征 + 24小时喂养记录单），不读妈妈栏
+  extractScope    String?               @map("extract_scope")
   extractedAt     DateTime?             @map("extracted_at")
   confirmedBy     String?               @map("confirmed_by")
   confirmedAt     DateTime?             @map("confirmed_at")

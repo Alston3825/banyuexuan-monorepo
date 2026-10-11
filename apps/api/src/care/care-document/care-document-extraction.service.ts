@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiGatewayClient } from '../../ai/ai-gateway/ai-gateway.client';
 import { allFields, FieldSpec, FORM_SPECS, AssessmentType } from '../care-assessment/assessment-specs';
 import { MED_AI_DESCRIPTION, MED_HEADER_FIELDS, MED_ITEM_COLUMNS } from '../care-medication/medication-specs';
-import { DAILY_AI_DESCRIPTION, dailyFlatFields, FEEDING_COLUMNS } from '../care-daily/daily-specs';
+import { DAILY_AI_DESCRIPTION, DAILY_BABY_AI_DESCRIPTION, DAILY_BABY_FIELDS, dailyFlatFields, FEEDING_COLUMNS } from '../care-daily/daily-specs';
 import { CareStorageService } from './care-storage.service';
 
 const MAX_CONCURRENT = 2;
@@ -40,8 +40,20 @@ export class CareDocumentExtractionService implements OnModuleInit {
   }
 
   /** 给 AI 的字段说明书：四张评估表按各自字段；日常护理记录 = 妈妈栏 + 宝宝栏 + 喂养记录表（table）。 */
-  private aiSpec(docType: string): { formTitle: string; description: string; fields: unknown[] } | null {
+  private aiSpec(docType: string, scope?: string | null): { formTitle: string; description: string; fields: unknown[] } | null {
     const slim = (f: FieldSpec) => ({ key: f.key, label: f.label, kind: f.kind, options: f.options, unit: f.unit, min: f.min, max: f.max, aiHint: f.aiHint });
+    if (docType === 'DAILY_RECORD' && scope === 'BABY_FEEDING') {
+      // 宝宝单页（《新生儿日常护理记录》）：只读宝宝体征 + 喂养表，不读妈妈栏，也就没有一堆“妈妈字段没识别出来”的噪音提醒
+      return {
+        formTitle: '新生儿日常护理记录（宝宝单页）',
+        description: DAILY_BABY_AI_DESCRIPTION,
+        fields: [
+          { key: 'sheetDate', label: '纸上的日期', kind: 'text', aiHint: '右上角“日期：”后手写的日期，如 8.26，原样抄下来' },
+          ...DAILY_BABY_FIELDS.flatMap((g) => g.fields).map(slim),
+          { key: 'feedings', label: '24小时宝宝喂养记录单', kind: 'table', columns: FEEDING_COLUMNS.map(slim) },
+        ],
+      };
+    }
     if (docType === 'DAILY_RECORD') {
       return {
         formTitle: '新生儿和产妇日常护理记录',
@@ -84,7 +96,7 @@ export class CareDocumentExtractionService implements OnModuleInit {
   private async run(documentId: string): Promise<void> {
     const doc = await this.prisma.careDocument.findUnique({ where: { id: documentId }, include: { files: { orderBy: { sortOrder: 'asc' } } } });
     if (!doc) return;
-    const spec = this.aiSpec(doc.docType);
+    const spec = this.aiSpec(doc.docType, doc.extractScope);
     if (!spec) throw new Error('这类资料只做拍照留档，不需要识别');
     if (doc.files.length === 0) throw new Error('还没有上传照片，无法识别');
     await this.prisma.careDocument.update({ where: { id: documentId }, data: { extractStatus: 'RUNNING' } });
