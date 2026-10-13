@@ -524,6 +524,8 @@ model WorkflowNode {
   approverType         WorkflowNodeApproverType @map("approver_type")
   approverRoleId       String?                  @map("approver_role_id")
   approverAccountId    String?                  @map("approver_account_id")
+  /// 指定多位员工（或签选 2~3 人、会签几人都要过）：员工 id 数组；approverAccountId 存第一位，兼容旧数据
+  approverAccountIds   Json?                    @map("approver_account_ids")
   approvalMode         WorkflowApprovalMode     @default(ALL) @map("approval_mode")
   /// 处理时限（小时）：审批人收到待办后超过这个时间算“超时”，在待办里标红提醒；空=不限时
   timeoutHours         Int?                     @map("timeout_hours")

@@ -38,7 +38,7 @@ export class WorkflowQueryService {
       instance.initiatorId,
       ...instance.approvers.map((a) => a.accountId),
       ...instance.actions.map((a) => a.actorId),
-      ...instance.definition.nodes.map((n) => n.approverAccountId ?? ''),
+      ...instance.definition.nodes.flatMap((n) => [n.approverAccountId ?? '', ...(Array.isArray(n.approverAccountIds) ? (n.approverAccountIds as string[]) : [])]),
     ]);
     const me = this.ctx.accountId!;
     const now = Date.now();
@@ -52,7 +52,7 @@ export class WorkflowQueryService {
       else if (instance.status === 'REJECTED') state = n.seq < cur ? 'DONE' : n.seq === cur ? 'REJECTED' : 'WAITING';
       else if (instance.status === 'WITHDRAWN') state = n.seq < cur ? 'DONE' : n.seq === cur ? 'WITHDRAWN' : 'WAITING';
       else if (active) state = n.seq < cur ? 'DONE' : n.seq === cur ? 'CURRENT' : 'WAITING';
-      const planned = n.approverType === 'ROLE' ? `角色：${roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）'}` : `指定：${nameOf.get(n.approverAccountId ?? '') ?? '某位员工'}`;
+      const planned = n.approverType === 'ROLE' ? `角色：${roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）'}` : `指定：${(Array.isArray(n.approverAccountIds) && n.approverAccountIds.length > 0 ? (n.approverAccountIds as string[]) : [n.approverAccountId ?? '']).map((id) => nameOf.get(id) ?? '某位员工').join('、')}`;
       return {
         seq: n.seq,
         name: n.name,

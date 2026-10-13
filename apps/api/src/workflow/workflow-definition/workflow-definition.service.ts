@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { AuditLogService } from '../../audit/audit-log.service';
@@ -10,6 +11,8 @@ export class WorkflowNodeInput {
   @IsIn(['ROLE', 'ACCOUNT']) approverType: 'ROLE' | 'ACCOUNT';
   @IsOptional() @IsString() approverRoleId?: string;
   @IsOptional() @IsString() approverAccountId?: string;
+  /** 指定多位员工（或签选 2~3 人等）；不传则用 approverAccountId 一位 */
+  @IsOptional() @IsArray() @IsString({ each: true }) approverAccountIds?: string[];
   @IsIn(['ALL', 'ANY']) approvalMode: 'ALL' | 'ANY';
   /** 处理时限（小时），不填=不限时 */
   @IsOptional() @IsInt() @Min(1) @Max(720) timeoutHours?: number | null;
@@ -49,7 +52,7 @@ export class WorkflowDefinitionService {
     for (const d of all) if (!latest.has(d.code)) latest.set(d.code, d);
     const defs = [...latest.values()];
     const roleIds = defs.flatMap((d) => d.nodes.map((n) => n.approverRoleId)).filter((x): x is string => !!x);
-    const accIds = defs.flatMap((d) => d.nodes.map((n) => n.approverAccountId)).filter((x): x is string => !!x);
+    const accIds = defs.flatMap((d) => d.nodes.flatMap((n) => [n.approverAccountId, ...this.idsOf(n)])).filter((x): x is string => !!x);
     const [roles, accounts, inflight] = await Promise.all([
       this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } }),
       this.prisma.account.findMany({ where: { id: { in: accIds } }, select: { id: true, realName: true } }),
@@ -74,11 +77,24 @@ export class WorkflowDefinitionService {
         approverType: n.approverType,
         approverRoleId: n.approverRoleId,
         approverAccountId: n.approverAccountId,
-        approverLabel: n.approverType === 'ROLE' ? roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）' : accName.get(n.approverAccountId ?? '') ?? '（员工已删除）',
+        approverAccountIds: this.idsOf(n),
+        approverLabel: n.approverType === 'ROLE' ? roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）' : this.idsOf(n).map((id) => accName.get(id) ?? '（员工已删除）').join('、'),
         approvalMode: n.approvalMode,
         timeoutHours: n.timeoutHours,
       })),
     }));
+  }
+
+  /** 输入里指定的员工（去重，保持顺序）：优先 approverAccountIds，没有就用单个 approverAccountId */
+  private accountIdsOf(n: WorkflowNodeInput): string[] {
+    const arr = n.approverAccountIds && n.approverAccountIds.length > 0 ? n.approverAccountIds : n.approverAccountId ? [n.approverAccountId] : [];
+    return [...new Set(arr)];
+  }
+
+  /** 已保存节点上指定的员工：新数据在 approverAccountIds，旧数据只有 approverAccountId */
+  private idsOf(n: { approverAccountId: string | null; approverAccountIds: unknown }): string[] {
+    const arr = Array.isArray(n.approverAccountIds) ? (n.approverAccountIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+    return arr.length > 0 ? arr : n.approverAccountId ? [n.approverAccountId] : [];
   }
 
   /** 修改某类单据的审批流程：改节点 = 生成新版本；只改名称/启停 = 原地更新。 */
@@ -100,8 +116,12 @@ export class WorkflowDefinitionService {
       if (!n.name?.trim()) throw new BadRequestException(`第 ${i + 1} 个节点请填写名称`);
       if (n.approverType === 'ROLE') {
         if (!n.approverRoleId || !(await this.prisma.role.findFirst({ where: { id: n.approverRoleId, tenantId }, select: { id: true } }))) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择审批角色`);
-      } else if (!n.approverAccountId || !(await this.prisma.account.findFirst({ where: { id: n.approverAccountId, tenantId, status: 'ACTIVE' }, select: { id: true } }))) {
-        throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择一位在职员工作为审批人`);
+      } else {
+        const ids = this.accountIdsOf(n);
+        if (ids.length === 0) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择审批人（可选多位在职员工）`);
+        if (ids.length > 10) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）最多指定 10 位审批人`);
+        const ok = await this.prisma.account.count({ where: { id: { in: ids }, tenantId, status: 'ACTIVE' } });
+        if (ok !== ids.length) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）选择的审批人里有已离职/停用的员工，请重新选择`);
       }
     }
     const enabled = dto.enabled ?? latest.status === 'PUBLISHED';
@@ -121,7 +141,8 @@ export class WorkflowDefinitionService {
               name: n.name.trim(),
               approverType: n.approverType,
               approverRoleId: n.approverType === 'ROLE' ? n.approverRoleId : null,
-              approverAccountId: n.approverType === 'ACCOUNT' ? n.approverAccountId : null,
+              approverAccountId: n.approverType === 'ACCOUNT' ? this.accountIdsOf(n)[0] : null,
+              approverAccountIds: n.approverType === 'ACCOUNT' ? this.accountIdsOf(n) : Prisma.JsonNull,
               approvalMode: n.approvalMode,
               timeoutHours: n.timeoutHours ?? null,
             })),

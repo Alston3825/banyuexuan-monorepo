@@ -35,7 +35,7 @@ export class WorkflowEngineService {
     }
     const first = definition.nodes[0];
     if (first) {
-      const people = await this.resolveApprovers(first.approverType, first.approverRoleId, first.approverAccountId, params.storeId);
+      const people = await this.resolveApprovers(first.approverType, first.approverRoleId, this.nodeAccountIds(first), params.storeId);
       if (people.length === 0) {
         throw new ConflictException(`审批流程「${definition.name}」的第一个节点「${first.name}」当前没有可审批的人（对应角色没有分配给任何在职员工），请联系管理员到“审批流程设置”里处理`);
       }
@@ -296,7 +296,7 @@ export class WorkflowEngineService {
     }
 
     const inst = await this.prisma.workflowInstance.findUnique({ where: { id: instanceId }, select: { storeId: true } });
-    const approverAccountIds = await this.resolveApprovers(node.approverType, node.approverRoleId, node.approverAccountId, inst?.storeId);
+    const approverAccountIds = await this.resolveApprovers(node.approverType, node.approverRoleId, this.nodeAccountIds(node), inst?.storeId);
     if (approverAccountIds.length === 0) {
       // 后面的节点没有可审批的人：自动跳过，免得单据卡死在没人处理的节点上
       const nextNode = await this.prisma.workflowNode.findFirst({ where: { workflowDefinitionId: definitionId, seq: { gt: seq } }, orderBy: { seq: 'asc' } });
@@ -317,16 +317,23 @@ export class WorkflowEngineService {
     ]);
   }
 
+  /** 节点指定的员工：新数据读 approverAccountIds（可多人），旧数据只有一个 approverAccountId */
+  private nodeAccountIds(n: { approverAccountId: string | null; approverAccountIds?: unknown }): string[] {
+    const arr = Array.isArray(n.approverAccountIds) ? (n.approverAccountIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+    return arr.length > 0 ? arr : n.approverAccountId ? [n.approverAccountId] : [];
+  }
+
   /** 按角色找审批人：只取在职账号；优先取“角色范围覆盖这家门店”的人（全局 / 本店 / 本区域），一个都没有才退回取所有持有该角色的人。 */
   private async resolveApprovers(
     approverType: 'ROLE' | 'ACCOUNT',
     approverRoleId: string | null,
-    approverAccountId: string | null,
+    approverAccountIds: string[],
     storeId?: string | null,
   ): Promise<string[]> {
-    if (approverType === 'ACCOUNT' && approverAccountId) {
-      const acc = await this.prisma.account.findUnique({ where: { id: approverAccountId }, select: { status: true } });
-      return acc?.status === 'ACTIVE' ? [approverAccountId] : [];
+    if (approverType === 'ACCOUNT' && approverAccountIds.length > 0) {
+      // 指定的几位员工里只取在职的
+      const accs = await this.prisma.account.findMany({ where: { id: { in: approverAccountIds }, status: 'ACTIVE' }, select: { id: true } });
+      return accs.map((a) => a.id);
     }
     if (approverType === 'ROLE' && approverRoleId) {
       const assignments = await this.prisma.accountRoleAssignment.findMany({

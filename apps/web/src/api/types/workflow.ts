@@ -198,6 +198,8 @@ export interface SettingsNode {
   approverType: 'ROLE' | 'ACCOUNT'
   approverRoleId: string | null
   approverAccountId: string | null
+  /** 指定的员工（可多位） */
+  approverAccountIds: string[]
   approverLabel: string
   approvalMode: 'ALL' | 'ANY'
   timeoutHours: number | null
@@ -222,6 +224,8 @@ export interface SaveDefinitionDto {
     approverType: 'ROLE' | 'ACCOUNT'
     approverRoleId?: string
     approverAccountId?: string
+    /** 指定多位员工（或签选 2~3 人等） */
+    approverAccountIds?: string[]
     approvalMode: 'ALL' | 'ANY'
     timeoutHours?: number | null
   }[]

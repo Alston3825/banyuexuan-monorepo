@@ -213,4 +213,30 @@ describe('P8 审批中心 / 我的待办 / 审批流程设置 (e2e)', () => {
     }
     void managerId;
   });
+
+  it('8. 指定多位员工（或签选 2～3 人）：每人都收到待办，任意一人通过即通过；设置页回显所有人名；有离职/不存在的人保存被拒', async () => {
+    const put = (nodes: Json[]) => request(server).put('/api/v1/workflow/definitions/DEMO_APPROVAL').set(authed(adminToken)).send({ nodes });
+    const saved = (await put([{ name: '多人或签', approverType: 'ACCOUNT', approverAccountIds: [managerId, adminId], approvalMode: 'ANY' }]).expect(200)).body as Json;
+    expect(saved.nodes[0].approverAccountIds).toEqual([managerId, adminId]);
+    expect(saved.nodes[0].approverLabel).toContain('、');
+    await put([{ name: '含不存在的人', approverType: 'ACCOUNT', approverAccountIds: [managerId, 'no-such-account'], approvalMode: 'ANY' }]).expect(400);
+
+    const inst = await submitDemo(`多人或签${Date.now()}`);
+    const p = await progress(adminToken, inst.id);
+    expect(p.nodes[0].approvers.map((a: Json) => a.accountId).sort()).toEqual([managerId, adminId].sort());
+    expect(p.nodes[0].planned).toContain('、');
+    expect((await myTodos(managerToken)).items.some((i: Json) => i.link === `/workflow/instances/${inst.id}`)).toBe(true);
+    expect((await myTodos(adminToken)).items.some((i: Json) => i.link === `/workflow/instances/${inst.id}`)).toBe(true);
+    await post(managerToken, `/workflow/instances/${inst.id}/approve`, { comment: '或签一人通过' }).expect(201);
+    expect((await progress(adminToken, inst.id)).status).toBe('APPROVED'); // 或签：一人通过整个节点通过
+
+    // 会签：两人都要通过
+    await put([{ name: '多人会签', approverType: 'ACCOUNT', approverAccountIds: [managerId, adminId], approvalMode: 'ALL' }]).expect(200);
+    const inst2 = await submitDemo(`多人会签${Date.now()}`);
+    await post(managerToken, `/workflow/instances/${inst2.id}/approve`, {}).expect(201);
+    expect((await progress(adminToken, inst2.id)).status).toBe('IN_REVIEW');
+    await post(adminToken, `/workflow/instances/${inst2.id}/approve`, {}).expect(201);
+    expect((await progress(adminToken, inst2.id)).status).toBe('APPROVED');
+    await restoreFlow();
+  });
 });
