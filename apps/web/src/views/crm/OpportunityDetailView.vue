@@ -82,7 +82,7 @@ onMounted(fetchAll)
 
     <FollowUpTimeline business-type="OPPORTUNITY" :business-id="opportunityId" />
 
-    <n-modal :show="loseVisible" @update:show="(v) => (loseVisible = v)">
+    <n-modal :mask-closable="false" :show="loseVisible" @update:show="(v) => (loseVisible = v)">
       <n-card title="标记流失" style="width: min(380px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="流失原因"><n-input v-model:value="loseReason" type="textarea" /></n-form-item>

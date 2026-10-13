@@ -264,7 +264,7 @@ onMounted(fetchList)
     <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: InventoryItem) => r.id" :scroll-x="1300" />
 
     <!-- 新建/编辑 -->
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑物品' : '新建物品'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="110">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
@@ -311,7 +311,7 @@ onMounted(fetchList)
     </n-modal>
 
     <!-- Excel 导入 -->
-    <n-modal :show="importVisible" @update:show="(v) => (importVisible = v)">
+    <n-modal :mask-closable="false" :show="importVisible" @update:show="(v) => (importVisible = v)">
       <n-card title="从 Excel 导入物品" style="width: min(1000px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onFileChosen" />
         <n-space align="center" style="margin-bottom: 10px">

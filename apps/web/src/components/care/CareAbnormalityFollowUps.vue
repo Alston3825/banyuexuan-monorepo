@@ -81,7 +81,7 @@ onMounted(fetchList)
       </n-timeline-item>
     </n-timeline>
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="添加护理异常跟进" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="类型">

@@ -81,7 +81,7 @@ const fmt = (iso: string) => {
 </script>
 
 <template>
-  <n-modal :show="show" @update:show="(v) => emit('update:show', v)">
+  <n-modal :mask-closable="false" :show="show" @update:show="(v) => emit('update:show', v)">
     <n-card title="发给客户确认每日服务报告" style="width: min(560px, 96vw)" :bordered="false" role="dialog" aria-modal="true" closable @close="emit('update:show', false)">
       <n-alert type="info" :show-icon="false" style="margin-bottom: 10px">
         客户打开链接 → 输入自己登记的<b>手机号后四位</b>核验本人 → 查看最近 7 天的服务报告 → 逐天确认（手写签名或长按确认）并给当班护理师打分。超过 7 天的记录不能再补确认。

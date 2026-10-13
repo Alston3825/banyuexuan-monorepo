@@ -374,7 +374,7 @@ onMounted(async () => {
       :scroll-x="900"
     />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="新建预订" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" @update:value="onStoreChange" /></n-form-item>
@@ -391,7 +391,7 @@ onMounted(async () => {
       </n-card>
     </n-modal>
 
-    <n-modal :show="cancelVisible" @update:show="(v) => (cancelVisible = v)">
+    <n-modal :mask-closable="false" :show="cancelVisible" @update:show="(v) => (cancelVisible = v)">
       <n-card title="取消预订" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="取消原因"><n-input v-model:value="cancelReason" type="textarea" /></n-form-item>
@@ -405,7 +405,7 @@ onMounted(async () => {
       </n-card>
     </n-modal>
 
-    <n-modal :show="opsVisible" @update:show="(v) => (opsVisible = v)">
+    <n-modal :mask-closable="false" :show="opsVisible" @update:show="(v) => (opsVisible = v)">
       <n-card
         v-if="opsOccupancy"
         :title="`客房动态：${opsOccupancy.occupancyNo}`"

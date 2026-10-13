@@ -107,7 +107,7 @@ onMounted(fetchList)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: DemoApprovalRequest) => r.id" :scroll-x="760" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="新建示例审批单" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="标题">

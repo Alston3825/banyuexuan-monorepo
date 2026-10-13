@@ -106,7 +106,7 @@ onMounted(fetchAll)
       </n-card>
     </n-space>
 
-    <n-modal :show="createVisible" @update:show="(v) => (createVisible = v)">
+    <n-modal :mask-closable="false" :show="createVisible" @update:show="(v) => (createVisible = v)">
       <n-card title="生成关怀计划" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="关怀模板">

@@ -104,7 +104,7 @@ onMounted(fetchAll)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: KnowledgeDocument) => r.id" :scroll-x="800" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑知识库文档' : '新建知识库文档'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="80">
           <n-form-item label="标题" path="title" :rule="{ required: true, message: '请输入标题' }">

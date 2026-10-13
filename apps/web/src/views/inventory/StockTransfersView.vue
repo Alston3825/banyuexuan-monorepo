@@ -157,7 +157,7 @@ onMounted(fetchAll)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: StockTransfer) => r.id" :scroll-x="1000" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="新建调拨单" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="调出仓库"><n-select v-model:value="model.fromWarehouseId" :options="warehouseOptions" /></n-form-item>

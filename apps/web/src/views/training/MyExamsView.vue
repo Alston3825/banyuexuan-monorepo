@@ -105,7 +105,7 @@ onMounted(fetchAll)
       </n-tab-pane>
     </n-tabs>
 
-    <n-modal :show="!!takingExam" @update:show="(v) => !v && (takingExam = null)">
+    <n-modal :mask-closable="false" :show="!!takingExam" @update:show="(v) => !v && (takingExam = null)">
       <n-card v-if="takingExam" :title="takingExam.title" style="width: min(640px, 94vw); max-height: 80vh; overflow-y: auto" :bordered="false" role="dialog" aria-modal="true">
         <n-space vertical :size="16">
           <n-card v-for="(q, idx) in takingExam.questions" :key="q.id" size="small" embedded>

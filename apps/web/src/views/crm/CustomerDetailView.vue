@@ -323,7 +323,7 @@ onMounted(async () => {
     <FollowUpTimeline business-type="CUSTOMER" :business-id="customerId" />
 
 
-    <n-modal :show="oppVisible" @update:show="(v) => (oppVisible = v)">
+    <n-modal :mask-closable="false" :show="oppVisible" @update:show="(v) => (oppVisible = v)">
       <n-card title="新建销售机会" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="意向金额（元）"><n-input-number v-model:value="oppModel.amountYuan" style="width: 100%" /></n-form-item>

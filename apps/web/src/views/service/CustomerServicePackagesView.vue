@@ -98,7 +98,7 @@ onMounted(fetchAll)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CustomerServicePackage) => r.id" :scroll-x="800" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="登记服务包购买" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>

@@ -312,7 +312,7 @@ onMounted(async () => {
       </n-grid>
     </div>
 
-    <n-modal :show="actionVisible" @update:show="(v) => (actionVisible = v)">
+    <n-modal :mask-closable="false" :show="actionVisible" @update:show="(v) => (actionVisible = v)">
       <n-card
         :title="selectedEntry ? `${selectedEntry.room.roomNo}（${statusLabel[selectedEntry.status]}）` : ''"
         style="width: min(480px, 94vw)"

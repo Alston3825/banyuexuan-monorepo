@@ -112,7 +112,7 @@ onMounted(async () => {
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: UtilityExpense) => r.id" :scroll-x="900" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑水电费登记' : '新建水电费登记'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>

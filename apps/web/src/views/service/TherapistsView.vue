@@ -95,7 +95,7 @@ onMounted(fetchAll)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Therapist) => r.id" :scroll-x="700" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑技师' : '新建技师'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="所属门店">

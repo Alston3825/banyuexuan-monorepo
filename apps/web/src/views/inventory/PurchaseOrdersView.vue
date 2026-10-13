@@ -244,7 +244,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 确认采购 -->
-    <n-modal :show="!!buyTarget" @update:show="(v) => !v && (buyTarget = null)">
+    <n-modal :mask-closable="false" :show="!!buyTarget" @update:show="(v) => !v && (buyTarget = null)">
       <n-card v-if="buyTarget" :title="`确认采购：${buyTarget.orderNo}`" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <p class="po-hint" style="margin-top: 0">点“确认采购”表示东西已经买好、在路上。系统会自动生成待收货的入库单，客服收到快递后逐项确认。</p>
         <n-form label-placement="top" size="small">
@@ -261,7 +261,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 取消 -->
-    <n-modal :show="!!cancelTarget" @update:show="(v) => !v && (cancelTarget = null)">
+    <n-modal :mask-closable="false" :show="!!cancelTarget" @update:show="(v) => !v && (cancelTarget = null)">
       <n-card title="取消采购单" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-input v-model:value="cancelReason" type="textarea" placeholder="请填写取消原因" :autosize="{ minRows: 2 }" />
         <template #footer>
@@ -271,7 +271,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 手工新建 -->
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="手工新建采购单（需审批）" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>

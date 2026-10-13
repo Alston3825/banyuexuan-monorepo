@@ -63,7 +63,7 @@ onMounted(fetchAll)
       </n-card>
     </n-space>
 
-    <n-modal :show="!!gradingAttempt" @update:show="(v) => !v && (gradingAttempt = null)">
+    <n-modal :mask-closable="false" :show="!!gradingAttempt" @update:show="(v) => !v && (gradingAttempt = null)">
       <n-card v-if="gradingAttempt" title="批阅简答题" style="width: min(600px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-space vertical :size="16">
           <n-card v-for="a in gradingAttempt.answers.filter((x) => x.question.type === 'SHORT_ANSWER')" :key="a.id" size="small" embedded>

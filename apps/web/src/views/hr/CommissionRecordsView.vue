@@ -149,7 +149,7 @@ onMounted(async () => {
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CommissionRecord) => r.id" :scroll-x="1100" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="新建提成记录" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="110">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>

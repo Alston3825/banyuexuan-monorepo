@@ -665,7 +665,7 @@ onMounted(async () => {
     </div>
 
     <!-- 新建预订（点空格触发） -->
-    <n-modal :show="createVisible" @update:show="(v) => (createVisible = v)">
+    <n-modal :mask-closable="false" :show="createVisible" @update:show="(v) => (createVisible = v)">
       <n-card
         :title="createTarget ? `新建预订 - ${createTarget.room.roomNo}` : '新建预订'"
         style="width: min(440px, 94vw)"
@@ -688,7 +688,7 @@ onMounted(async () => {
     </n-modal>
 
     <!-- 详情/改期/入住/离店/取消（点色块触发） -->
-    <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
+    <n-modal :mask-closable="false" :show="detailVisible" @update:show="(v) => (detailVisible = v)">
       <n-card v-if="detailOcc" :title="`${detailOcc.occupancyNo}（${customerNameById[detailOcc.customerId] ?? ''}）`" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="计划日期">
@@ -715,7 +715,7 @@ onMounted(async () => {
     </n-modal>
 
     <!-- 维修状态维护（点房间号触发） -->
-    <n-modal :show="maintVisible" @update:show="(v) => (maintVisible = v)">
+    <n-modal :mask-closable="false" :show="maintVisible" @update:show="(v) => (maintVisible = v)">
       <n-card :title="maintTarget ? `维修状态 - ${maintTarget.roomNo}` : ''" style="width: min(400px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <template v-if="maintTarget">
           <template v-if="!maintTarget.underMaintenance">

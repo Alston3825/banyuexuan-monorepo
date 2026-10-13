@@ -780,7 +780,7 @@ onMounted(fetchAll)
     </n-tabs>
 
     <!-- 编辑妈妈的风险标签 -->
-    <n-modal :show="mrtVisible" @update:show="(v) => (mrtVisible = v)">
+    <n-modal :mask-closable="false" :show="mrtVisible" @update:show="(v) => (mrtVisible = v)">
       <n-card title="编辑风险标签" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <p v-if="motherWrongTags.length" style="margin: 0 0 10px; color: #d9822b; font-size: 13px; line-height: 1.7">
           这份档案上有不属于风险标签的标签：{{ motherWrongTags.map((b) => b.tag.name).join('、') }}（销售用的客户分类/客户类型，被误选进来了）。点“保存”后会自动清掉。
@@ -796,7 +796,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 管理员：连同评估表/纸质资料一起删除宝宝档案 -->
-    <n-modal :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
+    <n-modal :mask-closable="false" :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
       <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <p style="margin: 0 0 10px; line-height: 1.7">
           “<b>{{ babyDel.name }}</b>”名下已有：<b style="color: #c0392b">{{ babyDel.attached.join('、') }}</b>。<br />
@@ -813,7 +813,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 编辑妈妈档案 -->
-    <n-modal :show="editVisible" @update:show="(v) => (editVisible = v)">
+    <n-modal :mask-closable="false" :show="editVisible" @update:show="(v) => (editVisible = v)">
       <n-card title="编辑妈妈档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="分娩方式">
@@ -846,7 +846,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 新增/编辑宝宝 -->
-    <n-modal :show="babyVisible" @update:show="(v) => (babyVisible = v)">
+    <n-modal :mask-closable="false" :show="babyVisible" @update:show="(v) => (babyVisible = v)">
       <n-card :title="editingBaby ? '编辑宝宝档案' : '新增宝宝档案'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="姓名/编号"><n-input v-model:value="babyModel.name" /></n-form-item>
@@ -878,7 +878,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 生成护理计划 -->
-    <n-modal :show="planFormVisible" @update:show="(v) => (planFormVisible = v)">
+    <n-modal :mask-closable="false" :show="planFormVisible" @update:show="(v) => (planFormVisible = v)">
       <n-card title="生成护理计划" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="对象">
@@ -921,7 +921,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 提交/更正护理记录 -->
-    <n-modal :show="recordVisible" @update:show="(v) => (recordVisible = v)">
+    <n-modal :mask-closable="false" :show="recordVisible" @update:show="(v) => (recordVisible = v)">
       <n-card :title="recordMode === 'correct' ? '更正护理记录' : '提交护理记录'" style="width: min(600px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="对象">

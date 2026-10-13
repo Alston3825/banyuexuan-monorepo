@@ -143,7 +143,7 @@ onMounted(fetchAll)
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CarePlanTemplate) => r.id" :scroll-x="800" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑护理方案' : '新建护理方案'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">

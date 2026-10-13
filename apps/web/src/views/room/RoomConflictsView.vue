@@ -121,7 +121,7 @@ const activeCount = computed(() => conflicts.value.length)
     </n-card>
 
     <!-- 换房 -->
-    <n-modal :show="!!moveTarget" @update:show="(v) => !v && (moveTarget = null)">
+    <n-modal :mask-closable="false" :show="!!moveTarget" @update:show="(v) => !v && (moveTarget = null)">
       <n-card v-if="moveTarget" :title="`把 ${moveTarget.side.customerName} 换到空房`" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <p class="rc-sub" style="margin: 0 0 8px">以下房间在 {{ day(moveTarget.side.plannedCheckIn) }} ~ {{ day(moveTarget.side.plannedCheckOut) }}（含整理间隔）没有别的预订，同房型的排在前面。</p>
         <n-empty v-if="freeRooms.length === 0" description="这段时间没有空房，可以试试改预估日期" />
@@ -141,7 +141,7 @@ const activeCount = computed(() => conflicts.value.length)
     </n-modal>
 
     <!-- 改日期 -->
-    <n-modal :show="!!dateTarget" @update:show="(v) => !v && (dateTarget = null)">
+    <n-modal :mask-closable="false" :show="!!dateTarget" @update:show="(v) => !v && (dateTarget = null)">
       <n-card v-if="dateTarget" :title="`修改 ${dateTarget.customerName} 的预估日期`" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-date-picker v-model:value="range" type="daterange" style="width: 100%" />
         <p class="rc-sub" style="margin-top: 8px">日期是预估的，改完保存即可；如果还和别的预订冲突，这里会继续提示。</p>

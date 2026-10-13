@@ -251,7 +251,7 @@ onMounted(async () => {
     </n-space>
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Room) => r.id" :scroll-x="1000" />
 
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑房间' : '新建房间'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="门店">
@@ -270,7 +270,7 @@ onMounted(async () => {
       </n-card>
     </n-modal>
 
-    <n-modal :show="maintenanceVisible" @update:show="(v) => (maintenanceVisible = v)">
+    <n-modal :mask-closable="false" :show="maintenanceVisible" @update:show="(v) => (maintenanceVisible = v)">
       <n-card title="标记维修" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="维修备注"><n-input v-model:value="maintenanceNote" type="textarea" :autosize="{ minRows: 3 }" /></n-form-item>
@@ -284,7 +284,7 @@ onMounted(async () => {
       </n-card>
     </n-modal>
 
-    <n-modal :show="deleteVisible" @update:show="(v) => (deleteVisible = v)">
+    <n-modal :mask-closable="false" :show="deleteVisible" @update:show="(v) => (deleteVisible = v)">
       <n-card
         :title="deleteMode === 'confirm' ? '⚠ 删除有数据的房间' : '无法删除房间'"
         style="width: min(480px, 94vw)"

@@ -265,7 +265,7 @@ onMounted(fetchAll)
     <n-data-table v-else :columns="columns" :data="shown" :loading="loading" :row-key="(r: GoodsReceipt) => r.id" :scroll-x="1100" />
 
     <!-- 详情 / 收货确认 -->
-    <n-modal :show="!!detail" @update:show="(v) => !v && (detail = null)">
+    <n-modal :mask-closable="false" :show="!!detail" @update:show="(v) => !v && (detail = null)">
       <n-card v-if="detail" :title="`入库单 ${detail.receiptNo}`" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <template #header-extra><component :is="() => renderStatusBadge(detail!.status, GOODS_RECEIPT_STATUS_MAP)" /></template>
         <n-descriptions :column="isMobile ? 1 : 3" label-placement="left" size="small" bordered style="margin-bottom: 10px">
@@ -324,7 +324,7 @@ onMounted(fetchAll)
       </n-card>
     </n-modal>
 
-    <n-modal :show="shortVisible" @update:show="(v) => (shortVisible = v)">
+    <n-modal :mask-closable="false" :show="shortVisible" @update:show="(v) => (shortVisible = v)">
       <n-card title="结束收货" style="width: min(440px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <p class="gr-hint" style="margin-top: 0">没到的货不会再入库，入库单和采购单都会标记完成。请写明原因，留作记录。</p>
         <n-input v-model:value="shortReason" type="textarea" placeholder="如：供应商缺货，已退款" :autosize="{ minRows: 2 }" />
@@ -335,7 +335,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <!-- 手工新建 -->
-    <n-modal :show="formVisible" @update:show="(v) => (formVisible = v)">
+    <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="手工新建入库单（临时入库）" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>

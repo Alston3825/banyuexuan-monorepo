@@ -73,7 +73,7 @@ async function doMerge() {
 </script>
 
 <template>
-  <n-modal :show="show" @update:show="(v: boolean) => emit('update:show', v)">
+  <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
     <n-card title="合并重复客户" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
       <p style="margin: 0 0 10px; line-height: 1.7">
         要合并掉的重复客户：<b style="color: #c0392b">{{ sourceLabel }}</b><br />

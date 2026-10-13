@@ -113,7 +113,7 @@ async function save() {
       <div class="ws-flow">{{ summary(d) }}</div>
     </n-card>
 
-    <n-modal :show="!!editing" @update:show="(v) => !v && (editing = null)">
+    <n-modal :mask-closable="false" :show="!!editing" @update:show="(v) => !v && (editing = null)">
       <n-card v-if="editing" :title="`修改审批流程：${editing.name}`" style="width: min(760px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="top" size="small">
           <n-form-item label="流程名称"><n-input v-model:value="form.name" /></n-form-item>
