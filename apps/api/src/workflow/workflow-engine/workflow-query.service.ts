@@ -31,14 +31,16 @@ export class WorkflowQueryService {
       },
     });
     if (!instance) throw new NotFoundException('审批单不存在');
-    const roleIds = instance.definition.nodes.map((n) => n.approverRoleId).filter((x): x is string => !!x);
+    const rolesOf = (n: { approverRoleId: string | null; approverRoleIds: unknown }): string[] => (Array.isArray(n.approverRoleIds) && n.approverRoleIds.length > 0 ? (n.approverRoleIds as string[]) : n.approverRoleId ? [n.approverRoleId] : []);
+    const acctsOf = (n: { approverAccountId: string | null; approverAccountIds: unknown }): string[] => (Array.isArray(n.approverAccountIds) && n.approverAccountIds.length > 0 ? (n.approverAccountIds as string[]) : n.approverAccountId ? [n.approverAccountId] : []);
+    const roleIds = instance.definition.nodes.flatMap((n) => rolesOf(n));
     const roles = roleIds.length ? await this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } }) : [];
     const roleName = new Map(roles.map((r) => [r.id, r.name]));
     const nameOf = await this.names([
       instance.initiatorId,
       ...instance.approvers.map((a) => a.accountId),
       ...instance.actions.map((a) => a.actorId),
-      ...instance.definition.nodes.flatMap((n) => [n.approverAccountId ?? '', ...(Array.isArray(n.approverAccountIds) ? (n.approverAccountIds as string[]) : [])]),
+      ...instance.definition.nodes.flatMap((n) => acctsOf(n)),
     ]);
     const me = this.ctx.accountId!;
     const now = Date.now();
@@ -52,7 +54,11 @@ export class WorkflowQueryService {
       else if (instance.status === 'REJECTED') state = n.seq < cur ? 'DONE' : n.seq === cur ? 'REJECTED' : 'WAITING';
       else if (instance.status === 'WITHDRAWN') state = n.seq < cur ? 'DONE' : n.seq === cur ? 'WITHDRAWN' : 'WAITING';
       else if (active) state = n.seq < cur ? 'DONE' : n.seq === cur ? 'CURRENT' : 'WAITING';
-      const planned = n.approverType === 'ROLE' ? `角色：${roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）'}` : `指定：${(Array.isArray(n.approverAccountIds) && n.approverAccountIds.length > 0 ? (n.approverAccountIds as string[]) : [n.approverAccountId ?? '']).map((id) => nameOf.get(id) ?? '某位员工').join('、')}`;
+      const plannedParts = [
+        ...(rolesOf(n).length > 0 ? [`角色：${rolesOf(n).map((id) => roleName.get(id) ?? '（角色已删除）').join('、')}`] : []),
+        ...(acctsOf(n).length > 0 ? [`指定：${acctsOf(n).map((id) => nameOf.get(id) ?? '某位员工').join('、')}`] : []),
+      ];
+      const planned = plannedParts.join('；') || '（未设置）';
       return {
         seq: n.seq,
         name: n.name,

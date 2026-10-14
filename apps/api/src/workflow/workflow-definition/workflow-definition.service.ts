@@ -10,6 +10,8 @@ export class WorkflowNodeInput {
   @IsString() @MaxLength(30) name: string;
   @IsIn(['ROLE', 'ACCOUNT']) approverType: 'ROLE' | 'ACCOUNT';
   @IsOptional() @IsString() approverRoleId?: string;
+  /** 指定多个角色（角色成员都算审批人）；可和指定员工同时选 */
+  @IsOptional() @IsArray() @IsString({ each: true }) approverRoleIds?: string[];
   @IsOptional() @IsString() approverAccountId?: string;
   /** 指定多位员工（或签选 2~3 人等）；不传则用 approverAccountId 一位 */
   @IsOptional() @IsArray() @IsString({ each: true }) approverAccountIds?: string[];
@@ -51,7 +53,7 @@ export class WorkflowDefinitionService {
     const latest = new Map<string, (typeof all)[number]>();
     for (const d of all) if (!latest.has(d.code)) latest.set(d.code, d);
     const defs = [...latest.values()];
-    const roleIds = defs.flatMap((d) => d.nodes.map((n) => n.approverRoleId)).filter((x): x is string => !!x);
+    const roleIds = defs.flatMap((d) => d.nodes.flatMap((n) => this.roleIdsOf(n)));
     const accIds = defs.flatMap((d) => d.nodes.flatMap((n) => [n.approverAccountId, ...this.idsOf(n)])).filter((x): x is string => !!x);
     const [roles, accounts, inflight] = await Promise.all([
       this.prisma.role.findMany({ where: { id: { in: roleIds } }, select: { id: true, name: true } }),
@@ -76,9 +78,14 @@ export class WorkflowDefinitionService {
         name: n.name,
         approverType: n.approverType,
         approverRoleId: n.approverRoleId,
+        approverRoleIds: this.roleIdsOf(n),
         approverAccountId: n.approverAccountId,
         approverAccountIds: this.idsOf(n),
-        approverLabel: n.approverType === 'ROLE' ? roleName.get(n.approverRoleId ?? '') ?? '（角色已删除）' : this.idsOf(n).map((id) => accName.get(id) ?? '（员工已删除）').join('、'),
+        approverLabel:
+          [
+            ...(this.roleIdsOf(n).length > 0 ? [`角色：${this.roleIdsOf(n).map((id) => roleName.get(id) ?? '（角色已删除）').join('、')}`] : []),
+            ...(this.idsOf(n).length > 0 ? [`员工：${this.idsOf(n).map((id) => accName.get(id) ?? '（员工已删除）').join('、')}`] : []),
+          ].join('；') || '（未设置）',
         approvalMode: n.approvalMode,
         timeoutHours: n.timeoutHours,
       })),
@@ -87,8 +94,20 @@ export class WorkflowDefinitionService {
 
   /** 输入里指定的员工（去重，保持顺序）：优先 approverAccountIds，没有就用单个 approverAccountId */
   private accountIdsOf(n: WorkflowNodeInput): string[] {
-    const arr = n.approverAccountIds && n.approverAccountIds.length > 0 ? n.approverAccountIds : n.approverAccountId ? [n.approverAccountId] : [];
+    const arr = n.approverAccountIds && n.approverAccountIds.length > 0 ? n.approverAccountIds : n.approverType === 'ACCOUNT' && n.approverAccountId ? [n.approverAccountId] : [];
     return [...new Set(arr)];
+  }
+
+  /** 输入里指定的角色（去重）：优先 approverRoleIds，没有就用旧的单个 approverRoleId（approverType=ROLE 时） */
+  private inputRoleIds(n: WorkflowNodeInput): string[] {
+    const arr = n.approverRoleIds && n.approverRoleIds.length > 0 ? n.approverRoleIds : n.approverType === 'ROLE' && n.approverRoleId ? [n.approverRoleId] : [];
+    return [...new Set(arr)];
+  }
+
+  /** 已保存节点上指定的角色 */
+  private roleIdsOf(n: { approverRoleId: string | null; approverRoleIds: unknown }): string[] {
+    const arr = Array.isArray(n.approverRoleIds) ? (n.approverRoleIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+    return arr.length > 0 ? arr : n.approverRoleId ? [n.approverRoleId] : [];
   }
 
   /** 已保存节点上指定的员工：新数据在 approverAccountIds，旧数据只有 approverAccountId */
@@ -114,15 +133,12 @@ export class WorkflowDefinitionService {
     if (nodes.length < 1 || nodes.length > 8) throw new BadRequestException('审批流程至少要有 1 个节点，最多 8 个');
     for (const [i, n] of nodes.entries()) {
       if (!n.name?.trim()) throw new BadRequestException(`第 ${i + 1} 个节点请填写名称`);
-      if (n.approverType === 'ROLE') {
-        if (!n.approverRoleId || !(await this.prisma.role.findFirst({ where: { id: n.approverRoleId, tenantId }, select: { id: true } }))) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择审批角色`);
-      } else {
-        const ids = this.accountIdsOf(n);
-        if (ids.length === 0) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择审批人（可选多位在职员工）`);
-        if (ids.length > 10) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）最多指定 10 位审批人`);
-        const ok = await this.prisma.account.count({ where: { id: { in: ids }, tenantId, status: 'ACTIVE' } });
-        if (ok !== ids.length) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）选择的审批人里有已离职/停用的员工，请重新选择`);
-      }
+      const roleIds = this.inputRoleIds(n);
+      const accIds = this.accountIdsOf(n);
+      if (roleIds.length === 0 && accIds.length === 0) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）请选择审批角色或审批人（可多选）`);
+      if (roleIds.length > 10 || accIds.length > 10) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）角色/审批人各最多选 10 个`);
+      if (roleIds.length > 0 && (await this.prisma.role.count({ where: { id: { in: roleIds }, tenantId } })) !== roleIds.length) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）选择的角色不存在，请重新选择`);
+      if (accIds.length > 0 && (await this.prisma.account.count({ where: { id: { in: accIds }, tenantId, status: 'ACTIVE' } })) !== accIds.length) throw new BadRequestException(`第 ${i + 1} 个节点（${n.name}）选择的审批人里有已离职/停用的员工，请重新选择`);
     }
     const enabled = dto.enabled ?? latest.status === 'PUBLISHED';
     const created = await this.prisma.$transaction(async (tx) => {
@@ -139,10 +155,12 @@ export class WorkflowDefinitionService {
             create: nodes.map((n, i) => ({
               seq: i + 1,
               name: n.name.trim(),
-              approverType: n.approverType,
-              approverRoleId: n.approverType === 'ROLE' ? n.approverRoleId : null,
-              approverAccountId: n.approverType === 'ACCOUNT' ? this.accountIdsOf(n)[0] : null,
-              approverAccountIds: n.approverType === 'ACCOUNT' ? this.accountIdsOf(n) : Prisma.JsonNull,
+              // 角色和员工可以同时选：有角色 type=ROLE，只有员工 type=ACCOUNT（旧字段保留第一个，兼容旧数据）
+              approverType: this.inputRoleIds(n).length > 0 ? ('ROLE' as const) : ('ACCOUNT' as const),
+              approverRoleId: this.inputRoleIds(n)[0] ?? null,
+              approverRoleIds: this.inputRoleIds(n).length > 0 ? this.inputRoleIds(n) : Prisma.JsonNull,
+              approverAccountId: this.accountIdsOf(n)[0] ?? null,
+              approverAccountIds: this.accountIdsOf(n).length > 0 ? this.accountIdsOf(n) : Prisma.JsonNull,
               approvalMode: n.approvalMode,
               timeoutHours: n.timeoutHours ?? null,
             })),

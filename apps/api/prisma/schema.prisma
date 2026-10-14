@@ -523,6 +523,8 @@ model WorkflowNode {
   name                 String
   approverType         WorkflowNodeApproverType @map("approver_type")
   approverRoleId       String?                  @map("approver_role_id")
+  /// 指定多个角色：角色 id 数组（角色成员 + 指定员工 都算审批人）；approverRoleId 存第一个，兼容旧数据
+  approverRoleIds      Json?                    @map("approver_role_ids")
   approverAccountId    String?                  @map("approver_account_id")
   /// 指定多位员工（或签选 2~3 人、会签几人都要过）：员工 id 数组；approverAccountId 存第一位，兼容旧数据
   approverAccountIds   Json?                    @map("approver_account_ids")

@@ -41,8 +41,7 @@ async function toggle(d: SettingsDefinition, enabled: boolean) {
 // ---------------- 编辑 ----------------
 interface NodeForm {
   name: string
-  approverType: 'ROLE' | 'ACCOUNT'
-  approverRoleId: string | null
+  approverRoleIds: string[]
   approverAccountIds: string[]
   approvalMode: 'ALL' | 'ANY'
   timeoutHours: number | null
@@ -55,10 +54,10 @@ function openEdit(d: SettingsDefinition) {
   editing.value = d
   form.value = {
     name: d.name,
-    nodes: d.nodes.map((n) => ({ name: n.name, approverType: n.approverType, approverRoleId: n.approverRoleId, approverAccountIds: n.approverAccountIds?.length ? [...n.approverAccountIds] : n.approverAccountId ? [n.approverAccountId] : [], approvalMode: n.approvalMode, timeoutHours: n.timeoutHours })),
+    nodes: d.nodes.map((n) => ({ name: n.name, approverRoleIds: n.approverRoleIds?.length ? [...n.approverRoleIds] : n.approverRoleId ? [n.approverRoleId] : [], approverAccountIds: n.approverAccountIds?.length ? [...n.approverAccountIds] : n.approverAccountId ? [n.approverAccountId] : [], approvalMode: n.approvalMode, timeoutHours: n.timeoutHours })),
   }
 }
-const addNode = () => form.value.nodes.push({ name: `第 ${form.value.nodes.length + 1} 级审批`, approverType: 'ROLE', approverRoleId: null, approverAccountIds: [], approvalMode: 'ALL', timeoutHours: 24 })
+const addNode = () => form.value.nodes.push({ name: `第 ${form.value.nodes.length + 1} 级审批`, approverRoleIds: [], approverAccountIds: [], approvalMode: 'ALL', timeoutHours: 24 })
 const removeNode = (i: number) => form.value.nodes.splice(i, 1)
 function move(i: number, d: -1 | 1) {
   const j = i + d
@@ -73,14 +72,13 @@ async function save() {
   const nodes: NonNullable<SaveDefinitionDto['nodes']> = []
   for (const [i, n] of form.value.nodes.entries()) {
     if (!n.name.trim()) return void message.error(`第 ${i + 1} 个节点请填写名称`)
-    if (n.approverType === 'ROLE' && !n.approverRoleId) return void message.error(`第 ${i + 1} 个节点请选择审批角色`)
-    if (n.approverType === 'ACCOUNT' && n.approverAccountIds.length === 0) return void message.error(`第 ${i + 1} 个节点请选择审批人（可选多位）`)
-    if (n.approverType === 'ACCOUNT' && n.approvalMode === 'ANY' && n.approverAccountIds.length < 2) message.warning(`第 ${i + 1} 个节点选了“或签”但只有 1 位审批人，等于单人审批；要多人任意一人通过请再加几位`)
+    if (n.approverRoleIds.length === 0 && n.approverAccountIds.length === 0) return void message.error(`第 ${i + 1} 个节点请选择审批角色或审批人（可多选）`)
+    if (n.approvalMode === 'ANY' && n.approverRoleIds.length + n.approverAccountIds.length < 2) message.warning(`第 ${i + 1} 个节点选了“或签”但只选了 1 个角色/审批人；如果这个角色里有多位员工，任意一位通过即可，否则等于单人审批`)
     nodes.push({
       name: n.name.trim(),
-      approverType: n.approverType,
-      approverRoleId: n.approverType === 'ROLE' ? n.approverRoleId! : undefined,
-      approverAccountIds: n.approverType === 'ACCOUNT' ? n.approverAccountIds : undefined,
+      approverType: n.approverRoleIds.length > 0 ? 'ROLE' : 'ACCOUNT',
+      approverRoleIds: n.approverRoleIds,
+      approverAccountIds: n.approverAccountIds,
       approvalMode: n.approvalMode,
       timeoutHours: n.timeoutHours ?? null,
     })
@@ -130,14 +128,13 @@ async function save() {
           </div>
           <div class="ws-grid">
             <n-form-item label="节点名称"><n-input v-model:value="n.name" maxlength="30" /></n-form-item>
-            <n-form-item label="审批人怎么定">
-              <n-select v-model:value="n.approverType" :options="[{ label: '按角色（该角色的在职员工，优先本门店）', value: 'ROLE' }, { label: '指定员工（可选多位）', value: 'ACCOUNT' }]" />
+            <n-form-item label="审批角色（可多选）">
+              <n-select v-model:value="n.approverRoleIds" :options="roles" multiple filterable clearable placeholder="选择角色：该角色的在职员工（优先本门店）都是审批人" />
             </n-form-item>
-            <n-form-item v-if="n.approverType === 'ROLE'" label="审批角色"><n-select v-model:value="n.approverRoleId" :options="roles" filterable placeholder="选择角色" /></n-form-item>
-            <n-form-item v-else label="审批人（可选多位）">
-              <n-select v-model:value="n.approverAccountIds" :options="staff" multiple filterable clearable placeholder="选择员工，可以选 2～3 位或更多" />
+            <n-form-item label="指定审批人（可多选）">
+              <n-select v-model:value="n.approverAccountIds" :options="staff" multiple filterable clearable placeholder="直接选员工，可选 2～3 位或更多" />
             </n-form-item>
-            <n-form-item label="多人时怎么审">
+            <n-form-item label="多人时怎么审（角色成员和指定员工合在一起算）">
               <n-select v-model:value="n.approvalMode" :options="[{ label: '会签：全部通过才算通过', value: 'ALL' }, { label: '或签：任意一人通过即可', value: 'ANY' }]" />
             </n-form-item>
             <n-form-item label="处理时限（小时，留空=不限时）"><n-input-number v-model:value="n.timeoutHours" :min="1" :max="720" clearable style="width: 100%" placeholder="如 24" /></n-form-item>

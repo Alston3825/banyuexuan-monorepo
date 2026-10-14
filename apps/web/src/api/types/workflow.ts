@@ -197,6 +197,7 @@ export interface SettingsNode {
   name: string
   approverType: 'ROLE' | 'ACCOUNT'
   approverRoleId: string | null
+  approverRoleIds: string[]
   approverAccountId: string | null
   /** 指定的员工（可多位） */
   approverAccountIds: string[]
@@ -223,6 +224,8 @@ export interface SaveDefinitionDto {
     name: string
     approverType: 'ROLE' | 'ACCOUNT'
     approverRoleId?: string
+    /** 指定多个角色 */
+    approverRoleIds?: string[]
     approverAccountId?: string
     /** 指定多位员工（或签选 2~3 人等） */
     approverAccountIds?: string[]

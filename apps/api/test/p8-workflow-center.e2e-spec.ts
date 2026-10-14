@@ -239,4 +239,29 @@ describe('P8 审批中心 / 我的待办 / 审批流程设置 (e2e)', () => {
     expect((await progress(adminToken, inst2.id)).status).toBe('APPROVED');
     await restoreFlow();
   });
+
+  it('9. 审批角色可多选，且可和指定员工同时选：角色成员 + 指定员工 合在一起都是审批人', async () => {
+    const put = (nodes: Json[]) => request(server).put('/api/v1/workflow/definitions/DEMO_APPROVAL').set(authed(adminToken)).send({ nodes });
+    const superRole = await prisma.role.findFirstOrThrow({ where: { code: 'SUPER_ADMIN' } });
+    // 两个角色（店长 + 超级管理员）
+    const s1 = (await put([{ name: '多角色', approverType: 'ROLE', approverRoleIds: [managerRoleId, superRole.id], approvalMode: 'ANY' }]).expect(200)).body as Json;
+    expect(s1.nodes[0].approverRoleIds).toEqual([managerRoleId, superRole.id]);
+    expect(s1.nodes[0].approverLabel).toContain('角色：');
+    const i1 = await submitDemo(`多角色${Date.now()}`);
+    const p1 = await progress(adminToken, i1.id);
+    expect(p1.nodes[0].approvers.map((a: Json) => a.accountId)).toEqual(expect.arrayContaining([managerId, adminId]));
+    await post(managerToken, `/workflow/instances/${i1.id}/approve`, {}).expect(201);
+    expect((await progress(adminToken, i1.id)).status).toBe('APPROVED');
+
+    // 角色 + 指定员工同时选（店长角色 + 指定管理员）
+    await put([{ name: '角色加员工', approverType: 'ROLE', approverRoleIds: [managerRoleId], approverAccountIds: [adminId], approvalMode: 'ANY' }]).expect(200);
+    const i2 = await submitDemo(`角色加员工${Date.now()}`);
+    const p2 = await progress(adminToken, i2.id);
+    expect(p2.nodes[0].approvers.map((a: Json) => a.accountId).sort()).toEqual([managerId, adminId].sort());
+    expect(p2.nodes[0].planned).toContain('角色：');
+    expect(p2.nodes[0].planned).toContain('指定：');
+    await post(adminToken, `/workflow/instances/${i2.id}/approve`, {}).expect(201);
+    expect((await progress(adminToken, i2.id)).status).toBe('APPROVED');
+    await restoreFlow();
+  });
 });
