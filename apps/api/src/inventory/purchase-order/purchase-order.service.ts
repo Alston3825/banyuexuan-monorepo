@@ -7,6 +7,7 @@ import { ActorContext } from '../../common/context/actor-context';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
+import { InventoryItemImportService, keyOf } from '../inventory-item/inventory-item-import.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { QueryPurchaseOrderDto } from './dto/query-purchase-order.dto';
 
@@ -36,6 +37,7 @@ export class PurchaseOrderService {
     private readonly workflowEngineService: WorkflowEngineService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly itemImport: InventoryItemImportService,
   ) {}
 
   async findMany(query: QueryPurchaseOrderDto = {}): Promise<PurchaseOrder[]> {
@@ -61,7 +63,23 @@ export class PurchaseOrderService {
 
   /** autoApprove：由已批准的申购单生成，直接是“待采购(APPROVED)”，不再走审批。 */
   async create(dto: CreatePurchaseOrderDto, opts: { autoApprove?: boolean } = {}): Promise<PurchaseOrder> {
-    const itemIds = [...new Set(dto.items.map((i) => i.itemId))];
+    // 新物品（物品库里还没有）：先加入物品库拿到物品 id；同名同规格已经有的直接对上，不会重复建
+    const newOnes = dto.items.filter((i) => !i.itemId);
+    for (const [idx, i] of dto.items.entries()) {
+      if (!i.itemId && !i.newItem) throw new BadRequestException(`第 ${idx + 1} 行请选择物品，或填写新物品的名称和单位`);
+    }
+    if (newOnes.length > 0) {
+      const made = await this.itemImport.ensureItems(
+        newOnes.map((i, n) => ({ rowNo: n + 1, name: i.newItem!.name, spec: i.newItem!.spec ?? null, brand: i.newItem!.brand ?? null, unit: i.newItem!.unit, referencePrice: i.unitPrice > 0 ? i.unitPrice / 100 : null })),
+        { createMissing: true, purpose: 'LOGISTICS' },
+      );
+      for (const i of newOnes) {
+        const id = made.get(keyOf(i.newItem!.name.trim(), i.newItem!.spec?.trim() || null));
+        if (!id) throw new BadRequestException(`新物品「${i.newItem!.name}」没能加入物品库，请检查名称和单位`);
+        i.itemId = id;
+      }
+    }
+    const itemIds = [...new Set(dto.items.map((i) => i.itemId as string))];
     const items = await this.prisma.inventoryItem.findMany({ where: { id: { in: itemIds } } });
     if (items.length !== itemIds.length) throw new BadRequestException('存在不存在的物品 ID');
 
@@ -83,7 +101,7 @@ export class PurchaseOrderService {
       await tx.purchaseOrderItem.createMany({
         data: dto.items.map((i) => ({
           purchaseOrderId: order.id,
-          itemId: i.itemId,
+          itemId: i.itemId as string,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           subtotal: i.quantity * i.unitPrice,

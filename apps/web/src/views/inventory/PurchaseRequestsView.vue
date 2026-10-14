@@ -13,6 +13,7 @@ import {
 import { inventoryItemApi, purchaseRequestApi, supplierApi, warehouseApi } from '../../api/modules/inventory.api'
 import { storeApi } from '../../api/modules/store.api'
 import ApprovalProgress from '../../components/workflow/ApprovalProgress.vue'
+import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
 import { useAuthStore } from '../../stores/auth'
 import type {
   InventoryItem, PurchaseRequest, PurchaseRequestItem, PurchaseRequestStatus, RequestImportPreview, RequestImportPreviewRow, Supplier, Warehouse,
@@ -42,6 +43,7 @@ const route = useRoute()
 const auth = useAuthStore()
 const canCollect = computed(() => auth.hasAccess('inventory.purchase-request.collect'))
 const canConvert = computed(() => auth.hasAccess('inventory.purchase-request.convert'))
+const canCreateRequest = computed(() => auth.hasAccess('inventory.purchase-request.create'))
 const isStaff = computed(() => canCollect.value || canConvert.value) // 采购岗：能看整个门店；其它人只看自己的部门申购单
 const tab = ref<'dept' | 'summary'>(route.query.tab === 'dept' ? 'dept' : isStaff.value ? 'summary' : 'dept')
 const DEPT_STATUS = ['DRAFT', 'SUBMITTED', 'COLLECTED', 'CANCELLED']
@@ -89,35 +91,76 @@ const columns = computed<DataTableColumns<PurchaseRequest>>(() => [
 ])
 
 // ---------------- 部门申购单：新建 / 汇总 ----------------
-interface DeptLine { key: number; name: string; spec: string; quantity: number | null; unit: string; unitPrice: number | null; purpose: string }
 const deptVisible = ref(false)
 const deptSaving = ref(false)
-let deptKey = 0
-const newLine = (): DeptLine => ({ key: deptKey++, name: '', spec: '', quantity: 1, unit: '', unitPrice: null, purpose: '' })
-const deptLines = ref<DeptLine[]>([newLine()])
+const deptLines = ref<ItemLine[]>([])
 const deptRemark = ref('')
 function openDept() {
-  deptLines.value = [newLine()]
+  deptLines.value = []
   deptRemark.value = ''
   deptVisible.value = true
 }
+/** 编辑器里的明细 → 接口的申购行 */
+function toBody(lines: ItemLine[]) {
+  return lines.map((l) => ({
+    itemId: l.itemId ?? undefined,
+    name: l.name.trim(),
+    spec: l.spec.trim() || null,
+    brand: l.brand.trim() || null,
+    quantity: l.quantity!,
+    unit: l.unit.trim() || null,
+    unitPrice: l.unitPrice,
+    purpose: l.purpose.trim() || null,
+  }))
+}
+function checkLines(lines: ItemLine[], needUnitForNew: boolean): string | null {
+  if (lines.length === 0) return '请至少添加一项要申购的物品'
+  for (const l of lines) {
+    if (!l.name.trim()) return '有一行新物品还没填名称'
+    if (!l.quantity || l.quantity < 1) return `「${l.name}」请填写数量`
+    if (needUnitForNew && !l.itemId && !l.unit.trim()) return `新物品「${l.name}」请填写单位（要加入物品库）`
+  }
+  return null
+}
 async function saveDept(submit: boolean) {
-  const lines = deptLines.value.filter((l) => l.name.trim())
-  if (lines.length === 0) return void message.error('请至少填写一项要申购的物品名称')
-  const bad = lines.find((l) => !l.quantity || l.quantity < 1)
-  if (bad) return void message.error(`「${bad.name}」请填写数量`)
+  const err = checkLines(deptLines.value, false)
+  if (err) return void message.error(err)
   deptSaving.value = true
   try {
-    await purchaseRequestApi.createDepartment({
-      submit,
-      remark: deptRemark.value.trim() || undefined,
-      items: lines.map((l) => ({ name: l.name.trim(), spec: l.spec.trim() || null, quantity: l.quantity!, unit: l.unit.trim() || null, unitPrice: l.unitPrice, purpose: l.purpose.trim() || null })),
-    })
+    await purchaseRequestApi.createDepartment({ submit, remark: deptRemark.value.trim() || undefined, items: toBody(deptLines.value) })
     deptVisible.value = false
     message.success(submit ? '已提交，客服会在“待汇总”里看到' : '已保存为草稿，确认无误后再提交')
     await fetchList()
   } finally {
     deptSaving.value = false
+  }
+}
+
+// ---------------- 手动新建申购单（汇总申购单） ----------------
+const manualVisible = ref(false)
+const manualSaving = ref(false)
+const manual = ref({ storeId: null as string | null, date: Date.now() as number | null, remark: '', createMissingItems: true })
+const manualLines = ref<ItemLine[]>([])
+function openManual() {
+  manual.value = { storeId: filterStore.value ?? stores.value[0]?.value ?? null, date: Date.now(), remark: '', createMissingItems: true }
+  manualLines.value = []
+  manualVisible.value = true
+}
+async function saveManual() {
+  if (!manual.value.storeId) return void message.error('请选择门店')
+  const err = checkLines(manualLines.value, manual.value.createMissingItems)
+  if (err) return void message.error(err)
+  manualSaving.value = true
+  try {
+    const d = new Date(manual.value.date ?? Date.now())
+    const requestDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const created = await purchaseRequestApi.create({ storeId: manual.value.storeId, requestDate, remark: manual.value.remark.trim() || undefined, items: toBody(manualLines.value), createMissingItems: manual.value.createMissingItems })
+    manualVisible.value = false
+    message.success('申购单已保存为草稿：可以点开补单价、改数量，没问题再提交审批')
+    await fetchList()
+    void openDetail(created.id)
+  } finally {
+    manualSaving.value = false
   }
 }
 const collecting = ref(false)
@@ -470,12 +513,15 @@ onMounted(async () => {
       <n-space>
         <n-button v-if="tab === 'dept' && canCollect" type="warning" :disabled="collectKeys.length === 0" :loading="collecting" @click="doCollect">汇总所选（{{ collectKeys.length }}）</n-button>
         <n-button v-if="tab === 'dept'" type="primary" @click="openDept">＋ 新建部门申购单</n-button>
-        <n-button v-else type="primary" @click="openImport">从 Excel 导入申购表</n-button>
+        <template v-else>
+          <n-button v-if="canCreateRequest" type="primary" @click="openManual">＋ 手动新建申购单</n-button>
+          <n-button v-if="canCreateRequest" @click="openImport">从 Excel 导入申购表</n-button>
+        </template>
       </n-space>
     </n-space>
 
     <template v-if="isMobile">
-      <n-empty v-if="!loading && rows.length === 0" :description="tab === 'dept' ? '还没有部门申购单，点右上角新建' : '还没有汇总申购单，点右上角导入每月的申购表，或到“部门申购”里汇总'" />
+      <n-empty v-if="!loading && rows.length === 0" :description="tab === 'dept' ? '还没有部门申购单，点右上角新建' : '还没有汇总申购单，点右上角手动新建或导入每月的申购表，或到“部门申购”里汇总'" />
       <div v-for="r in rows" :key="r.id" class="pr-card" @click="openDetail(r.id)">
         <div class="pr-top">
           <n-checkbox v-if="tab === 'dept' && canCollect && r.status === 'SUBMITTED'" :checked="collectKeys.includes(r.id)" @click.stop @update:checked="(v: boolean) => (collectKeys = v ? [...collectKeys, r.id] : collectKeys.filter((x) => x !== r.id))" />
@@ -532,24 +578,33 @@ onMounted(async () => {
     <n-modal :mask-closable="false" :show="deptVisible" @update:show="(v) => (deptVisible = v)">
       <n-card title="新建部门申购单" style="width: min(860px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <p class="pr-tip">填写本部门要买的东西。申请部门和申请人会自动带出（取自你的账号）。提交后自动汇总给客服，由客服统一提交店长审批。单价不知道可以不填，客服会补。</p>
-        <div v-for="(l, i) in deptLines" :key="l.key" class="pr-line-box">
-          <div class="pr-line-head"><b>第 {{ i + 1 }} 项</b><n-button v-if="deptLines.length > 1" size="tiny" type="error" quaternary @click="deptLines.splice(i, 1)">删除</n-button></div>
-          <div class="pr-grid">
-            <n-input v-model:value="l.name" placeholder="物品名称（必填）" />
-            <n-input v-model:value="l.spec" placeholder="规格/型号/尺寸" />
-            <n-input-number v-model:value="l.quantity" :min="1" :precision="0" placeholder="数量" style="width: 100%" />
-            <n-input v-model:value="l.unit" placeholder="单位（个/箱/桶…）" />
-            <n-input-number v-model:value="l.unitPrice" :min="0" :show-button="false" placeholder="单价（选填）" style="width: 100%" />
-            <n-input v-model:value="l.purpose" placeholder="用途（选填）" />
-          </div>
-        </div>
-        <n-button dashed block style="margin-top: 8px" @click="deptLines.push(newLine())">＋ 再加一项</n-button>
+        <item-lines-editor v-model="deptLines" />
         <n-input v-model:value="deptRemark" type="textarea" placeholder="备注（选填）" :autosize="{ minRows: 1 }" style="margin-top: 10px" />
         <template #footer>
           <n-space justify="end">
             <n-button @click="deptVisible = false">取消</n-button>
             <n-button :loading="deptSaving" @click="saveDept(false)">存为草稿</n-button>
             <n-button type="primary" :loading="deptSaving" @click="saveDept(true)">保存并提交</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
+
+    <!-- 手动新建申购单 -->
+    <n-modal :mask-closable="false" :show="manualVisible" @update:show="(v) => (manualVisible = v)">
+      <n-card title="手动新建申购单" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+        <p class="pr-tip">先在搜索框里找物品库里已有的物品，点一下加入；之前没采购过的东西点“添加未录入的新物品”自己填。保存后是草稿，可以再补单价、改数量，没问题再提交审批。</p>
+        <n-space align="center" :size="14" style="margin-bottom: 10px" :wrap="true">
+          <n-space align="center" :size="6"><span>门店</span><n-select v-model:value="manual.storeId" :options="stores" style="width: 170px" /></n-space>
+          <n-space align="center" :size="6"><span>申购日期</span><n-date-picker v-model:value="manual.date" type="date" style="width: 150px" /></n-space>
+        </n-space>
+        <item-lines-editor v-model="manualLines" />
+        <n-checkbox v-model:checked="manual.createMissingItems" style="margin-top: 8px">新物品同时加入物品库（需要填写单位），下次直接搜得到</n-checkbox>
+        <n-input v-model:value="manual.remark" type="textarea" placeholder="备注（选填）" :autosize="{ minRows: 1 }" style="margin-top: 10px" />
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="manualVisible = false">取消</n-button>
+            <n-button type="primary" :loading="manualSaving" @click="saveManual">保存为草稿</n-button>
           </n-space>
         </template>
       </n-card>

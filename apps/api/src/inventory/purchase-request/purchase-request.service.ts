@@ -8,7 +8,7 @@ import { DataScopeService } from '../../common/scope/data-scope.service';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { WorkflowEngineService } from '../../workflow/workflow-engine/workflow-engine.service';
 import { PurchaseOrderService } from '../purchase-order/purchase-order.service';
-import { keyOf, norm } from '../inventory-item/inventory-item-import.service';
+import { InventoryItemImportService, keyOf, norm } from '../inventory-item/inventory-item-import.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 
 const DEFINITION_CODE = 'INVENTORY_PURCHASE_REQUEST';
@@ -54,6 +54,7 @@ export class PurchaseRequestService {
     private readonly auditLogService: AuditLogService,
     private readonly dataScope: DataScopeService,
     private readonly ctx: RequestContextService,
+    private readonly itemImport: InventoryItemImportService,
   ) {}
 
   /** 采购岗（客服/采购员/店长…）能看到整个门店的申购单；其他人（部门负责人）只能看自己提交的部门申购单。 */
@@ -101,6 +102,62 @@ export class PurchaseRequestService {
       throw new ForbiddenException('只能查看自己提交的部门申购单');
     }
     return this.reconcileStatus(row);
+  }
+
+  // ---------------- 手动新建（汇总申购单） ----------------
+  /**
+   * 手动新建申购单（汇总申购单，草稿）：物品可以从物品库里选（带 itemId），也可以填之前没采购过的新物品；
+   * createMissingItems=true 时，新物品（写了单位的）同时加入物品库。之后和导入的申购单一样：补单价 → 提交审批 → 生成采购单。
+   */
+  async createManual(body: { storeId: string; requestDate?: string; remark?: string; items: RequestLineBody[]; createMissingItems?: boolean }) {
+    const store = await this.prisma.store.findFirst({ where: { id: body.storeId, tenantId: this.ctx.tenantId } });
+    if (!store) throw new BadRequestException('请选择申购所属的门店');
+    await this.dataScope.assertStoreAccessible(this.ctx, store.id);
+    if (!body.items?.length) throw new BadRequestException('请至少添加一项要申购的物品');
+    if (body.items.length > 500) throw new BadRequestException('一张申购单最多 500 行');
+    const me = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId! }, select: { realName: true } });
+
+    const rows = body.items.map((raw, i) => {
+      if (!raw.name?.trim()) throw new BadRequestException(`第 ${i + 1} 行请填写物品名称`);
+      if (raw.quantity === undefined) throw new BadRequestException(`第 ${i + 1} 行（${raw.name}）请填写数量`);
+      return { raw, data: this.normalize({ ...raw, requester: raw.requester ?? me?.realName }) };
+    });
+    // 新物品加入物品库（只处理没选已有物品、且写了单位的）
+    const itemIdByKey = new Map<string, string>();
+    if (body.createMissingItems) {
+      const fresh = rows.filter((r) => !r.raw.itemId && norm(r.raw.unit));
+      if (fresh.length > 0) {
+        const made = await this.itemImport.ensureItems(
+          fresh.map((r, n) => ({ rowNo: n + 1, name: norm(r.raw.name), spec: norm(r.raw.spec) || null, brand: norm(r.raw.brand) || null, unit: norm(r.raw.unit) || null, referencePrice: (r.data.unitPrice as number | null | undefined) ?? null })),
+          { createMissing: true, purpose: 'LOGISTICS' },
+        );
+        made.forEach((v, k) => itemIdByKey.set(k, v));
+      }
+    }
+    const lines: Prisma.PurchaseRequestItemUncheckedCreateWithoutPurchaseRequestInput[] = [];
+    for (const [i, r] of rows.entries()) {
+      const price = (r.data.unitPrice as number | null | undefined) ?? null;
+      const key = keyOf(norm(r.raw.name), norm(r.raw.spec) || null);
+      const itemId = r.raw.itemId ?? itemIdByKey.get(key) ?? (await this.resolveItem(norm(r.raw.name), norm(r.raw.spec) || null));
+      lines.push({ ...(r.data as object), sortNo: i + 1, itemId: itemId ?? null, subtotal: price === null ? 0 : round2((r.data.quantity as number) * price) } as Prisma.PurchaseRequestItemUncheckedCreateWithoutPurchaseRequestInput);
+    }
+    const created = await this.prisma.purchaseRequest.create({
+      data: {
+        tenantId: this.ctx.tenantId!,
+        storeId: store.id,
+        requestNo: generateBusinessNo('SG'),
+        requestDate: body.requestDate && /^\d{4}-\d{2}-\d{2}$/.test(body.requestDate) ? new Date(body.requestDate) : new Date(),
+        kind: 'SUMMARY',
+        status: 'DRAFT',
+        totalAmount: round2(lines.reduce((s, l) => s + Number(l.subtotal ?? 0), 0)),
+        remark: body.remark?.trim() || null,
+        createdBy: this.ctx.accountId!,
+        items: { create: lines },
+      },
+      include,
+    });
+    await this.audit('STATE_TRANSITION', created.id, null, created, `手动新建申购单（${lines.length} 项）`, store.id);
+    return created;
   }
 
   // ---------------- 部门申购单 / 汇总 ----------------

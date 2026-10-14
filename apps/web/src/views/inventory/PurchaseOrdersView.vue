@@ -5,10 +5,11 @@
  */
 import { computed, h, onBeforeUnmount, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NSelect, NInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
 import { purchaseOrderApi, supplierApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
+import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { PurchaseOrder, PurchaseOrderItemInput, Supplier, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
@@ -39,7 +40,6 @@ const filterStatus = ref<string | null>(null)
 const storeOptions = computed(() => stores.value.map((s) => ({ label: s.name, value: s.id })))
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
 const supplierOptions = computed(() => suppliers.value.map((s) => ({ label: s.name, value: s.id })))
-const itemOptions = computed(() => items.value.map((i) => ({ label: `${i.name}（${i.unit}）`, value: i.id })))
 const statusOptions = Object.entries(PURCHASE_ORDER_STATUS_MAP).map(([value, m]) => ({ label: m.label, value }))
 const shown = computed(() => rows.value.filter((r) => !filterStatus.value || r.status === filterStatus.value))
 
@@ -50,9 +50,9 @@ const model = ref({
   warehouseId: null as string | null,
   supplierId: null as string | null,
   remark: '',
-  items: [] as (PurchaseOrderItemInput & { key: number })[],
+  items: [] as ItemLine[],
+  createMissing: true,
 })
-let itemRowKey = 0
 
 async function fetchAll() {
   loading.value = true
@@ -75,17 +75,19 @@ async function fetchAll() {
 }
 
 function openCreateModal() {
-  model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, supplierId: null, remark: '', items: [] }
+  model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, supplierId: null, remark: '', items: [], createMissing: true }
   formVisible.value = true
-}
-function createItemRow() {
-  return { key: itemRowKey++, itemId: '', quantity: 1, unitPrice: 0 }
 }
 
 async function handleSubmit() {
   if (!model.value.storeId || !model.value.warehouseId || !model.value.supplierId || model.value.items.length === 0) {
     message.error('请完整填写门店/仓库/供应商，并至少添加一行采购明细')
     return
+  }
+  for (const l of model.value.items) {
+    if (!l.name.trim()) return void message.error('有一行新物品还没填名称')
+    if (!l.quantity || l.quantity < 1) return void message.error(`「${l.name}」请填写数量`)
+    if (!l.itemId && !l.unit.trim()) return void message.error(`新物品「${l.name}」请填写单位（会同时加入物品库）`)
   }
   submitting.value = true
   try {
@@ -94,7 +96,12 @@ async function handleSubmit() {
       warehouseId: model.value.warehouseId,
       supplierId: model.value.supplierId,
       remark: model.value.remark || undefined,
-      items: model.value.items.map(({ key: _key, ...i }) => i),
+      // 单价界面上填“元”，接口按“分”存
+      items: model.value.items.map((l): PurchaseOrderItemInput => ({
+        ...(l.itemId ? { itemId: l.itemId } : { newItem: { name: l.name.trim(), spec: l.spec.trim() || undefined, brand: l.brand.trim() || undefined, unit: l.unit.trim() } }),
+        quantity: l.quantity!,
+        unitPrice: Math.round((l.unitPrice ?? 0) * 100),
+      })),
     })
     message.success('采购单已创建')
     formVisible.value = false
@@ -272,20 +279,17 @@ onMounted(fetchAll)
 
     <!-- 手工新建 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="手工新建采购单（需审批）" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="手工新建采购单（需审批）" style="width: min(860px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="入库仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="供应商"><n-select v-model:value="model.supplierId" :options="supplierOptions" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="采购明细">
-            <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(200px, 94vw)" />
-                <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: min(120px, 94vw)" />
-                <n-input-number v-model:value="value.unitPrice" :min="0" placeholder="单价(分)" style="width: min(140px, 94vw)" />
-              </n-space>
-            </n-dynamic-input>
+            <div style="width: 100%">
+              <item-lines-editor v-model="model.items" :show-purpose="false" />
+              <div style="margin-top: 6px; color: #888; font-size: 12px">没采购过的新物品会自动加入物品库，下次直接搜得到；单价不填按 0 元，之后在采购时再核对。</div>
+            </div>
           </n-form-item>
         </n-form>
         <template #footer>

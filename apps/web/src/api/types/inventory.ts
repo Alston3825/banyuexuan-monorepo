@@ -124,7 +124,9 @@ export interface StockBatchExpiryAlert extends StockBatch {
 
 // ---------------- 采购单 ----------------
 export interface PurchaseOrderItemInput {
-  itemId: string
+  /** 物品库里已有的物品；新物品不传，改传 newItem */
+  itemId?: string
+  newItem?: { name: string; spec?: string; brand?: string; unit: string }
   quantity: number
   unitPrice: number
 }

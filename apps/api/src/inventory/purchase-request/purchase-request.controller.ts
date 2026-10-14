@@ -56,6 +56,14 @@ class CreateDepartmentDto {
   /** true=保存并提交（交给客服汇总） */
   @IsOptional() @IsBoolean() submit?: boolean;
 }
+class CreateManualDto {
+  @IsString() storeId: string;
+  @IsOptional() @IsString() requestDate?: string;
+  @IsOptional() @IsString() remark?: string;
+  @IsArray() items: RequestLineBody[];
+  /** 新物品（写了单位的）同时加入物品库 */
+  @IsOptional() @IsBoolean() createMissingItems?: boolean;
+}
 class CollectDto {
   @IsArray() @IsString({ each: true }) ids: string[];
   @IsOptional() @IsString() remark?: string;
@@ -103,6 +111,13 @@ export class PurchaseRequestController {
   @RequirePermission('inventory.purchase-request.create')
   createDepartment(@Body() dto: CreateDepartmentDto) {
     return this.service.createDepartment(dto);
+  }
+
+  /** 手动新建申购单（汇总申购单草稿）：从物品库选物品，或填没采购过的新物品 */
+  @Post()
+  @RequirePermission('inventory.purchase-request.create')
+  createManual(@Body() dto: CreateManualDto) {
+    return this.service.createManual(dto);
   }
 
   /** 客服汇总：把勾选的“已提交”部门申购单合并成一张汇总申购单 */

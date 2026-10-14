@@ -49,6 +49,11 @@ export const warehouseApi = {
 
 export const inventoryItemApi = {
   list: () => http.get<InventoryItem[]>('/inventory/items').then((r) => r.data),
+  /** 选物品的搜索框：按名称/规格/品牌/编码模糊搜，最多 30 条 */
+  search: (keyword?: string) =>
+    http
+      .get<{ id: string; code: string; name: string; spec: string | null; brand: string | null; unit: string; referencePrice: string | number | null }[]>('/inventory/items/search', { params: { keyword: keyword || undefined } })
+      .then((r) => r.data),
   create: (body: CreateInventoryItemDto) => http.post<InventoryItem>('/inventory/items', body).then((r) => r.data),
   update: (id: string, body: UpdateInventoryItemDto) => http.patch<InventoryItem>(`/inventory/items/${id}`, body).then((r) => r.data),
   /** Excel 导入第一步：上传表格，返回识别结果供核对（不入库） */
@@ -137,6 +142,9 @@ export const stockCountApi = {
 
 export const purchaseRequestApi = {
   list: (params?: { storeId?: string; status?: PurchaseRequestStatus; kind?: PurchaseRequestKind }) => http.get<PurchaseRequest[]>('/inventory/purchase-requests', { params }).then((r) => r.data),
+  /** 手动新建申购单（汇总申购单草稿）：物品从物品库选，或填没采购过的新物品 */
+  create: (body: { storeId: string; requestDate?: string; remark?: string; items: PurchaseRequestLineBody[]; createMissingItems?: boolean }) =>
+    http.post<PurchaseRequest>('/inventory/purchase-requests', body).then((r) => r.data),
   /** 部门负责人新建部门申购单（submit=true 直接提交给客服汇总） */
   createDepartment: (body: { items: PurchaseRequestLineBody[]; remark?: string; storeId?: string; submit?: boolean }) =>
     http.post<PurchaseRequest>('/inventory/purchase-requests/department', body).then((r) => r.data),

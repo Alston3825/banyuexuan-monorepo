@@ -26,6 +26,20 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     return this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId }, orderBy: { createdAt: 'desc' } });
   }
 
+  async search(keyword?: string) {
+    const k = keyword?.trim();
+    return this.prisma.inventoryItem.findMany({
+      where: {
+        tenantId: this.ctx.tenantId,
+        status: 'ACTIVE',
+        ...(k ? { OR: [{ name: { contains: k } }, { spec: { contains: k } }, { brand: { contains: k } }, { code: { contains: k } }] } : {}),
+      },
+      select: { id: true, code: true, name: true, spec: true, brand: true, unit: true, referencePrice: true },
+      orderBy: [{ name: 'asc' }],
+      take: 30,
+    });
+  }
+
   create(data: {
     code: string;
     name: string;

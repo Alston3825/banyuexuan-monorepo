@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { WarehousePurpose } from '@prisma/client';
 import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
@@ -38,6 +38,12 @@ export class InventoryItemController {
   @RequirePermission('inventory.item.create')
   importCommit(@Body() dto: CommitImportDto) {
     return this.importService.commit(dto);
+  }
+
+  /** 选物品的搜索框用：按名称/规格/品牌/编码模糊搜，最多 30 条。各种“新建申购单/采购单”都要用，登录即可查（只返回基础资料）。 */
+  @Get('search')
+  search(@Query('keyword') keyword?: string) {
+    return this.inventoryItemService.search(keyword);
   }
 
   @Get()
