@@ -96,7 +96,7 @@ function onPurchaseOrderChange(poId: string | null) {
   const po = purchaseOrders.value.find((p) => p.id === poId)
   if (po) {
     model.value.warehouseId = po.warehouseId
-    model.value.items = po.items.map((i) => ({ key: itemRowKey++, itemId: i.itemId, quantity: i.quantity, unitCost: i.unitPrice }))
+    model.value.items = po.items.map((i) => ({ key: itemRowKey++, itemId: i.itemId, quantity: i.quantity, unitCost: i.unitPrice / 100 }))
   }
 }
 function createItemRow() {
@@ -112,7 +112,7 @@ async function handleSubmit() {
       warehouseId: model.value.warehouseId,
       purchaseOrderId: model.value.purchaseOrderId ?? undefined,
       remark: model.value.remark || undefined,
-      items: model.value.items.map(({ key: _key, ...i }) => i),
+      items: model.value.items.map(({ key: _key, ...i }) => ({ ...i, unitCost: Math.round((i.unitCost ?? 0) * 100) })), // 界面填“元”，接口按“分”
     })
     message.success('入库单已创建')
     formVisible.value = false
@@ -361,8 +361,14 @@ onMounted(fetchAll)
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
               <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
                 <item-select v-model="value.itemId" :items="items" style="width: min(320px, 94vw)" />
-                <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: min(120px, 94vw)" />
-                <n-input-number v-model:value="value.unitCost" :min="0" placeholder="单位成本(分)" style="width: min(140px, 94vw)" />
+                <n-input-number v-model:value="value.quantity" :min="1" :precision="0" placeholder="数量" style="width: min(150px, 94vw)">
+                  <template #prefix>数量</template>
+                  <template #suffix>{{ items.find((i) => i.id === value.itemId)?.unit ?? '' }}</template>
+                </n-input-number>
+                <n-input-number v-model:value="value.unitCost" :min="0" :show-button="false" placeholder="0" style="width: min(190px, 94vw)">
+                  <template #prefix>单位成本</template>
+                  <template #suffix>元</template>
+                </n-input-number>
               </n-space>
             </n-dynamic-input>
           </n-form-item>
