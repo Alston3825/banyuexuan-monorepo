@@ -8,12 +8,16 @@ import { warehouseStockApi } from '../api/modules/inventory.api'
 export function useWarehouseStockMap(warehouseId: Ref<string | null | undefined>) {
   const stock = ref<Map<string, number>>(new Map())
   const loaded = ref(false)
+  const loading = ref(false)
+  const failed = ref(false)
   let seq = 0
   async function load() {
     const my = ++seq
     stock.value = new Map()
     loaded.value = false
+    failed.value = false
     if (!warehouseId.value) return
+    loading.value = true
     try {
       const list = await warehouseStockApi.list({ warehouseId: warehouseId.value })
       if (my !== seq) return
@@ -21,6 +25,9 @@ export function useWarehouseStockMap(warehouseId: Ref<string | null | undefined>
       loaded.value = true
     } catch {
       /* 没权限取库存：不显示、不拦截 */
+      if (my === seq) failed.value = true
+    } finally {
+      if (my === seq) loading.value = false
     }
   }
   watch(warehouseId, load)
@@ -32,5 +39,5 @@ export function useWarehouseStockMap(warehouseId: Ref<string | null | undefined>
     for (const r of rows) if (r.itemId) used.set(r.itemId, (used.get(r.itemId) ?? 0) + (r.quantity ?? 0))
     return [...used.entries()].filter(([id, n]) => n > stockOf(id)).map(([id, n]) => ({ id, used: n, stock: stockOf(id) }))
   }
-  return { stock, loaded, stockOf, overOf, reload: load }
+  return { stock, loaded, loading, failed, stockOf, overOf, reload: load }
 }

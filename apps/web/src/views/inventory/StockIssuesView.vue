@@ -40,7 +40,7 @@ let itemRowKey = 0
 
 // 选了仓库后取这个仓库每种物品的现有库存：下拉里和每一行都显示，领用数量超过库存就拦住
 const warehouseRef = computed(() => model.value.warehouseId)
-const { stock, loaded: stockLoaded, stockOf, overOf } = useWarehouseStockMap(warehouseRef)
+const { stock, loaded: stockLoaded, loading: stockLoading, stockOf, overOf } = useWarehouseStockMap(warehouseRef)
 const overItems = computed(() => overOf(model.value.items))
 const itemName = (id: string) => items.value.find((i) => i.id === id)?.name ?? '该物品'
 const unitOf = (id: string) => items.value.find((i) => i.id === id)?.unit ?? ''
@@ -194,10 +194,14 @@ onMounted(fetchAll)
               </n-alert>
               <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
                 <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
-                  <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" :disable-empty="true" style="width: min(360px, 94vw)" />
-                  <n-input-number v-model:value="value.quantity" :min="1" :precision="0" :status="rowOver(value) ? 'error' : undefined" placeholder="数量" style="width: min(130px, 94vw)" />
-                  <span v-if="value.itemId && stockLoaded" :style="{ whiteSpace: 'nowrap', color: rowOver(value) ? '#d03050' : '#18a058', fontSize: '13px' }">
-                    现有库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}<template v-if="rowOver(value)">，库存不足</template>
+                  <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" style="width: min(280px, 94vw)" />
+                  <n-input-number v-model:value="value.quantity" :min="1" :precision="0" :status="rowOver(value) ? 'error' : undefined" placeholder="数量" style="width: min(120px, 94vw)" />
+                  <!-- 现有库存：选了物品就一直显示（0 也显示）；还没选仓库时提示先选仓库 -->
+                  <span v-if="value.itemId" class="stock-hint" :class="{ 'stock-bad': stockLoaded && rowOver(value), 'stock-ok': stockLoaded && !rowOver(value) }">
+                    <template v-if="!model.warehouseId">选好仓库后显示现有库存</template>
+                    <template v-else-if="stockLoading">库存查询中…</template>
+                    <template v-else-if="stockLoaded">现有库存 <b>{{ stockOf(value.itemId) }}</b> {{ unitOf(value.itemId) }}<template v-if="rowOver(value)">，库存不足</template></template>
+                    <template v-else>暂时查不到库存</template>
                   </span>
                 </n-space>
               </n-dynamic-input>
@@ -214,3 +218,17 @@ onMounted(fetchAll)
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+.stock-hint {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #999;
+}
+.stock-ok {
+  color: #18a058;
+}
+.stock-bad {
+  color: #d03050;
+}
+</style>
