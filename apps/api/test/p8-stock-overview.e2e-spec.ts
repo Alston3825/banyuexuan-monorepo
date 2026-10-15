@@ -62,6 +62,7 @@ describe('P8 库存总览 (e2e)', () => {
   it('搜索和筛选：按名称搜；只看预警/缺货/有库存；按仓库只算该仓库', async () => {
     expect((await get({ keyword: `物品LOW${tag}` })).rows).toHaveLength(1);
     expect((await get({ keyword: 'ov_OK_' + tag })).rows).toHaveLength(1); // 按编码搜
+    expect((await get({ keyword: 'zlwp ok ' + tag })).rows.map((x: Json) => x.itemId)).toEqual([ids.OK]); // 拼音首字母（总览物品OK）+ 编号尾数
     expect((await get({ keyword: tag, status: 'ALERT' })).rows.map((x: Json) => x.itemId)).toEqual([ids.OUT, ids.LOW]);
     expect((await get({ keyword: tag, status: 'OUT' })).rows.map((x: Json) => x.itemId)).toEqual([ids.OUT]);
     expect((await get({ keyword: tag, status: 'IN_STOCK' })).rows).toHaveLength(3);

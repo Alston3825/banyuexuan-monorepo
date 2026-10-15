@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch, type VNode } from 'vue'
+import { computed, h, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, NAlert, type DataTableColumns } from 'naive-ui'
-import { stockIssueApi, warehouseApi, inventoryItemApi, warehouseStockApi } from '../../api/modules/inventory.api'
+import { stockIssueApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
+import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
+import { docMatches } from '../../utils/item-search'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { StockIssue, StockIssueItemInput, StockIssueType, Warehouse, InventoryItem } from '../../api/types/inventory'
@@ -21,20 +24,8 @@ const loading = ref(false)
 
 const storeOptions = computed(() => stores.value.map((s) => ({ label: s.name, value: s.id })))
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
-// 选了仓库后，取这个仓库每种物品的现有库存：下拉里直接显示，数量超过库存就不让提交
-const stockByItem = ref<Map<string, number>>(new Map())
-const stockLoaded = ref(false)
-const stockOf = (itemId: string) => stockByItem.value.get(itemId) ?? 0
-const itemOptions = computed(() =>
-  items.value
-    .map((i) => ({ i, q: stockOf(i.id) }))
-    .sort((a, b) => (b.q > 0 ? 1 : 0) - (a.q > 0 ? 1 : 0))
-    .map(({ i, q }) => ({
-      label: stockLoaded.value ? `${i.name}（${i.unit}）· 现有库存 ${q}${q <= 0 ? '（无库存）' : ''}` : `${i.name}（${i.unit}）`,
-      value: i.id,
-      disabled: stockLoaded.value && q <= 0,
-    })),
-)
+const keyword = ref('')
+const shown = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.issueNo, r.warehouse?.name, r.remark], r.items)))
 
 const formVisible = ref(false)
 const submitting = ref(false)
@@ -46,6 +37,14 @@ const model = ref({
   items: [] as (StockIssueItemInput & { key: number })[],
 })
 let itemRowKey = 0
+
+// 选了仓库后取这个仓库每种物品的现有库存：下拉里和每一行都显示，领用数量超过库存就拦住
+const warehouseRef = computed(() => model.value.warehouseId)
+const { stock, loaded: stockLoaded, stockOf, overOf } = useWarehouseStockMap(warehouseRef)
+const overItems = computed(() => overOf(model.value.items))
+const itemName = (id: string) => items.value.find((i) => i.id === id)?.name ?? '该物品'
+const unitOf = (id: string) => items.value.find((i) => i.id === id)?.unit ?? ''
+const rowOver = (r: { itemId: string }) => !!r.itemId && overItems.value.some((o) => o.id === r.itemId)
 
 async function fetchAll() {
   loading.value = true
@@ -62,42 +61,12 @@ async function fetchAll() {
 
 function openCreateModal() {
   model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, issueType: 'ISSUE', remark: '', items: [] }
-  stockLoaded.value = false
-  stockByItem.value = new Map()
   formVisible.value = true
 }
 
 function createItemRow() {
   return { key: itemRowKey++, itemId: '', quantity: 1 }
 }
-
-async function loadStocks(warehouseId: string | null) {
-  stockLoaded.value = false
-  stockByItem.value = new Map()
-  if (!warehouseId) return
-  try {
-    const list = await warehouseStockApi.list({ warehouseId })
-    stockByItem.value = new Map(list.map((st) => [st.itemId, st.quantity]))
-    stockLoaded.value = true
-  } catch {
-    /* 没有查看库存的权限时取不到：不影响新建，提交时后端仍会校验库存 */
-  }
-}
-watch(() => model.value.warehouseId, loadStocks)
-
-/** 同一个物品在几行里重复选，按合计和库存比 */
-const usedByItem = computed(() => {
-  const m = new Map<string, number>()
-  for (const r of model.value.items) if (r.itemId) m.set(r.itemId, (m.get(r.itemId) ?? 0) + (r.quantity ?? 0))
-  return m
-})
-const itemName = (id: string) => items.value.find((i) => i.id === id)?.name ?? '该物品'
-/** 领用数量大于现有库存的物品（提示用） */
-const overItems = computed(() => {
-  if (!stockLoaded.value) return []
-  return [...usedByItem.value.entries()].filter(([id, used]) => used > stockOf(id)).map(([id, used]) => ({ id, used, stock: stockOf(id) }))
-})
-const rowOver = (r: { itemId: string; quantity?: number | null }) => stockLoaded.value && !!r.itemId && usedByItem.value.has(r.itemId) && (usedByItem.value.get(r.itemId) ?? 0) > stockOf(r.itemId)
 
 async function handleSubmit() {
   if (!model.value.storeId || !model.value.warehouseId || model.value.items.length === 0) {
@@ -204,10 +173,11 @@ onMounted(fetchAll)
 
 <template>
   <div>
-    <n-space justify="end" style="margin-bottom: 12px">
+    <n-space justify="space-between" align="center" style="margin-bottom: 12px" :wrap="true">
+      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：单号 / 物品名称（支持拼音首字母）/ 仓库" style="width: min(360px, 94vw)" />
       <n-button type="primary" @click="openCreateModal">新建出库/领用单</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: StockIssue) => r.id" :scroll-x="1000" />
+    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: StockIssue) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card title="新建出库/领用单" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
@@ -224,10 +194,10 @@ onMounted(fetchAll)
               </n-alert>
               <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
                 <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
-                  <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品（可输入名称搜索）" style="width: min(300px, 94vw)" />
+                  <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" :disable-empty="true" style="width: min(360px, 94vw)" />
                   <n-input-number v-model:value="value.quantity" :min="1" :precision="0" :status="rowOver(value) ? 'error' : undefined" placeholder="数量" style="width: min(130px, 94vw)" />
                   <span v-if="value.itemId && stockLoaded" :style="{ whiteSpace: 'nowrap', color: rowOver(value) ? '#d03050' : '#18a058', fontSize: '13px' }">
-                    现有库存 {{ stockOf(value.itemId) }} {{ items.find((i) => i.id === value.itemId)?.unit }}<template v-if="rowOver(value)">，库存不足</template>
+                    现有库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}<template v-if="rowOver(value)">，库存不足</template>
                   </span>
                 </n-space>
               </n-dynamic-input>

@@ -14,6 +14,8 @@ import { storeApi } from '../../api/modules/store.api'
 import { useAuthStore } from '../../stores/auth'
 import type { GoodsReceipt, GoodsReceiptItem, GoodsReceiptItemInput, PurchaseOrder, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
+import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, GOODS_RECEIPT_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
 
@@ -40,9 +42,14 @@ const filterStatus = ref<string | null>(null)
 const storeOptions = computed(() => stores.value.map((s) => ({ label: s.name, value: s.id })))
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
 const approvedPurchaseOrderOptions = computed(() => purchaseOrders.value.filter((p) => p.status === 'APPROVED').map((p) => ({ label: `${p.orderNo}（${p.supplier.name}）`, value: p.id })))
-const itemOptions = computed(() => items.value.map((i) => ({ label: `${i.name}（${i.unit}）`, value: i.id })))
 const statusOptions = Object.entries(GOODS_RECEIPT_STATUS_MAP).map(([value, m]) => ({ label: m.label, value }))
-const shown = computed(() => rows.value.filter((r) => !filterStatus.value || r.status === filterStatus.value))
+const keyword = ref('')
+const shown = computed(() =>
+  rows.value.filter((r) => (!filterStatus.value || r.status === filterStatus.value) && docMatches(keyword.value, [r.receiptNo, r.purchaseOrder?.orderNo, r.warehouse?.name, r.remark], r.items)),
+)
+// 入库单明细里按物品搜（一张单上物品多时快速定位）
+const lineKeyword = ref('')
+const detailLines = computed(() => (detail.value?.items ?? []).filter((l) => itemMatches(l.item, lineKeyword.value)))
 const remaining = (l: GoodsReceiptItem) => Math.max(0, l.quantity - l.receivedQuantity)
 const progressText = (r: GoodsReceipt) => {
   if (!r.tracked) return '-'
@@ -171,6 +178,7 @@ function recvQuantityClean(): Record<string, number> {
   return out
 }
 async function openDetail(r: GoodsReceipt) {
+  lineKeyword.value = ''
   detail.value = await goodsReceiptApi.get(r.id)
   resetRecv()
 }
@@ -248,7 +256,10 @@ onMounted(fetchAll)
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px" align="center">
-      <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 170px" />
+      <n-space align="center" :wrap="true">
+        <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：入库单号 / 采购单号 / 物品名称（支持拼音首字母）/ 仓库" style="width: min(400px, 94vw)" />
+        <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 150px" />
+      </n-space>
       <n-button v-if="canCreate" @click="openCreateModal">手工新建入库单（临时入库）</n-button>
     </n-space>
 
@@ -282,8 +293,9 @@ onMounted(fetchAll)
             快递到了就在“这次到货”里填写到了几个（没到的留空），再点“确认收货并入库”。可以分多次，货品陆续到也没关系。
             <n-button size="tiny" style="margin-left: 8px" @click="fillAll">全部填成剩余数量</n-button>
           </div>
+          <n-input v-if="detail.items.length > 6" v-model:value="lineKeyword" clearable placeholder="🔍 在这张入库单里搜物品（名称 / 拼音首字母）" style="margin-bottom: 8px" />
           <div class="gr-lines">
-            <div v-for="l in detail.items" :key="l.id" class="gr-lrow" :class="{ 'gr-done': remaining(l) === 0 }">
+            <div v-for="l in detailLines" :key="l.id" class="gr-lrow" :class="{ 'gr-done': remaining(l) === 0 }">
               <div class="gr-lname">
                 <b>{{ l.item.name }}</b><span v-if="l.item.spec" class="gr-sub"> {{ l.item.spec }}</span>
                 <div class="gr-sub">采购 {{ l.quantity }} {{ l.item.unit }} · 已到 {{ l.receivedQuantity }} · <span :style="remaining(l) ? 'color:#d9822b' : 'color:#18a058'">{{ remaining(l) ? `还差 ${remaining(l)}` : '已到齐 ✓' }}</span></div>
@@ -308,9 +320,10 @@ onMounted(fetchAll)
           </div>
         </template>
         <template v-else>
+          <n-input v-if="detail.items.length > 6" v-model:value="lineKeyword" clearable placeholder="🔍 在这张入库单里搜物品（名称 / 拼音首字母）" style="margin-bottom: 8px" />
           <table class="gr-table">
             <thead><tr><th>物品</th><th>数量</th><th>单位成本（元）</th></tr></thead>
-            <tbody><tr v-for="l in detail.items" :key="l.id"><td>{{ l.item.name }}</td><td>{{ l.quantity }} {{ l.item.unit }}</td><td>{{ (l.unitCost / 100).toFixed(2) }}</td></tr></tbody>
+            <tbody><tr v-for="l in detailLines" :key="l.id"><td>{{ l.item.name }}</td><td>{{ l.quantity }} {{ l.item.unit }}</td><td>{{ (l.unitCost / 100).toFixed(2) }}</td></tr></tbody>
           </table>
         </template>
 
@@ -336,7 +349,7 @@ onMounted(fetchAll)
 
     <!-- 手工新建 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="手工新建入库单（临时入库）" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="手工新建入库单（临时入库）" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="关联采购单">
@@ -346,8 +359,8 @@ onMounted(fetchAll)
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="入库明细">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(200px, 94vw)" />
+              <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
+                <item-select v-model="value.itemId" :items="items" style="width: min(320px, 94vw)" />
                 <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: min(120px, 94vw)" />
                 <n-input-number v-model:value="value.unitCost" :min="0" placeholder="单位成本(分)" style="width: min(140px, 94vw)" />
               </n-space>

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
+import { itemMatchesKeyword } from '../common/item-match';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -27,17 +28,14 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
   }
 
   async search(keyword?: string) {
-    const k = keyword?.trim();
-    return this.prisma.inventoryItem.findMany({
-      where: {
-        tenantId: this.ctx.tenantId,
-        status: 'ACTIVE',
-        ...(k ? { OR: [{ name: { contains: k } }, { spec: { contains: k } }, { brand: { contains: k } }, { code: { contains: k } }] } : {}),
-      },
-      select: { id: true, code: true, name: true, spec: true, brand: true, unit: true, referencePrice: true },
+    const all = await this.prisma.inventoryItem.findMany({
+      where: { tenantId: this.ctx.tenantId, status: 'ACTIVE' },
+      select: { id: true, code: true, name: true, spec: true, brand: true, category: true, unit: true, referencePrice: true },
       orderBy: [{ name: 'asc' }],
-      take: 30,
+      take: 5000,
     });
+    // 名称/规格/品牌/编码 + 拼音（全拼/首字母）在内存里匹配，最多返回 30 条
+    return all.filter((i) => itemMatchesKeyword(i, keyword)).slice(0, 30);
   }
 
   create(data: {

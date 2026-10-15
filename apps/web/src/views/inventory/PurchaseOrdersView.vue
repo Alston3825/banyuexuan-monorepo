@@ -3,12 +3,13 @@
  * 采购单：店长批准的申购单生成的采购单直接是“待采购”（不再审批），采购员采购完点“确认采购”，
  * 系统自动生成待收货的入库单，之后由客服按快递到货情况逐项确认收货。手工新建的采购单仍走审批。
  */
-import { computed, h, onBeforeUnmount, onMounted, ref, type VNode } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NSelect, NInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
 import { purchaseOrderApi, supplierApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
+import { docMatches, itemMatches } from '../../utils/item-search'
 import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { PurchaseOrder, PurchaseOrderItemInput, Supplier, Warehouse, InventoryItem } from '../../api/types/inventory'
@@ -41,7 +42,13 @@ const storeOptions = computed(() => stores.value.map((s) => ({ label: s.name, va
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
 const supplierOptions = computed(() => suppliers.value.map((s) => ({ label: s.name, value: s.id })))
 const statusOptions = Object.entries(PURCHASE_ORDER_STATUS_MAP).map(([value, m]) => ({ label: m.label, value }))
-const shown = computed(() => rows.value.filter((r) => !filterStatus.value || r.status === filterStatus.value))
+const keyword = ref('')
+const shown = computed(() =>
+  rows.value.filter((r) => (!filterStatus.value || r.status === filterStatus.value) && docMatches(keyword.value, [r.orderNo, r.supplier?.name, r.warehouse?.name, r.expressNo, r.remark], r.items)),
+)
+// 采购单详情里按物品搜
+const lineKeyword = ref('')
+const detailLines = computed(() => (detail.value?.items ?? []).filter((i) => itemMatches(i.item, lineKeyword.value)))
 
 const formVisible = ref(false)
 const submitting = ref(false)
@@ -172,6 +179,7 @@ async function doCancel() {
 
 // ---------------- 详情 ----------------
 const detail = ref<PurchaseOrder | null>(null)
+watch(detail, () => (lineKeyword.value = ''))
 const receiptOf = (o: PurchaseOrder) => o.goodsReceipts?.find((g) => g.tracked) ?? o.goodsReceipts?.[0] ?? null
 const canCancel = (o: PurchaseOrder) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PURCHASED'].includes(o.status)
 
@@ -201,7 +209,10 @@ onMounted(fetchAll)
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px" align="center">
-      <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 170px" />
+      <n-space align="center" :wrap="true">
+        <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：采购单号 / 供应商 / 物品名称（支持拼音首字母）/ 运单号" style="width: min(400px, 94vw)" />
+        <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 150px" />
+      </n-space>
       <n-button v-if="canCreate" type="primary" @click="openCreateModal">手工新建采购单（需审批）</n-button>
     </n-space>
 
@@ -233,10 +244,11 @@ onMounted(fetchAll)
           <n-descriptions-item v-if="detail.cancelReason" label="取消原因" :span="2">{{ detail.cancelReason }}</n-descriptions-item>
           <n-descriptions-item v-if="receiptOf(detail)" label="入库单" :span="2"><a style="cursor: pointer; color: #2080f0" @click="router.push('/inventory/goods-receipts')">{{ receiptOf(detail)!.receiptNo }}（去入库单页面收货）</a></n-descriptions-item>
         </n-descriptions>
+        <n-input v-if="detail.items.length > 6" v-model:value="lineKeyword" clearable placeholder="🔍 在这张采购单里搜物品（名称 / 拼音首字母）" style="margin-bottom: 8px" />
         <table class="po-table">
           <thead><tr><th>物品</th><th>规格</th><th>数量</th><th>单价（元）</th><th>小计（元）</th></tr></thead>
           <tbody>
-            <tr v-for="i in detail.items" :key="i.id"><td>{{ i.item.name }}</td><td>{{ i.item.spec ?? '-' }}</td><td>{{ i.quantity }} {{ i.item.unit }}</td><td>{{ yuan(i.unitPrice) }}</td><td>{{ yuan(i.subtotal) }}</td></tr>
+            <tr v-for="i in detailLines" :key="i.id"><td>{{ i.item.name }}</td><td>{{ i.item.spec ?? '-' }}</td><td>{{ i.quantity }} {{ i.item.unit }}</td><td>{{ yuan(i.unitPrice) }}</td><td>{{ yuan(i.subtotal) }}</td></tr>
           </tbody>
         </table>
         <div v-if="detail.status === 'APPROVED'" class="po-hint">这张采购单已经是“待采购”：由店长批准的申购单生成，不需要再审批。采购完成后点“确认采购”。</div>

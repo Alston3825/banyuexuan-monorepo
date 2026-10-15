@@ -88,6 +88,8 @@ export class PurchaseRequestService {
         purchaseOrder: { select: { id: true, orderNo: true } },
         summaryRequest: { select: { id: true, requestNo: true } },
         _count: { select: { items: true } },
+        // 列表里按物品搜索用：只带名称/规格/品牌
+        items: { select: { name: true, spec: true, brand: true } },
       },
       orderBy: [{ requestDate: 'desc' }, { createdAt: 'desc' }],
     });

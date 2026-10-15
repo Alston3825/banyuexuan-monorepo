@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, NAlert, type DataTableColumns } from 'naive-ui'
 import { stockTransferApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import type { StockTransfer, StockTransferItemInput, Warehouse, InventoryItem } from '../../api/types/inventory'
+import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
+import { docMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
 
@@ -16,7 +19,6 @@ const items = ref<InventoryItem[]>([])
 const loading = ref(false)
 
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
-const itemOptions = computed(() => items.value.map((i) => ({ label: `${i.name}（${i.unit}）`, value: i.id })))
 
 const formVisible = ref(false)
 const submitting = ref(false)
@@ -27,6 +29,17 @@ const model = ref({
   items: [] as (StockTransferItemInput & { key: number })[],
 })
 let itemRowKey = 0
+
+const keyword = ref('')
+const shown = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.transferNo, r.fromWarehouse?.name, r.toWarehouse?.name, r.remark], r.items)))
+
+// 调出仓库里每种物品的现有库存：下拉里和每行都显示，调拨数量超过库存就拦住
+const fromRef = computed(() => model.value.fromWarehouseId)
+const { stock, loaded: stockLoaded, stockOf, overOf } = useWarehouseStockMap(fromRef)
+const overItems = computed(() => overOf(model.value.items))
+const itemName = (id: string) => items.value.find((i) => i.id === id)?.name ?? '该物品'
+const unitOf = (id: string) => items.value.find((i) => i.id === id)?.unit ?? ''
+const rowOver = (r: { itemId: string }) => !!r.itemId && overItems.value.some((o) => o.id === r.itemId)
 
 async function fetchAll() {
   loading.value = true
@@ -57,6 +70,11 @@ async function handleSubmit() {
   if (model.value.fromWarehouseId === model.value.toWarehouseId) {
     message.error('调出仓库与调入仓库不能相同')
     return
+  }
+  if (model.value.items.some((i) => !i.itemId)) return void message.error('有一行还没选物品')
+  if (overItems.value.length > 0) {
+    const o = overItems.value[0]
+    return void message.error(`「${itemName(o.id)}」调拨数量 ${o.used} 大于调出仓库现有库存 ${o.stock}，无法提交`)
   }
   submitting.value = true
   try {
@@ -152,30 +170,40 @@ onMounted(fetchAll)
 
 <template>
   <div>
-    <n-space justify="end" style="margin-bottom: 12px">
+    <n-space justify="space-between" align="center" style="margin-bottom: 12px" :wrap="true">
+      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：单号 / 物品名称（支持拼音首字母）/ 仓库" style="width: min(360px, 94vw)" />
       <n-button type="primary" @click="openCreateModal">新建调拨单</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: StockTransfer) => r.id" :scroll-x="1000" />
+    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: StockTransfer) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建调拨单" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建调拨单" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="调出仓库"><n-select v-model:value="model.fromWarehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="调入仓库"><n-select v-model:value="model.toWarehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="调拨明细">
-            <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(240px, 94vw)" />
-                <n-input-number v-model:value="value.quantity" :min="1" placeholder="数量" style="width: min(140px, 94vw)" />
-              </n-space>
-            </n-dynamic-input>
+            <div style="width: 100%">
+              <n-alert v-if="!model.fromWarehouseId" type="info" :show-icon="false" style="margin-bottom: 8px">先选调出仓库，选好后物品下拉里会显示每种物品在调出仓库的现有库存。</n-alert>
+              <n-alert v-for="o in overItems" :key="o.id" type="error" :show-icon="false" style="margin-bottom: 6px">
+                ⚠「{{ itemName(o.id) }}」调拨数量 {{ o.used }} 大于调出仓库现有库存 {{ o.stock }}，无法提交，请减少数量。
+              </n-alert>
+              <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
+                <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
+                  <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" :disable-empty="true" style="width: min(360px, 94vw)" />
+                  <n-input-number v-model:value="value.quantity" :min="1" :precision="0" :status="rowOver(value) ? 'error' : undefined" placeholder="数量" style="width: min(130px, 94vw)" />
+                  <span v-if="value.itemId && stockLoaded" :style="{ whiteSpace: 'nowrap', color: rowOver(value) ? '#d03050' : '#18a058', fontSize: '13px' }">
+                    调出仓库现有库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}<template v-if="rowOver(value)">，库存不足</template>
+                  </span>
+                </n-space>
+              </n-dynamic-input>
+            </div>
           </n-form-item>
         </n-form>
         <template #footer>
           <n-space justify="end">
             <n-button @click="formVisible = false">取消</n-button>
-            <n-button type="primary" :loading="submitting" @click="handleSubmit">提交</n-button>
+            <n-button type="primary" :loading="submitting" :disabled="overItems.length > 0" @click="handleSubmit">提交</n-button>
           </n-space>
         </template>
       </n-card>

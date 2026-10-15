@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from 'vue'
-import { NSpace, NDataTable, NSelect, NSwitch, NInputNumber, NTag, type DataTableColumns } from 'naive-ui'
+import { NSpace, NDataTable, NSelect, NSwitch, NInputNumber, NInput, NTag, type DataTableColumns } from 'naive-ui'
 import { stockBatchApi, warehouseApi } from '../../api/modules/inventory.api'
+import { itemMatches } from '../../utils/item-search'
 import type { StockBatch, StockBatchExpiryAlert } from '../../api/types/inventory'
 
 const rows = ref<(StockBatch | StockBatchExpiryAlert)[]>([])
@@ -11,6 +12,8 @@ const loading = ref(false)
 const warehouseId = ref<string | null>(null)
 const expiryOnly = ref(false)
 const withinDays = ref(7)
+const keyword = ref('')
+const shown = computed(() => rows.value.filter((r) => itemMatches(r.item, keyword.value) || (keyword.value.trim() !== '' && (r.batchNo ?? '').toLowerCase().includes(keyword.value.trim().toLowerCase()))))
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
 
 async function fetchList() {
@@ -53,7 +56,8 @@ watch([warehouseId, expiryOnly, withinDays], fetchList)
 
 <template>
   <div>
-    <n-space style="margin-bottom: 12px" align="center">
+    <n-space style="margin-bottom: 12px" align="center" :wrap="true">
+      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索物品（名称 / 规格 / 拼音首字母）或批次号" style="width: min(340px, 94vw)" />
       <n-select v-model:value="warehouseId" :options="warehouseOptions" clearable placeholder="全部仓库" style="width: min(220px, 94vw)" />
       <n-space align="center" :size="8">
         <n-switch v-model:value="expiryOnly" />
@@ -64,6 +68,6 @@ watch([warehouseId, expiryOnly, withinDays], fetchList)
         <n-input-number v-model:value="withinDays" :min="1" style="width: min(100px, 94vw)" />
       </n-space>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r) => r.id" :scroll-x="900" />
+    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r) => r.id" :scroll-x="900" />
   </div>
 </template>

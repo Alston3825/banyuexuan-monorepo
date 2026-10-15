@@ -7,6 +7,9 @@ import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { StockCount, StockCountItemInput, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
+import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
+import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
 
@@ -20,7 +23,6 @@ const loading = ref(false)
 
 const storeOptions = computed(() => stores.value.map((s) => ({ label: s.name, value: s.id })))
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
-const itemOptions = computed(() => items.value.map((i) => ({ label: `${i.name}（${i.unit}）`, value: i.id })))
 
 const formVisible = ref(false)
 const submitting = ref(false)
@@ -31,6 +33,15 @@ const model = ref({
   items: [] as (StockCountItemInput & { key: number })[],
 })
 let itemRowKey = 0
+
+const keyword = ref('')
+const shown = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.countNo, r.warehouse?.name, r.remark], r.items)))
+// 盘点的仓库里每种物品的系统库存：下拉里显示，方便对着数
+const whRef = computed(() => model.value.warehouseId)
+const { stock, loaded: stockLoaded, stockOf } = useWarehouseStockMap(whRef)
+const unitOf = (id: string) => items.value.find((i) => i.id === id)?.unit ?? ''
+// 盘点明细（查看）里按物品搜
+const detailKeyword = ref('')
 
 async function fetchAll() {
   loading.value = true
@@ -126,6 +137,7 @@ const detailVisible = ref(false)
 const detailRow = ref<StockCount | null>(null)
 
 async function openDetail(row: StockCount) {
+  detailKeyword.value = ""
   detailRow.value = await stockCountApi.get(row.id)
   detailVisible.value = true
 }
@@ -161,22 +173,24 @@ onMounted(fetchAll)
 
 <template>
   <div>
-    <n-space justify="end" style="margin-bottom: 12px">
+    <n-space justify="space-between" align="center" style="margin-bottom: 12px" :wrap="true">
+      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：单号 / 物品名称（支持拼音首字母）/ 仓库" style="width: min(360px, 94vw)" />
       <n-button type="primary" @click="openCreateModal">新建盘点单</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: StockCount) => r.id" :scroll-x="1000" />
+    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: StockCount) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建盘点单" style="width: min(680px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建盘点单" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="盘点明细">
             <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
-              <n-space :wrap="false" align="center" style="width: 100%; overflow-x: auto; padding-bottom: 4px">
-                <n-select v-model:value="value.itemId" :options="itemOptions" filterable placeholder="物品" style="width: min(240px, 94vw)" />
+              <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
+                <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" style="width: min(360px, 94vw)" />
                 <n-input-number v-model:value="value.countedQuantity" :min="0" placeholder="实际盘点数量" style="width: min(160px, 94vw)" />
+                <span v-if="value.itemId && stockLoaded" style="white-space: nowrap; color: #18a058; font-size: 13px">系统库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}</span>
               </n-space>
             </n-dynamic-input>
           </n-form-item>
@@ -191,7 +205,8 @@ onMounted(fetchAll)
     </n-modal>
 
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card v-if="detailRow" :title="`盘点明细：${detailRow.countNo}`" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detailRow" :title="`盘点明细：${detailRow.countNo}`" style="width: min(640px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+        <n-input v-model:value="detailKeyword" clearable placeholder="🔍 在这张盘点单里搜物品" style="margin-bottom: 8px" />
         <n-data-table
           :columns="[
             { key: 'item', title: '物品', render: (r: any) => r.item.name },
@@ -199,7 +214,7 @@ onMounted(fetchAll)
             { key: 'countedQuantity', title: '盘点数量' },
             { key: 'diffQuantity', title: '差异', render: (r: any) => (r.diffQuantity > 0 ? `+${r.diffQuantity}` : r.diffQuantity) },
           ]"
-          :data="detailRow.items"
+          :data="detailRow.items.filter((r: any) => itemMatches(r.item, detailKeyword))"
           :row-key="(r: any) => r.id"
         />
         <template #footer>

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { itemMatchesKeyword } from '../common/item-match';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { QueryWarehouseStockDto } from './dto/query-warehouse-stock.dto';
@@ -45,15 +46,13 @@ export class WarehouseStockService {
    */
   async overview(query: { warehouseId?: string; keyword?: string; status?: 'ALL' | 'ALERT' | 'LOW' | 'OUT' | 'IN_STOCK' } = {}) {
     const k = query.keyword?.trim();
-    const items = await this.prisma.inventoryItem.findMany({
-      where: {
-        tenantId: this.ctx.tenantId,
-        status: 'ACTIVE',
-        ...(k ? { OR: [{ name: { contains: k } }, { spec: { contains: k } }, { brand: { contains: k } }, { code: { contains: k } }] } : {}),
-      },
+    const allItems = await this.prisma.inventoryItem.findMany({
+      where: { tenantId: this.ctx.tenantId, status: 'ACTIVE' },
       orderBy: { name: 'asc' },
-      take: 3000,
+      take: 5000,
     });
+    // 名称/规格/品牌/编码 + 拼音（全拼/首字母）
+    const items = k ? allItems.filter((i) => itemMatchesKeyword(i, k)) : allItems;
     const stocks = await this.prisma.warehouseStock.findMany({
       where: { warehouseId: query.warehouseId, warehouse: { tenantId: this.ctx.tenantId }, itemId: { in: items.map((i) => i.id) } },
       include: { warehouse: { select: { id: true, name: true } } },

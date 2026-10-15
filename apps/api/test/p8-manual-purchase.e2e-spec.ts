@@ -49,6 +49,11 @@ describe('P8 手动新建申购单 / 采购单 (e2e)', () => {
     expect(r[0]).toMatchObject({ id: existingItemId, unit: '箱', spec: '大号' });
     const bySpec = (await request(server).get('/api/v1/inventory/items/search').query({ keyword: '大号' }).set(authed(staffToken)).expect(200)).body as Json[];
     expect(bySpec.some((x) => x.id === existingItemId)).toBe(true);
+    // 拼音首字母 / 全拼也能搜（手动申购已有物品 → sdsgyywp / shoudongshengou）
+    const byInitials = (await request(server).get('/api/v1/inventory/items/search').query({ keyword: 'sdsgyywp' }).set(authed(staffToken)).expect(200)).body as Json[];
+    expect(byInitials.some((x) => x.id === existingItemId)).toBe(true);
+    const byFull = (await request(server).get('/api/v1/inventory/items/search').query({ keyword: 'shoudongshengou' }).set(authed(staffToken)).expect(200)).body as Json[];
+    expect(byFull.some((x) => x.id === existingItemId)).toBe(true);
     await request(server).get('/api/v1/inventory/items/search').expect(401);
   });
 

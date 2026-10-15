@@ -13,6 +13,8 @@ import {
 import { inventoryItemApi, purchaseRequestApi, supplierApi, warehouseApi } from '../../api/modules/inventory.api'
 import { storeApi } from '../../api/modules/store.api'
 import ApprovalProgress from '../../components/workflow/ApprovalProgress.vue'
+import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import { docMatches, itemMatches } from '../../utils/item-search'
 import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
 import { useAuthStore } from '../../stores/auth'
 import type {
@@ -53,6 +55,9 @@ const statusOptions = computed(() =>
     .map(([value, m]) => ({ label: m.label, value })),
 )
 const collectKeys = ref<string[]>([])
+// 搜索：申购单号 / 申请部门 / 申请人 / 门店 / 里面的物品名称（支持拼音首字母）
+const keyword = ref('')
+const shownRows = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.requestNo, r.departmentName, r.creatorName, r.store?.name, r.remark], (r.items ?? []).map((i) => ({ name: i.name, spec: i.spec })))))
 
 async function fetchList() {
   loading.value = true
@@ -325,6 +330,9 @@ async function handleImport() {
 
 // ---------------- 详情 ----------------
 const detail = ref<PurchaseRequest | null>(null)
+const detailKeyword = ref('')
+const detailLines = computed(() => (detail.value?.items ?? []).filter((l) => itemMatches({ name: l.name, spec: l.spec, brand: l.brand }, detailKeyword.value)))
+watch(detail, (d, o) => d?.id !== o?.id && (detailKeyword.value = ''))
 const detailVisible = ref(false)
 async function openDetail(id: string) {
   detail.value = await purchaseRequestApi.get(id)
@@ -381,9 +389,22 @@ const detailColumns: DataTableColumns<PurchaseRequestItem> = [
 const lineVisible = ref(false)
 const lineSaving = ref(false)
 const lineEditing = ref<PurchaseRequestItem | null>(null)
+const allItems = ref<InventoryItem[]>([])
+async function ensureItems() {
+  if (allItems.value.length === 0) allItems.value = await inventoryItemApi.list().catch(() => [])
+}
+const lineItemId = ref<string | null>(null)
+function pickLineItem(id: string) {
+  const it = allItems.value.find((x) => x.id === id)
+  if (!it) return
+  lineItemId.value = it.id
+  lineModel.value = { ...lineModel.value, name: it.name, spec: it.spec ?? '', brand: it.brand ?? '', unit: it.unit, unitPrice: lineModel.value.unitPrice ?? (it.referencePrice ? Number(it.referencePrice) : null) }
+}
 const lineModel = ref({ name: '', spec: '', brand: '', unit: '', quantity: 1 as number | null, unitPrice: null as number | null, department: '', requester: '', purpose: '' })
 function openLine(l: PurchaseRequestItem | null) {
   lineEditing.value = l
+  lineItemId.value = l?.itemId ?? null
+  void ensureItems()
   lineModel.value = l
     ? { name: l.name, spec: l.spec ?? '', brand: l.brand ?? '', unit: l.unit ?? '', quantity: l.quantity, unitPrice: l.unitPrice === null ? null : Number(l.unitPrice), department: l.department ?? '', requester: l.requester ?? '', purpose: l.purpose ?? '' }
     : { name: '', spec: '', brand: '', unit: '', quantity: 1, unitPrice: null, department: '', requester: '', purpose: '' }
@@ -396,7 +417,7 @@ async function saveLine() {
   if (!m.quantity || m.quantity < 1) return void message.error('请填写数量')
   lineSaving.value = true
   try {
-    const body = { name: m.name, spec: m.spec, brand: m.brand, unit: m.unit, quantity: m.quantity, unitPrice: m.unitPrice, department: m.department, requester: m.requester, purpose: m.purpose }
+    const body = { ...(lineItemId.value ? { itemId: lineItemId.value } : {}), name: m.name, spec: m.spec, brand: m.brand, unit: m.unit, quantity: m.quantity, unitPrice: m.unitPrice, department: m.department, requester: m.requester, purpose: m.purpose }
     detail.value = lineEditing.value
       ? await purchaseRequestApi.updateLine(detail.value.id, lineEditing.value.id, body, detail.value.version)
       : await purchaseRequestApi.addLine(detail.value.id, body, detail.value.version)
@@ -452,7 +473,6 @@ const convertVisible = ref(false)
 const converting = ref(false)
 const suppliers = ref<Supplier[]>([])
 const warehouses = ref<Warehouse[]>([])
-const allItems = ref<InventoryItem[]>([])
 const conv = ref({ supplierId: null as string | null, warehouseId: null as string | null })
 const fixPrices = ref<Record<string, number | null>>({})
 const fixItems = ref<Record<string, string | null>>({})
@@ -507,6 +527,7 @@ onMounted(async () => {
     </n-tabs>
     <n-space justify="space-between" style="margin-bottom: 12px" align="center">
       <n-space>
+        <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：单号 / 部门 / 申请人 / 物品名称（支持拼音首字母）" style="width: min(380px, 94vw)" />
         <n-select v-model:value="filterStore" :options="stores" clearable placeholder="全部门店" style="width: 160px" />
         <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 170px" />
       </n-space>
@@ -521,8 +542,8 @@ onMounted(async () => {
     </n-space>
 
     <template v-if="isMobile">
-      <n-empty v-if="!loading && rows.length === 0" :description="tab === 'dept' ? '还没有部门申购单，点右上角新建' : '还没有汇总申购单，点右上角手动新建或导入每月的申购表，或到“部门申购”里汇总'" />
-      <div v-for="r in rows" :key="r.id" class="pr-card" @click="openDetail(r.id)">
+      <n-empty v-if="!loading && shownRows.length === 0" :description="tab === 'dept' ? '还没有部门申购单，点右上角新建' : '还没有汇总申购单，点右上角手动新建或导入每月的申购表，或到“部门申购”里汇总'" />
+      <div v-for="r in shownRows" :key="r.id" class="pr-card" @click="openDetail(r.id)">
         <div class="pr-top">
           <n-checkbox v-if="tab === 'dept' && canCollect && r.status === 'SUBMITTED'" :checked="collectKeys.includes(r.id)" @click.stop @update:checked="(v: boolean) => (collectKeys = v ? [...collectKeys, r.id] : collectKeys.filter((x) => x !== r.id))" />
           <b>{{ r.requestNo }}</b><component :is="() => renderStatusBadge(r.status, PURCHASE_REQUEST_STATUS_MAP)" />
@@ -532,7 +553,7 @@ onMounted(async () => {
         <div v-if="r.summaryRequest" class="pr-line">已汇总到 {{ r.summaryRequest.requestNo }}</div>
       </div>
     </template>
-    <n-data-table v-else :columns="columns" :data="rows" :loading="loading" :row-key="(r: PurchaseRequest) => r.id" v-model:checked-row-keys="collectKeys" :scroll-x="1100" />
+    <n-data-table v-else :columns="columns" :data="shownRows" :loading="loading" :row-key="(r: PurchaseRequest) => r.id" v-model:checked-row-keys="collectKeys" :scroll-x="1100" />
 
     <!-- Excel 导入 -->
     <n-modal :mask-closable="false" :show="importVisible" @update:show="(v) => (importVisible = v)">
@@ -632,7 +653,8 @@ onMounted(async () => {
           <ApprovalProgress :key="detail.id + detail.status" business-type="PURCHASE_REQUEST" :business-id="detail.id" @changed="onApprovalChanged" />
         </n-card>
         <n-space v-if="isDraft" style="margin-bottom: 8px"><n-button size="small" @click="openLine(null)">＋ 加一行</n-button></n-space>
-        <n-data-table :columns="detailColumns" :data="detail.items" :row-key="(l: PurchaseRequestItem) => l.id" :scroll-x="1250" :max-height="380" size="small" />
+        <n-input v-if="detail.items.length > 6" v-model:value="detailKeyword" clearable placeholder="🔍 在这张申购单里搜物品（名称 / 规格 / 拼音首字母）" style="margin-bottom: 8px; max-width: 420px" />
+        <n-data-table :columns="detailColumns" :data="detailLines" :row-key="(l: PurchaseRequestItem) => l.id" :scroll-x="1250" :max-height="380" size="small" />
         <template #footer>
           <n-space justify="end">
             <n-button v-if="['DRAFT', 'SUBMITTED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(detail.status) && (!isDept || isMine || canCollect)" quaternary type="error" @click="(cancelReason = ''), (cancelVisible = true)">取消申购单</n-button>
@@ -649,7 +671,8 @@ onMounted(async () => {
     <n-modal :mask-closable="false" :show="lineVisible" @update:show="(v) => (lineVisible = v)">
       <n-card :title="lineEditing ? '修改这一行' : '加一行'" style="width: min(520px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100" size="small">
-          <n-form-item label="物品名称"><n-input v-model:value="lineModel.name" /></n-form-item>
+          <n-form-item v-if="allItems.length > 0" label="从物品库选"><item-select :model-value="lineItemId" :items="allItems" @update:model-value="pickLineItem" /></n-form-item>
+          <n-form-item label="物品名称"><n-input v-model:value="lineModel.name" placeholder="没在物品库里的新物品直接填名称" @update:value="lineItemId = null" /></n-form-item>
           <n-form-item label="规格/型号/尺寸"><n-input v-model:value="lineModel.spec" /></n-form-item>
           <n-form-item label="品牌"><n-input v-model:value="lineModel.brand" /></n-form-item>
           <n-form-item label="数量"><n-input-number v-model:value="lineModel.quantity" :min="1" :precision="0" style="width: 100%" /></n-form-item>
@@ -687,7 +710,7 @@ onMounted(async () => {
           <div v-for="l in problemLines" :key="l.id" class="pr-fix">
             <div class="pr-fix-name"><b>{{ l.name }}</b> <span class="pr-sub">{{ l.spec ?? '' }} · {{ l.quantity }}{{ l.unit ?? '' }}</span></div>
             <n-input-number v-if="l.unitPrice === null" v-model:value="fixPrices[l.id]" :min="0" :precision="4" :show-button="false" placeholder="单价（元）" style="width: 130px" />
-            <n-select v-if="!l.itemId" v-model:value="fixItems[l.id]" :options="allItems.map((i) => ({ label: `${i.name}${i.spec ? ' ' + i.spec : ''}（${i.unit}）`, value: i.id }))" filterable placeholder="对应哪个物品" style="width: 260px" />
+            <item-select v-if="!l.itemId" :model-value="fixItems[l.id]" :items="allItems" placeholder="搜索并选择对应的物品（名称 / 拼音首字母）" @update:model-value="(v) => (fixItems[l.id] = v)" />
           </div>
         </template>
         <template #footer>

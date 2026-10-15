@@ -11,6 +11,7 @@ import {
 } from 'naive-ui'
 import { inventoryItemApi } from '../../api/modules/inventory.api'
 import type { InventoryItem, ItemImportPreview, ItemImportPreviewRow, ItemImportStatus } from '../../api/types/inventory'
+import { itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, COMMON_STATUS_MAP, WAREHOUSE_PURPOSE_LABEL_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
 
@@ -18,11 +19,8 @@ const rows = ref<InventoryItem[]>([])
 const loading = ref(false)
 const keyword = ref('')
 
-const shown = computed(() => {
-  const k = keyword.value.trim().toLowerCase()
-  if (!k) return rows.value
-  return rows.value.filter((r) => [r.name, r.code, r.spec ?? '', r.brand ?? '', r.category ?? ''].some((t) => t.toLowerCase().includes(k)))
-})
+// 名称 / 规格 / 品牌 / 编码 / 分类 都能搜，也支持拼音（全拼或首字母，如 bxm = 保鲜膜）
+const shown = computed(() => rows.value.filter((r) => itemMatches(r, keyword.value)))
 
 const formVisible = ref(false)
 const editingRow = ref<InventoryItem | null>(null)
@@ -255,7 +253,7 @@ onMounted(fetchList)
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px">
-      <n-input v-model:value="keyword" clearable placeholder="搜索名称 / 规格 / 品牌 / 编码" style="width: min(260px, 60vw)" />
+      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索名称 / 规格 / 品牌 / 编码 / 拼音首字母" style="width: min(360px, 94vw)" />
       <n-space>
         <n-button @click="openImport">从 Excel 导入</n-button>
         <n-button type="primary" @click="openCreateModal">新建物品</n-button>
