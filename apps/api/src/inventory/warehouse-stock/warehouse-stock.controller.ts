@@ -15,6 +15,14 @@ export class WarehouseStockController {
     return this.warehouseStockService.findMany(query);
   }
 
+  /** 库存总览：每种物品一行（含没入过库的，数量 0），带预警状态、汇总；支持搜索和按状态筛选 */
+  @Get('overview')
+  @RequirePermission('inventory.warehouse-stock.view')
+  overview(@Query('warehouseId') warehouseId?: string, @Query('keyword') keyword?: string, @Query('status') status?: string) {
+    const st = ['ALL', 'ALERT', 'LOW', 'OUT', 'IN_STOCK'].includes(status ?? '') ? (status as 'ALL' | 'ALERT' | 'LOW' | 'OUT' | 'IN_STOCK') : 'ALL';
+    return this.warehouseStockService.overview({ warehouseId: warehouseId || undefined, keyword, status: st });
+  }
+
   @Get('low-stock-alerts')
   @RequirePermission('inventory.warehouse-stock.view')
   lowStockAlerts(@Query('warehouseId') warehouseId?: string) {

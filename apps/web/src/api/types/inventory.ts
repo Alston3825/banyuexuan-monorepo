@@ -467,3 +467,25 @@ export interface PurchaseRequestLineBody {
   remark?: string | null
   itemId?: string | null
 }
+
+export type StockOverviewFilter = 'ALL' | 'ALERT' | 'LOW' | 'OUT' | 'IN_STOCK'
+export interface StockOverviewRow {
+  itemId: string
+  code: string
+  name: string
+  spec: string | null
+  brand: string | null
+  unit: string
+  category: string | null
+  safetyStockThreshold: number | null
+  quantity: number
+  /** 平均成本，分 */
+  avgCost: number
+  status: 'OUT' | 'LOW' | 'OK' | 'NO_THRESHOLD'
+  warehouses: { warehouseId: string; warehouseName: string; quantity: number }[]
+  updatedAt: string | null
+}
+export interface StockOverview {
+  summary: { itemCount: number; alertCount: number; outCount: number; lowCount: number; inStockCount: number; totalValue: number }
+  rows: StockOverviewRow[]
+}

@@ -1,5 +1,7 @@
 import { http } from '../client'
 import type {
+  StockOverview,
+  StockOverviewFilter,
   CreateGoodsReceiptDto,
   CreateInventoryItemDto,
   CreatePurchaseOrderDto,
@@ -68,6 +70,9 @@ export const inventoryItemApi = {
 }
 
 export const warehouseStockApi = {
+  /** 库存总览：每种物品一行（没入过库的数量 0），带预警状态和汇总 */
+  overview: (params?: { warehouseId?: string; keyword?: string; status?: StockOverviewFilter }) =>
+    http.get<StockOverview>('/inventory/warehouse-stocks/overview', { params }).then((r) => r.data),
   list: (params?: { warehouseId?: string; itemId?: string }) => http.get<WarehouseStock[]>('/inventory/warehouse-stocks', { params }).then((r) => r.data),
   lowStockAlerts: (params?: { warehouseId?: string }) =>
     http.get<WarehouseStock[]>('/inventory/warehouse-stocks/low-stock-alerts', { params }).then((r) => r.data),
