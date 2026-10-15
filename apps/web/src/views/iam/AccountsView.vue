@@ -52,6 +52,28 @@ const positionOptions = ref<{ label: string; value: string }[]>([])
 const roleOptions = ref<{ label: string; value: string }[]>([])
 const regionOptions = ref<{ label: string; value: string }[]>([])
 
+// ---------------- 搜索 / 筛选：员工多了要能一下子找到人 ----------------
+const keyword = ref('')
+const filterStore = ref<string | null>(null)
+const filterDept = ref<string | null>(null)
+const filterStatus = ref<string | null>(null)
+const statusFilterOptions = [
+  { label: '正常', value: 'ACTIVE' },
+  { label: '已停用', value: 'DISABLED' },
+]
+/** 按姓名 / 手机号 / 用户名 / 工号 模糊匹配，再按门店、部门、状态筛选 */
+const shownRows = computed(() => {
+  const k = keyword.value.trim().toLowerCase()
+  return rows.value.filter((a) => {
+    if (filterStore.value && a.storeId !== filterStore.value) return false
+    if (filterDept.value && a.departmentId !== filterDept.value) return false
+    if (filterStatus.value && a.status !== filterStatus.value) return false
+    if (!k) return true
+    const no = profileByAccount.value.get(a.id)?.employeeNo ?? ''
+    return [a.realName, a.phone ?? '', a.username, no].some((v) => v.toLowerCase().includes(k))
+  })
+})
+
 async function fetchList() {
   loading.value = true
   try {
@@ -401,9 +423,12 @@ function confirmDelete(row: Account) {
 }
 
 const columns: DataTableColumns<Account> = [
-  { key: 'username', title: '用户名' },
-  { key: 'realName', title: '姓名' },
-  { key: 'phone', title: '手机号', render: (row) => row.phone ?? '-' },
+  { key: 'realName', title: '姓名', width: 100 },
+  { key: 'employeeNo', title: '工号', width: 90, render: (row) => profileByAccount.value.get(row.id)?.employeeNo ?? '-' },
+  { key: 'phone', title: '手机号', width: 130, render: (row) => row.phone ?? '-' },
+  { key: 'store', title: '门店', width: 130, render: (row) => storeOptions.value.find((o) => o.value === row.storeId)?.label ?? '-' },
+  { key: 'dept', title: '部门', width: 100, render: (row) => departmentOptions.value.find((o) => o.value === row.departmentId)?.label ?? '-' },
+  { key: 'username', title: '用户名', width: 130 },
   { key: 'status', title: '状态', render: (row) => renderStatusBadge(row.status, ACCOUNT_STATUS_MAP) },
   { key: 'lastLoginAt', title: '最近登录', render: (row) => (row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : '从未登录') },
   {
@@ -433,11 +458,17 @@ onMounted(async () => {
     <div class="acc-drop acc-drop-page" :class="{ 'acc-drop-on': dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop="onDrop" @click="fileInput?.click()">
       📄 把填好的《员工信息表》Excel 拖到这里（或点击选择），自动读取并批量开通账号；用户名 = 手机号，初始密码 {{ DEFAULT_PASSWORD }}
     </div>
-    <n-space justify="space-between" style="margin-bottom: 12px">
-      <span />
+    <n-space justify="space-between" align="center" style="margin-bottom: 12px" :wrap="true">
+      <n-space align="center" :wrap="true">
+        <n-input v-model:value="keyword" clearable placeholder="🔍 搜索员工：姓名 / 手机号 / 工号 / 用户名" style="width: min(320px, 94vw)" />
+        <n-select v-model:value="filterStore" :options="storeOptions" clearable placeholder="全部门店" style="width: 150px" />
+        <n-select v-model:value="filterDept" :options="departmentOptions" clearable filterable placeholder="全部部门" style="width: 140px" />
+        <n-select v-model:value="filterStatus" :options="statusFilterOptions" clearable placeholder="全部状态" style="width: 120px" />
+        <span style="color: #888; font-size: 13px">共 {{ shownRows.length }} / {{ rows.length }} 人</span>
+      </n-space>
       <n-button type="primary" @click="openCreateModal">新建账号</n-button>
     </n-space>
-    <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Account) => r.id" :scroll-x="900" />
+    <n-data-table :columns="columns" :data="shownRows" :loading="loading" :row-key="(r: Account) => r.id" :scroll-x="1100" :pagination="{ pageSize: 30 }" />
 
     <!-- 新建/编辑 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
