@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CarePlanVersionService, CareServiceLogService, PlanBody, ServiceLogBody } from './care-plan-version.service';
 
@@ -40,6 +40,13 @@ class ServiceLogDto implements ServiceLogBody {
   @ApiProperty({ required: false }) @IsOptional() @IsString() doneByName?: string;
   @ApiProperty({ required: false }) @IsOptional() clientSigned?: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() note?: string;
+}
+class ImportPreviewDto {
+  @ApiProperty() @IsString() @IsNotEmpty() documentId: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() babyProfileId?: string | null;
+}
+class ImportCommitDto extends ImportPreviewDto {
+  @ApiProperty() @IsArray() items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[];
 }
 void IsObject;
 
@@ -111,6 +118,20 @@ export class CarePlanVersionController {
   @RequirePermission('care.profile.update')
   createLog(@Body() dto: ServiceLogDto) {
     return this.logs.create(dto);
+  }
+
+  /** 拍照识别的纸质护理计划表 → 比对已登记记录，只列出新写的（预览，不入库） */
+  @Post('service-logs/import-preview')
+  @RequirePermission('care.profile.update')
+  importPreview(@Body() dto: ImportPreviewDto) {
+    return this.logs.importPreview(dto.documentId, dto.babyProfileId);
+  }
+
+  /** 确认登记勾选的记录（已有的自动跳过） */
+  @Post('service-logs/import-commit')
+  @RequirePermission('care.profile.update')
+  importCommit(@Body() dto: ImportCommitDto) {
+    return this.logs.importCommit(dto);
   }
 
   @Delete('service-logs/:id')

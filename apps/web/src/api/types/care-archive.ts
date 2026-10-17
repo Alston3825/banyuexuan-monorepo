@@ -342,6 +342,37 @@ export interface ServiceSummary {
   rows: ServiceRow[]
 }
 
+/** 拍照识别纸质护理计划表后的比对结果 */
+export interface SheetImportItem {
+  idx: number
+  serviceCode: string
+  name: string
+  sheetLabel: string
+  group: 'ITEM' | 'EDU'
+  subject: 'MOTHER' | 'BABY'
+  date: string
+  time: string | null
+  systolic: number | null
+  diastolic: number | null
+  weightKg: number | null
+  doneByName: string | null
+  clientSigned: boolean
+  /** AI 两次读图不一致/没把握 */
+  uncertain: boolean
+  /** NEW=新写的 EXISTS=系统里已登记过 INVALID=没读全/有问题，需要在这里补 */
+  status: 'NEW' | 'EXISTS' | 'INVALID'
+  issue?: string
+}
+export interface SheetImportPreview {
+  documentId: string
+  motherProfileId: string
+  babyProfileId: string | null
+  babies: { id: string; label: string }[]
+  header: { patientName: string | null; customerName: string | null; nameMatches: boolean | null; checkInDate: string | null }
+  counts: { total: number; planned: number; new: number; exists: number; invalid: number }
+  items: SheetImportItem[]
+}
+
 export interface StatMetric {
   code: string
   label: string

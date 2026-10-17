@@ -10,6 +10,7 @@ import { careServiceLogApi } from '../../api/modules/care-archive.api'
 import { CARE_LEVEL_LABEL, type ServiceRow, type ServiceSummary } from '../../api/types/care-archive'
 import { useAuthStore } from '../../stores/auth'
 import { dialog, message } from '../../utils/discrete-api'
+import ServiceSheetImportDialog from './ServiceSheetImportDialog.vue'
 
 const props = defineProps<{ motherProfileId: string }>()
 const auth = useAuthStore()
@@ -19,6 +20,7 @@ const data = ref<ServiceSummary | null>(null)
 const loading = ref(false)
 const form = ref<{ row: ServiceRow; date: number; time: number; by: string; signed: boolean; note: string; systolic: number | null; diastolic: number | null; weightKg: number | null } | null>(null)
 const saving = ref(false)
+const importShow = ref(false)
 
 const groups = computed(() => {
   const rows = data.value?.rows ?? []
@@ -109,6 +111,8 @@ defineExpose({ reload: load })
       <div class="sl-top">
         入住第 <b>{{ data.stayDay }}</b> 天 · 妈妈护理等级：<n-tag size="small" type="info">{{ CARE_LEVEL_LABEL[data.motherLevel] }}</n-tag>
         <span class="sl-sub">频次按护理等级的标准计算；等级在“护理计划”里由护理长制定、护理主任审核。</span>
+        <n-button type="primary" style="margin-top: 8px" @click="importShow = true">📷 拍照导入纸质护理计划表（只登记新写的）</n-button>
+        <span class="sl-sub">纸表每天往上写新记录，每天拍一张整页照片就行，系统自动对比，只把新写的登记进来，不用一项一项手点。也可以继续用下面的“＋ 记一次”手动登记。</span>
       </div>
     </n-card>
 
@@ -133,6 +137,8 @@ defineExpose({ reload: load })
       </n-card>
       <n-empty v-if="data && groups.length === 0" description="没有服务项目" />
     </n-space>
+
+    <service-sheet-import-dialog v-model:show="importShow" :mother-profile-id="motherProfileId" @done="load" />
 
     <n-modal :mask-closable="false" :show="!!form" @update:show="(v) => !v && (form = null)">
       <n-card v-if="form" :title="`记一次：${form.row.name}${form.row.babyLabel ? '（' + form.row.babyLabel + '）' : ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">

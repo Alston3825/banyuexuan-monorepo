@@ -1,5 +1,5 @@
 import { http } from '../client'
-import type { CareSummary, PlanBody, PlanVersion, ServiceSummary, StatMetric, StatRow, MedicationAuth, MedicationBody, MedicationSpecs, DailyDay, DailyDays, DailySpecs, SaveDayBody, AssessmentOverview, AssessmentRecord, AssessmentType, CareDocType, CareDocument, FormSpec } from '../types/care-archive'
+import type { CareSummary, PlanBody, PlanVersion, ServiceSummary, StatMetric, StatRow, MedicationAuth, MedicationBody, MedicationSpecs, DailyDay, DailyDays, DailySpecs, SaveDayBody, AssessmentOverview, AssessmentRecord, AssessmentType, CareDocType, CareDocument, FormSpec, SheetImportItem, SheetImportPreview } from '../types/care-archive'
 
 export interface UploadDocumentMeta {
   docType: CareDocType
@@ -98,6 +98,12 @@ export const careServiceLogApi = {
   }) =>
     http.post('/care/service-logs', body).then((r) => r.data),
   remove: (id: string) => http.delete(`/care/service-logs/${id}`).then(() => undefined),
+  /** 拍照识别的纸质护理计划表 → 和已登记的比对，只列新写的（预览，不入库） */
+  importPreview: (documentId: string, babyProfileId?: string | null) =>
+    http.post<SheetImportPreview>('/care/service-logs/import-preview', { documentId, babyProfileId }).then((r) => r.data),
+  /** 确认登记勾选的记录（已有的自动跳过） */
+  importCommit: (body: { documentId: string; babyProfileId?: string | null; items: Pick<SheetImportItem, 'serviceCode' | 'date' | 'time' | 'systolic' | 'diastolic' | 'weightKg' | 'doneByName' | 'clientSigned'>[] }) =>
+    http.post<{ created: number; skipped: number }>('/care/service-logs/import-commit', body, { timeout: 60_000 }).then((r) => r.data),
 }
 
 export const careStatsApi = {

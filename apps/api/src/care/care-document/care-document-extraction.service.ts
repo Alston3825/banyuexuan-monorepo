@@ -5,6 +5,7 @@ import { AiGatewayClient } from '../../ai/ai-gateway/ai-gateway.client';
 import { allFields, FieldSpec, FORM_SPECS, AssessmentType } from '../care-assessment/assessment-specs';
 import { MED_AI_DESCRIPTION, MED_HEADER_FIELDS, MED_ITEM_COLUMNS } from '../care-medication/medication-specs';
 import { DAILY_AI_DESCRIPTION, DAILY_BABY_AI_DESCRIPTION, DAILY_BABY_FIELDS, dailyFlatFields, FEEDING_COLUMNS } from '../care-daily/daily-specs';
+import { serviceSheetAiSpec } from '../care-plan-version/service-sheet-specs';
 import { CareStorageService } from './care-storage.service';
 
 const MAX_CONCURRENT = 2;
@@ -36,7 +37,7 @@ export class CareDocumentExtractionService implements OnModuleInit {
   }
 
   isStructured(docType: string): boolean {
-    return docType in FORM_SPECS || docType === 'DAILY_RECORD' || docType === 'MEDICATION_AUTH';
+    return docType in FORM_SPECS || docType === 'DAILY_RECORD' || docType === 'MEDICATION_AUTH' || docType === 'CARE_PLAN';
   }
 
   /** 给 AI 的字段说明书：四张评估表按各自字段；日常护理记录 = 妈妈栏 + 宝宝栏 + 喂养记录表（table）。 */
@@ -61,6 +62,7 @@ export class CareDocumentExtractionService implements OnModuleInit {
         fields: [...dailyFlatFields().map(slim), { key: 'feedings', label: '24小时宝宝喂养记录单', kind: 'table', columns: FEEDING_COLUMNS.map(slim) }],
       };
     }
+    if (docType === 'CARE_PLAN') return serviceSheetAiSpec(); // 产妇常规护理计划统计表 → 服务执行记录
     if (docType === 'MEDICATION_AUTH') {
       return {
         formTitle: '新生儿用药服药喂药委托书',

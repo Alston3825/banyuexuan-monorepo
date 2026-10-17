@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
+import { serviceNameOf, sheetRowLabel } from './service-sheet-specs';
 import { allServiceCodes, expectedCount, freqText, LEVEL_STANDARDS, LevelCode, SERVICE_MEASURE, ServiceStd } from './care-standards';
 
 const DAY_MS = 86_400_000;
@@ -412,6 +413,213 @@ export class CareServiceLogService {
       requestId: this.ctx.requestId,
     });
     return created;
+  }
+
+  // ---------------- 拍照导入纸质《产妇常规护理计划》统计表 ----------------
+
+  /**
+   * 拍照识别的结果 → 和已登记的服务执行记录比对：已经登记过的跳过，只把“新写的”列出来等人确认。
+   * 比对按 项目+对象(妈妈/哪个宝宝)+日期 数个数（同一天做了两次、系统里只记了一次，就还差一次）；宣教项目入住期间只记一次。
+   */
+  async importPreview(documentId: string, babyProfileId?: string | null) {
+    const doc = await this.prisma.careDocument.findFirst({ where: { id: documentId, tenantId: this.ctx.tenantId } });
+    if (!doc || doc.docType !== 'CARE_PLAN') throw new NotFoundException('没有找到这份护理计划表照片');
+    if (doc.extractStatus !== 'DONE' || !doc.extractData) throw new ConflictException('这份照片还没有识别完成');
+    const m = await this.mother(doc.motherProfileId);
+    const baby = (babyProfileId ?? doc.babyProfileId) ? m.babies.find((b) => b.id === (babyProfileId ?? doc.babyProfileId)) : m.babies[0];
+    const data = doc.extractData as { patientName?: string; checkInDate?: string; entries?: Record<string, unknown>[] };
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    const uncertain = new Set<number>();
+    for (const w of (doc.extractWarnings as { field?: string; level?: string }[] | null) ?? []) {
+      const mm = /^entries\.(\d+)\./.exec(w.field ?? '');
+      if (mm && w.level !== 'info') uncertain.add(Number(mm[1]));
+    }
+    const customer = await this.prisma.customer.findFirst({ where: { id: m.customerId }, select: { name: true } });
+    const existing = await this.prisma.careServiceLog.findMany({ where: { tenantId: this.ctx.tenantId, motherProfileId: m.id }, select: { serviceCode: true, babyProfileId: true, doneDate: true } });
+    const exCount = new Map<string, number>();
+    for (const l of existing) {
+      const k = `${l.serviceCode}|${l.babyProfileId ?? ''}|${ymd(l.doneDate)}`;
+      exCount.set(k, (exCount.get(k) ?? 0) + 1);
+    }
+    const hasAny = (code: string, babyId: string) => existing.some((l) => l.serviceCode === code && (l.babyProfileId ?? '') === babyId);
+    const today = ymd(beijingToday());
+    const seen = new Map<string, number>();
+    // 血压/体重行：纸上常常先把后面几次的预定日期写好（如体重 17/10、25/10），数值是空的——这是“预约”，不是已做的记录，直接忽略
+    let planned = 0;
+    const isPlanned = (e: Record<string, unknown>) => {
+      const code = String(e.serviceCode ?? '');
+      if (code === 'BP') return e.systolic == null && e.diastolic == null;
+      if (code === 'WEIGHT') return e.weightKg == null;
+      return false;
+    };
+    const buildItem = (e: Record<string, unknown>, idx: number) => {
+      const code = String(e.serviceCode ?? '');
+      const std = LEVEL_STANDARDS.LEVEL3.services.find((s) => s.code === code);
+      const date = typeof e.date === 'string' ? e.date.slice(0, 10) : '';
+      const base = {
+        idx,
+        serviceCode: code,
+        name: std ? std.name : code,
+        sheetLabel: sheetRowLabel(code),
+        group: std?.group ?? 'ITEM',
+        subject: std?.subject ?? 'MOTHER',
+        date,
+        time: typeof e.time === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(e.time) ? e.time.padStart(5, '0') : null,
+        systolic: typeof e.systolic === 'number' ? e.systolic : null,
+        diastolic: typeof e.diastolic === 'number' ? e.diastolic : null,
+        weightKg: typeof e.weightKg === 'number' ? e.weightKg : null,
+        doneByName: typeof e.doneByName === 'string' ? e.doneByName : null,
+        clientSigned: e.clientSigned === 'YES' || e.clientSigned === true,
+        uncertain: uncertain.has(idx),
+      };
+      const bid = std?.subject === 'BABY' ? (baby?.id ?? '') : '';
+      let status: 'NEW' | 'EXISTS' | 'INVALID' = 'NEW';
+      let issue: string | undefined;
+      if (!std) {
+        status = 'INVALID';
+        issue = '不认识的项目';
+      } else if (std.subject === 'BABY' && !baby) {
+        status = 'INVALID';
+        issue = '这是宝宝的项目，但这位妈妈还没有宝宝档案';
+      } else if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date).getTime())) {
+        status = 'INVALID';
+        issue = '日期没读出来，请在这里补上日期';
+      } else {
+        const v = this.validateMeasure(code, base.systolic, base.diastolic, base.weightKg);
+        if (v) {
+          status = 'INVALID';
+          issue = v;
+        } else if (std.freq.kind === 'ONCE' ? hasAny(code, bid) || (seen.get(`${code}|${bid}`) ?? 0) > 0 : false) {
+          status = 'EXISTS';
+        } else if (std.freq.kind !== 'ONCE') {
+          const k = `${code}|${bid}|${date}`;
+          const n = (seen.get(k) ?? 0) + 1;
+          seen.set(k, n);
+          if (n <= (exCount.get(k) ?? 0)) status = 'EXISTS';
+          else if (date > today) {
+            status = 'INVALID';
+            issue = '日期是未来，请核对';
+          }
+        }
+        if (std.freq.kind === 'ONCE' && status === 'NEW') seen.set(`${code}|${bid}`, 1);
+      }
+      return { ...base, status, issue };
+    };
+    const items = entries.flatMap((e, idx) => {
+      if (isPlanned(e)) {
+        planned++;
+        return [];
+      }
+      return [buildItem(e, idx)];
+    });
+    return {
+      documentId: doc.id,
+      motherProfileId: m.id,
+      babyProfileId: baby?.id ?? null,
+      babies: m.babies.map((b) => ({ id: b.id, label: `宝宝${b.sequenceNo}${b.name ? '：' + b.name : ''}` })),
+      header: {
+        patientName: data.patientName ?? null,
+        customerName: customer?.name ?? null,
+        // 表上的名字和档案里的客户名对不上，多半是拍错了人（只提醒，不拦）
+        nameMatches: !data.patientName || !customer?.name ? null : data.patientName.replace(/\s/g, '') === customer.name.replace(/\s/g, ''),
+        checkInDate: data.checkInDate ?? null,
+      },
+      counts: { total: items.length, planned, new: items.filter((i) => i.status === 'NEW').length, exists: items.filter((i) => i.status === 'EXISTS').length, invalid: items.filter((i) => i.status === 'INVALID').length },
+      items,
+    };
+  }
+
+  private validateMeasure(code: string, systolic: number | null, diastolic: number | null, weightKg: number | null): string | null {
+    const measure = SERVICE_MEASURE[code];
+    if (measure === 'BP') {
+      if (systolic === null || diastolic === null) return '血压没读全（需要高压和低压）';
+      if (systolic < 60 || systolic > 260 || diastolic < 30 || diastolic > 160 || diastolic >= systolic) return '血压数值不合理，请核对';
+    } else if (measure === 'WEIGHT') {
+      if (weightKg === null) return '体重没读出来';
+      if (weightKg < 30 || weightKg > 200) return '体重数值不合理，请核对';
+    }
+    return null;
+  }
+
+  /** 确认登记：把勾选的（可能被人改过日期/数值的）记录写进服务执行；已经有的自动跳过，不会重复。 */
+  async importCommit(input: { documentId: string; babyProfileId?: string | null; items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[] }) {
+    const doc = await this.prisma.careDocument.findFirst({ where: { id: input.documentId, tenantId: this.ctx.tenantId } });
+    if (!doc || doc.docType !== 'CARE_PLAN') throw new NotFoundException('没有找到这份护理计划表照片');
+    const m = await this.mother(doc.motherProfileId);
+    const baby = input.babyProfileId ? m.babies.find((b) => b.id === input.babyProfileId) : m.babies[0];
+    if (!Array.isArray(input.items) || input.items.length === 0) throw new BadRequestException('没有要登记的记录');
+    if (input.items.length > 300) throw new BadRequestException('一次最多登记 300 条');
+    const today = ymd(beijingToday());
+    const existing = await this.prisma.careServiceLog.findMany({ where: { tenantId: this.ctx.tenantId, motherProfileId: m.id }, select: { serviceCode: true, babyProfileId: true, doneDate: true } });
+    const exCount = new Map<string, number>();
+    for (const l of existing) {
+      const k = `${l.serviceCode}|${l.babyProfileId ?? ''}|${ymd(l.doneDate)}`;
+      exCount.set(k, (exCount.get(k) ?? 0) + 1);
+    }
+    const hasAny = (code: string, bid: string) => existing.some((l) => l.serviceCode === code && (l.babyProfileId ?? '') === bid);
+    const used = new Map<string, number>();
+    const rows: Prisma.CareServiceLogCreateManyInput[] = [];
+    let skipped = 0;
+    for (const [i, it] of input.items.entries()) {
+      const std = LEVEL_STANDARDS.LEVEL3.services.find((s) => s.code === it.serviceCode);
+      if (!std) throw new BadRequestException(`第 ${i + 1} 条：未知的服务项目`);
+      if (std.subject === 'BABY' && !baby) throw new BadRequestException(`第 ${i + 1} 条（${std.name}）是宝宝的项目，但还没有宝宝档案`);
+      const date = String(it.date ?? '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date).getTime())) throw new BadRequestException(`第 ${i + 1} 条（${std.name}）日期不正确`);
+      if (date > today) throw new BadRequestException(`第 ${i + 1} 条（${std.name}）日期 ${date} 是未来，不能登记`);
+      const bad = this.validateMeasure(std.code, it.systolic ?? null, it.diastolic ?? null, it.weightKg ?? null);
+      if (bad) throw new BadRequestException(`第 ${i + 1} 条（${std.name}）：${bad}`);
+      const bid = std.subject === 'BABY' ? (baby?.id ?? '') : '';
+      // 去重：已登记的、本次里重复的都跳过
+      if (std.freq.kind === 'ONCE') {
+        if (hasAny(std.code, bid) || used.has(`${std.code}|${bid}`)) {
+          skipped++;
+          continue;
+        }
+        used.set(`${std.code}|${bid}`, 1);
+      } else {
+        const k = `${std.code}|${bid}|${date}`;
+        const n = (used.get(k) ?? 0) + 1;
+        used.set(k, n);
+        if (n <= (exCount.get(k) ?? 0)) {
+          skipped++;
+          continue;
+        }
+      }
+      const time = it.time && /^([01]?\d|2[0-3]):[0-5]\d$/.test(it.time) ? it.time.padStart(5, '0') : null;
+      rows.push({
+        tenantId: this.ctx.tenantId!,
+        storeId: m.storeId,
+        motherProfileId: m.id,
+        babyProfileId: std.subject === 'BABY' ? baby!.id : null,
+        serviceCode: std.code,
+        doneDate: new Date(`${date}T00:00:00.000Z`),
+        doneTime: time,
+        systolic: SERVICE_MEASURE[std.code] === 'BP' ? (it.systolic ?? null) : null,
+        diastolic: SERVICE_MEASURE[std.code] === 'BP' ? (it.diastolic ?? null) : null,
+        weightKg: SERVICE_MEASURE[std.code] === 'WEIGHT' && it.weightKg != null ? Math.round(it.weightKg * 100) / 100 : null,
+        doneByName: it.doneByName?.trim() || null,
+        clientSigned: !!it.clientSigned,
+        note: '纸质表拍照识别登记',
+        createdBy: this.ctx.accountId!,
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      if (rows.length > 0) await tx.careServiceLog.createMany({ data: rows });
+      await tx.careDocument.update({ where: { id: doc.id }, data: { status: 'CONFIRMED', confirmedBy: this.ctx.accountId, confirmedAt: new Date(), version: { increment: 1 } } });
+    });
+    await this.auditLogService.record({
+      action: 'CREATE',
+      entityType: 'CareServiceLog',
+      entityId: doc.id,
+      afterData: { fromDocument: doc.id, created: rows.length, skipped } as Prisma.InputJsonValue,
+      remark: `拍照导入纸质护理计划表：新登记 ${rows.length} 条，已有跳过 ${skipped} 条（${rows.slice(0, 5).map((r) => serviceNameOf(r.serviceCode)).join('、')}${rows.length > 5 ? '…' : ''}）`,
+      tenantId: this.ctx.tenantId,
+      storeId: m.storeId,
+      accountId: this.ctx.accountId,
+      requestId: this.ctx.requestId,
+    });
+    return { created: rows.length, skipped };
   }
 
   async remove(id: string) {
