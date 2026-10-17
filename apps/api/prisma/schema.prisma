@@ -2268,6 +2268,7 @@ model CareServiceLog {
   doneTime        String?  @map("done_time") @db.VarChar(5) // 做的时间 HH:mm（旧记录没有）
   systolic        Int? // 测量类项目：收缩压 mmHg（产妇血压）
   diastolic       Int? // 舒张压 mmHg
+  heartRate       Int?     @map("heart_rate") // 心率 次/分（测血压时一起测）
   weightKg        Decimal? @map("weight_kg") @db.Decimal(5, 2) // 测量类项目：体重 kg（产妇体重）
   doneByName      String?  @map("done_by_name") // 护理员/查房人
   clientSigned    Boolean  @default(false) @map("client_signed") // 客户已签字（宣教项目）

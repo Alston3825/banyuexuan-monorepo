@@ -126,7 +126,7 @@ async function commit() {
     const res = await careServiceLogApi.importCommit({
       documentId: docId.value,
       babyProfileId: babyId.value,
-      items: selected.value.map((r) => ({ serviceCode: r.serviceCode, date: r.date, time: r.time, systolic: r.systolic, diastolic: r.diastolic, weightKg: r.weightKg, doneByName: r.doneByName, clientSigned: r.clientSigned })),
+      items: selected.value.map((r) => ({ serviceCode: r.serviceCode, date: r.date, time: r.time, systolic: r.systolic, diastolic: r.diastolic, heartRate: r.heartRate, weightKg: r.weightKg, doneByName: r.doneByName, clientSigned: r.clientSigned })),
     })
     message.success(`已登记 ${res.created} 条${res.skipped ? `，${res.skipped} 条已有、自动跳过` : ''}`)
     emit('update:show', false)
@@ -184,6 +184,7 @@ const close = () => emit('update:show', false)
             <template v-if="isBP(r)">
               <div class="si-field"><span>高压</span><n-input-number v-model:value="r.systolic" :min="60" :max="260" :precision="0" :show-button="false" placeholder="mmHg" style="width: 100%" /></div>
               <div class="si-field"><span>低压</span><n-input-number v-model:value="r.diastolic" :min="30" :max="160" :precision="0" :show-button="false" placeholder="mmHg" style="width: 100%" /></div>
+              <div class="si-field"><span>心率（选填）</span><n-input-number v-model:value="r.heartRate" :min="30" :max="220" :precision="0" :show-button="false" placeholder="次/分" style="width: 100%" /></div>
             </template>
             <div v-if="isWeight(r)" class="si-field"><span>体重 kg</span><n-input-number v-model:value="r.weightKg" :min="30" :max="200" :precision="2" :show-button="false" style="width: 100%" /></div>
             <div v-if="r.group === 'EDU'" class="si-field"><span>护理员</span><n-input v-model:value="r.doneByName" placeholder="签名" /></div>

@@ -91,6 +91,7 @@ export const careServiceLogApi = {
     doneTime: string
     systolic?: number
     diastolic?: number
+    heartRate?: number
     weightKg?: number
     doneByName?: string
     clientSigned?: boolean
@@ -98,11 +99,14 @@ export const careServiceLogApi = {
   }) =>
     http.post('/care/service-logs', body).then((r) => r.data),
   remove: (id: string) => http.delete(`/care/service-logs/${id}`).then(() => undefined),
+  /** 按日期打卡：某个护理项目某一天 已执行/未执行 */
+  toggleDay: (body: { motherProfileId: string; babyProfileId?: string | null; serviceCode: string; date: string; done: boolean }) =>
+    http.post<{ count: number }>('/care/service-logs/toggle-day', body).then((r) => r.data),
   /** 拍照识别的纸质护理计划表 → 和已登记的比对，只列新写的（预览，不入库） */
   importPreview: (documentId: string, babyProfileId?: string | null) =>
     http.post<SheetImportPreview>('/care/service-logs/import-preview', { documentId, babyProfileId }).then((r) => r.data),
   /** 确认登记勾选的记录（已有的自动跳过） */
-  importCommit: (body: { documentId: string; babyProfileId?: string | null; items: Pick<SheetImportItem, 'serviceCode' | 'date' | 'time' | 'systolic' | 'diastolic' | 'weightKg' | 'doneByName' | 'clientSigned'>[] }) =>
+  importCommit: (body: { documentId: string; babyProfileId?: string | null; items: Pick<SheetImportItem, 'serviceCode' | 'date' | 'time' | 'systolic' | 'diastolic' | 'heartRate' | 'weightKg' | 'doneByName' | 'clientSigned'>[] }) =>
     http.post<{ created: number; skipped: number }>('/care/service-logs/import-commit', body, { timeout: 60_000 }).then((r) => r.data),
 }
 

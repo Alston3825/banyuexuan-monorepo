@@ -326,6 +326,7 @@ export interface ServiceRow {
     date: string
     time: string | null
     systolic: number | null
+    heartRate?: number | null
     diastolic: number | null
     weightKg: number | null
     doneByName: string | null
@@ -354,6 +355,7 @@ export interface SheetImportItem {
   time: string | null
   systolic: number | null
   diastolic: number | null
+  heartRate: number | null
   weightKg: number | null
   doneByName: string | null
   clientSigned: boolean

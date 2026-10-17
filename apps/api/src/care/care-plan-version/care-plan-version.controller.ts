@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CarePlanVersionService, CareServiceLogService, PlanBody, ServiceLogBody } from './care-plan-version.service';
 
@@ -36,17 +36,25 @@ class ServiceLogDto implements ServiceLogBody {
   @ApiProperty({ required: false }) @IsOptional() @IsString() doneTime?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() systolic?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() diastolic?: number;
+  @ApiProperty({ required: false, description: '心率 次/分（测血压时一起登记，选填）' }) @IsOptional() @IsInt() heartRate?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() weightKg?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() doneByName?: string;
   @ApiProperty({ required: false }) @IsOptional() clientSigned?: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() note?: string;
+}
+class ToggleDayDto {
+  @ApiProperty() @IsString() @IsNotEmpty() motherProfileId: string;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() babyProfileId?: string | null;
+  @ApiProperty() @IsString() @IsNotEmpty() serviceCode: string;
+  @ApiProperty() @IsString() @IsNotEmpty() date: string;
+  @ApiProperty() @IsBoolean() done: boolean;
 }
 class ImportPreviewDto {
   @ApiProperty() @IsString() @IsNotEmpty() documentId: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() babyProfileId?: string | null;
 }
 class ImportCommitDto extends ImportPreviewDto {
-  @ApiProperty() @IsArray() items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[];
+  @ApiProperty() @IsArray() items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; heartRate?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[];
 }
 void IsObject;
 
@@ -132,6 +140,13 @@ export class CarePlanVersionController {
   @RequirePermission('care.profile.update')
   importCommit(@Body() dto: ImportCommitDto) {
     return this.logs.importCommit(dto);
+  }
+
+  /** 按日期打卡：某个护理项目某一天“已执行/未执行” */
+  @Post('service-logs/toggle-day')
+  @RequirePermission('care.profile.update')
+  toggleDay(@Body() dto: ToggleDayDto) {
+    return this.logs.toggleDay({ ...dto, done: !!dto.done });
   }
 
   @Delete('service-logs/:id')

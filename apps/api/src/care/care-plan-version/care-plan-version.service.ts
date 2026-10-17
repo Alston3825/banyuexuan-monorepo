@@ -270,6 +270,7 @@ export interface ServiceLogBody {
   doneTime?: string; // HH:mm
   systolic?: number;
   diastolic?: number;
+  heartRate?: number;
   weightKg?: number;
   doneByName?: string;
   clientSigned?: boolean;
@@ -332,6 +333,7 @@ export class CareServiceLogService {
           time: l.doneTime,
           systolic: l.systolic,
           diastolic: l.diastolic,
+          heartRate: l.heartRate,
           weightKg: l.weightKg === null ? null : Number(l.weightKg),
           doneByName: l.doneByName,
           clientSigned: l.clientSigned,
@@ -365,6 +367,7 @@ export class CareServiceLogService {
     const measure = SERVICE_MEASURE[std.code];
     let systolic: number | null = null;
     let diastolic: number | null = null;
+    let heartRate: number | null = null;
     let weightKg: number | null = null;
     if (measure === 'BP') {
       systolic = dto.systolic ?? null;
@@ -373,6 +376,8 @@ export class CareServiceLogService {
       if (systolic < 60 || systolic > 260) throw new BadRequestException('收缩压应在 60~260 mmHg 之间');
       if (diastolic < 30 || diastolic > 160) throw new BadRequestException('舒张压应在 30~160 mmHg 之间');
       if (diastolic >= systolic) throw new BadRequestException('舒张压应低于收缩压，请检查是否填反');
+      heartRate = dto.heartRate ?? null;
+      if (heartRate !== null && (heartRate < 30 || heartRate > 220)) throw new BadRequestException('心率应在 30~220 次/分之间');
     } else if (measure === 'WEIGHT') {
       weightKg = dto.weightKg ?? null;
       if (weightKg === null) throw new BadRequestException('请填写体重');
@@ -394,6 +399,7 @@ export class CareServiceLogService {
         doneTime: time,
         systolic,
         diastolic,
+        heartRate,
         weightKg,
         doneByName: dto.doneByName?.trim() || null,
         clientSigned: !!dto.clientSigned,
@@ -405,7 +411,7 @@ export class CareServiceLogService {
       action: 'CREATE',
       entityType: 'CareServiceLog',
       entityId: created.id,
-      afterData: { serviceCode: std.code, doneDate: day, doneTime: time, systolic, diastolic, weightKg } as Prisma.InputJsonValue,
+      afterData: { serviceCode: std.code, doneDate: day, doneTime: time, systolic, diastolic, heartRate, weightKg } as Prisma.InputJsonValue,
       remark: `${std.name} ${day} ${time}`,
       tenantId: this.ctx.tenantId,
       storeId: m.storeId,
@@ -413,6 +419,42 @@ export class CareServiceLogService {
       requestId: this.ctx.requestId,
     });
     return created;
+  }
+
+  /**
+   * “打卡”式登记（会阴护理、理疗、按摩子宫、各类查房、洗头泡脚、床品、宝宝洗澡等不需要填数值的护理项目）：
+   * 在一个对话框里按日期列出，每天一个“是否执行”开关。打开 = 记一次（没有具体时间，护理员取当前登录人）；关闭 = 删掉那一天的记录。
+   */
+  async toggleDay(dto: { motherProfileId: string; babyProfileId?: string | null; serviceCode: string; date: string; done: boolean }) {
+    const m = await this.mother(dto.motherProfileId);
+    const std = LEVEL_STANDARDS.LEVEL3.services.find((s) => s.code === dto.serviceCode);
+    if (!std || std.group !== 'ITEM' || SERVICE_MEASURE[std.code]) throw new BadRequestException('这个项目不支持按日期打卡（宣教和测量类项目请用“记一次”）');
+    if (std.subject === 'BABY') {
+      if (!dto.babyProfileId || !m.babies.some((b) => b.id === dto.babyProfileId)) throw new BadRequestException('请选择是哪个宝宝');
+    }
+    const day = String(dto.date ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(new Date(day).getTime())) throw new BadRequestException('日期格式不正确');
+    if (day > ymd(beijingToday())) throw new BadRequestException('不能记录未来的日期');
+    const where = { tenantId: this.ctx.tenantId!, motherProfileId: m.id, serviceCode: std.code, babyProfileId: std.subject === 'BABY' ? dto.babyProfileId! : null, doneDate: new Date(`${day}T00:00:00.000Z`) };
+    const existing = await this.prisma.careServiceLog.count({ where });
+    if (dto.done) {
+      if (existing > 0) return { count: existing }; // 已经记过，不重复
+      const me = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId! }, select: { realName: true } });
+      await this.prisma.careServiceLog.create({ data: { ...where, storeId: m.storeId, doneByName: me?.realName ?? null, createdBy: this.ctx.accountId! } });
+    } else if (existing > 0) {
+      await this.prisma.careServiceLog.deleteMany({ where });
+    }
+    await this.auditLogService.record({
+      action: dto.done ? 'CREATE' : 'DELETE',
+      entityType: 'CareServiceLog',
+      entityId: m.id,
+      remark: `${std.name} ${day} ${dto.done ? '标记已执行' : '取消执行'}`,
+      tenantId: this.ctx.tenantId,
+      storeId: m.storeId,
+      accountId: this.ctx.accountId,
+      requestId: this.ctx.requestId,
+    });
+    return { count: dto.done ? 1 : 0 };
   }
 
   // ---------------- 拍照导入纸质《产妇常规护理计划》统计表 ----------------
@@ -467,6 +509,7 @@ export class CareServiceLogService {
         time: typeof e.time === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(e.time) ? e.time.padStart(5, '0') : null,
         systolic: typeof e.systolic === 'number' ? e.systolic : null,
         diastolic: typeof e.diastolic === 'number' ? e.diastolic : null,
+        heartRate: typeof e.heartRate === 'number' ? e.heartRate : null,
         weightKg: typeof e.weightKg === 'number' ? e.weightKg : null,
         doneByName: typeof e.doneByName === 'string' ? e.doneByName : null,
         clientSigned: e.clientSigned === 'YES' || e.clientSigned === true,
@@ -542,7 +585,7 @@ export class CareServiceLogService {
   }
 
   /** 确认登记：把勾选的（可能被人改过日期/数值的）记录写进服务执行；已经有的自动跳过，不会重复。 */
-  async importCommit(input: { documentId: string; babyProfileId?: string | null; items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[] }) {
+  async importCommit(input: { documentId: string; babyProfileId?: string | null; items: { serviceCode: string; date: string; time?: string | null; systolic?: number | null; diastolic?: number | null; heartRate?: number | null; weightKg?: number | null; doneByName?: string | null; clientSigned?: boolean }[] }) {
     const doc = await this.prisma.careDocument.findFirst({ where: { id: input.documentId, tenantId: this.ctx.tenantId } });
     if (!doc || doc.docType !== 'CARE_PLAN') throw new NotFoundException('没有找到这份护理计划表照片');
     const m = await this.mother(doc.motherProfileId);
@@ -597,6 +640,7 @@ export class CareServiceLogService {
         doneTime: time,
         systolic: SERVICE_MEASURE[std.code] === 'BP' ? (it.systolic ?? null) : null,
         diastolic: SERVICE_MEASURE[std.code] === 'BP' ? (it.diastolic ?? null) : null,
+        heartRate: SERVICE_MEASURE[std.code] === 'BP' && it.heartRate != null && it.heartRate >= 30 && it.heartRate <= 220 ? it.heartRate : null,
         weightKg: SERVICE_MEASURE[std.code] === 'WEIGHT' && it.weightKg != null ? Math.round(it.weightKg * 100) / 100 : null,
         doneByName: it.doneByName?.trim() || null,
         clientSigned: !!it.clientSigned,

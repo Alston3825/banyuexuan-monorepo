@@ -126,4 +126,30 @@ describe('P8 拍照导入纸质护理计划表 (e2e)', () => {
     expect(empty.counts.total).toBe(0);
     await request(server).post('/api/v1/care/service-logs/import-preview').set(authed()).send({ documentId: 'nope' }).expect(404);
   });
+
+  it('4. 血压可以同时登记心率（选填，范围校验）；会阴护理等按日期打卡：开关=当天是否执行，重复开不重复记，关掉删除', async () => {
+    const post = (url: string, body: Json) => request(server).post(`/api/v1/care/${url}`).set(authed()).send(body);
+    const base = { motherProfileId: motherId, serviceCode: 'BP', doneDate: D(14), doneTime: '09:30', systolic: 118, diastolic: 76 };
+    await post('service-logs', { ...base, heartRate: 300 }).expect(400);
+    await post('service-logs', { ...base, heartRate: 76 }).expect(201);
+    const sum = (await request(server).get('/api/v1/care/service-logs/summary').query({ motherProfileId: motherId }).set(authed()).expect(200)).body as Json;
+    const bp = sum.rows.find((r: Json) => r.code === 'BP');
+    expect(bp.logs.find((l: Json) => l.date === D(14))).toMatchObject({ systolic: 118, diastolic: 76, heartRate: 76 });
+    await post('service-logs', { ...base, doneDate: D(15), heartRate: undefined }).expect(201); // 心率不填也行
+
+    const day = (done: boolean, extra: Json = {}) => post('service-logs/toggle-day', { motherProfileId: motherId, serviceCode: 'PERINEAL', date: D(14), done, ...extra });
+    const countOf = async () => prisma.careServiceLog.count({ where: { motherProfileId: motherId, serviceCode: 'PERINEAL', doneDate: new Date(`${D(14)}T00:00:00.000Z`) } });
+    const before = await countOf();
+    await day(true).expect(201);
+    await day(true).expect(201); // 重复打开不会重复记
+    expect(await countOf()).toBe(before === 0 ? 1 : before);
+    await day(false).expect(201);
+    expect(await countOf()).toBe(0);
+    await day(true, { date: '2099-01-01' }).expect(400); // 未来
+    await day(true, { serviceCode: 'BP' }).expect(400); // 测量类项目不能打卡
+    await day(true, { serviceCode: 'EDU_ADMISSION' }).expect(400); // 宣教项目不能打卡
+    // 宝宝的项目要指定宝宝
+    await post('service-logs/toggle-day', { motherProfileId: motherId, serviceCode: 'BABY_BATH', date: D(14), done: true }).expect(400);
+    await post('service-logs/toggle-day', { motherProfileId: motherId, babyProfileId: babyId, serviceCode: 'BABY_BATH', date: D(14), done: true }).expect(201);
+  });
 });

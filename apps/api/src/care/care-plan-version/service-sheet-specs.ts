@@ -52,6 +52,7 @@ export const SHEET_ENTRY_COLUMNS: FieldSpec[] = [
   text('time', '时间', { hint: 'HH:mm', aiHint: '纸上写了具体时间才填，没写就留空' }),
   int('systolic', '收缩压(高压)', { unit: 'mmHg', min: 60, max: 260, aiHint: '仅血压行：145/95mmHg 里的 145' }),
   int('diastolic', '舒张压(低压)', { unit: 'mmHg', min: 30, max: 160, aiHint: '仅血压行：145/95mmHg 里的 95' }),
+  int('heartRate', '心率(次/分)', { unit: '次/分', min: 30, max: 220, aiHint: '仅血压行：血压旁边如果写了心率/脉搏（如 72次/分），没写就留空' }),
   dec('weightKg', '体重(kg)', { unit: 'kg', min: 30, max: 200, aiHint: '仅体重行；如果写的是斤（如 136 斤）请换算成公斤填，拿不准就原样填数字并放进 unclear_fields' }),
   text('doneByName', '护理员', { aiHint: '“护理员签名”栏手写的名字（宣教项目才有）' }),
   single('clientSigned', '客户已签', [o('YES', '已签')], { aiHint: '“客户签名”栏有签字就填 YES，没签留空' }),
