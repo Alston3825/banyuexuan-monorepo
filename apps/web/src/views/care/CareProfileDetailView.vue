@@ -67,6 +67,7 @@ import CareArchivePanel from '../../components/care/CareArchivePanel.vue'
 import NurseSelect from '../../components/care/NurseSelect.vue'
 import CarePlanPanel from '../../components/care/CarePlanPanel.vue'
 import ServiceLogsPanel from '../../components/care/ServiceLogsPanel.vue'
+import GrowthCurvesPanel from '../../components/care/GrowthCurvesPanel.vue'
 import CareSummaryPanel from '../../components/care/CareSummaryPanel.vue'
 import MedicationPanel from '../../components/care/MedicationPanel.vue'
 import DailyRecordsPanel from '../../components/care/DailyRecordsPanel.vue'
@@ -77,7 +78,7 @@ const motherProfileId = route.params.id as string
 const router = useRouter()
 
 // ---------------- 档案标签页（把护理档案的各部分归到母婴档案下） ----------------
-const TAB_NAMES = ['overview', 'admission', 'plans', 'services', 'daily', 'medication', 'discharge', 'summary', 'risk', 'orientation', 'choking', 'outreach']
+const TAB_NAMES = ['overview', 'admission', 'plans', 'services', 'growth', 'daily', 'medication', 'discharge', 'summary', 'risk', 'orientation', 'choking', 'outreach']
 const activeTab = ref<string>(TAB_NAMES.includes(String(route.query.tab)) ? String(route.query.tab) : 'overview')
 watch(activeTab, (name) => {
   if (route.query.tab !== name) router.replace({ query: { ...route.query, tab: name } })
@@ -88,6 +89,7 @@ const TAB_LABELS: { name: string; label: string }[] = [
   { name: 'admission', label: '入所评估' },
   { name: 'plans', label: '护理计划' },
   { name: 'services', label: '服务执行' },
+  { name: 'growth', label: '生长曲线' },
   { name: 'daily', label: '日常护理记录' },
   { name: 'medication', label: '用药委托书' },
   { name: 'discharge', label: '出所评估' },
@@ -743,6 +745,10 @@ onMounted(fetchAll)
 
       <n-tab-pane name="services" tab="服务执行">
         <ServiceLogsPanel :mother-profile-id="motherProfileId" />
+      </n-tab-pane>
+
+      <n-tab-pane name="growth" tab="生长曲线">
+        <GrowthCurvesPanel v-if="mother" :key="mother.id" :babies="mother.babies" :customer-name="mother.customer?.name" />
       </n-tab-pane>
 
       <n-tab-pane name="daily" tab="日常护理记录">

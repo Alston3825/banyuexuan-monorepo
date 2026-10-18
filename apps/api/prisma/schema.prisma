@@ -1544,6 +1544,8 @@ model BabyProfile {
   medicationAuths     CareMedicationAuth[]
   planVersions        CarePlanVersion[]
   serviceLogs         CareServiceLog[]
+  growthRecords       BabyGrowthRecord[]
+  growthShares        BabyGrowthShare[]
   admissionAssessment CareBabyAdmission?
   dischargeAssessment CareBabyDischarge?
 
@@ -4185,4 +4187,46 @@ model RecycleBinItem {
 
   @@index([tenantId, entityType, expiresAt])
   @@map("recycle_bin_items")
+}
+
+/// 宝宝生长测量记录（身长/体重/头围）：定期测量，和《7岁以下儿童生长标准》WS/T 423-2022 的百分位对比、生成曲线图。
+/// 日常护理记录里的体重也会自动并入曲线（不用重复录）；身长、头围只来自这里。
+model BabyGrowthRecord {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  storeId         String   @map("store_id")
+  motherProfileId String   @map("mother_profile_id")
+  babyProfileId   String   @map("baby_profile_id")
+  measuredAt      DateTime @map("measured_at") @db.Date
+  weightKg        Float?   @map("weight_kg")
+  lengthCm        Float?   @map("length_cm")
+  headCm          Float?   @map("head_cm")
+  measuredByName  String?  @map("measured_by_name")
+  note            String?
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  baby BabyProfile @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, babyProfileId, measuredAt])
+  @@map("baby_growth_records")
+}
+
+/// 发给客户看的“生长曲线”链接：凭不可猜的随机链接打开（只读，随记录更新），可随时作废。
+model BabyGrowthShare {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  babyProfileId String    @map("baby_profile_id")
+  tokenHash     String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt     DateTime  @map("expires_at")
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  revokedAt     DateTime? @map("revoked_at")
+  openCount     Int       @default(0) @map("open_count")
+  lastOpenedAt  DateTime? @map("last_opened_at")
+
+  baby BabyProfile @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, babyProfileId])
+  @@map("baby_growth_shares")
 }

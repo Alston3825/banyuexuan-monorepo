@@ -20,6 +20,14 @@ const routes: RouteRecordRaw[] = [
     props: true,
     meta: { title: '每日服务报告', public: true },
   },
+  // 客户打开的宝宝生长曲线（不登录，只读）
+  {
+    path: '/g/:token',
+    name: 'growth-report',
+    component: () => import('../views/public/GrowthReportView.vue'),
+    props: true,
+    meta: { title: '宝宝生长曲线', public: true },
+  },
   {
     path: '/login',
     name: 'login',
