@@ -4,7 +4,7 @@
  * 手机优先：分成“宝宝/妈妈”标签页，喂养用卡片行录入；也可以拍纸质记录单照片，AI 识别后预填，
  * 人工核对（标黄的是没把握的）后保存——保存之前不会写进数据库。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onErrorCaptured, ref, watch } from 'vue'
 import { NAlert, NButton, NCard, NModal, NSelect, NSpace, NSpin, NTag } from 'naive-ui'
 import { careDailyApi, careDocumentApi } from '../../api/modules/care-archive.api'
 import type { CareDocument, DailyDay, DailySpecs, ExtractWarning, FeedingEntry } from '../../api/types/care-archive'
@@ -47,6 +47,86 @@ const title = computed(() => {
 const babyOptions = computed(() => (day.value?.babies ?? []).map((b) => ({ label: `宝宝${b.baby.sequenceNo}${b.baby.name ? '：' + b.baby.name : ''}`, value: b.baby.id })))
 const babyLabel = (id: string) => babyOptions.value.find((o) => o.value === id)?.label ?? '宝宝'
 
+
+// ---- 草稿自动保存：核对/填写到一半页面被刷新、闪退、误关，重新打开能恢复，不用重拍重填 ----
+const draftKey = () => `daily-draft:${props.motherProfileId}:${props.date}`
+let draftReady = false
+let draftTimer: ReturnType<typeof setTimeout> | null = null
+function writeDraft() {
+  if (!draftReady || !day.value) return
+  try {
+    localStorage.setItem(draftKey(), JSON.stringify({ at: Date.now(), version: day.value.record?.version ?? null, mother: motherValues.value, babies: babyStates.value, documentId: doc.value?.id ?? null, aiBabyId: aiBabyId.value }))
+  } catch {
+    /* 存储满了/被禁用就算了，不影响正常填写 */
+  }
+}
+function scheduleDraft() {
+  if (!draftReady) return
+  if (draftTimer) clearTimeout(draftTimer)
+  draftTimer = setTimeout(writeDraft, 800)
+}
+function clearDraft() {
+  draftReady = false
+  if (draftTimer) clearTimeout(draftTimer)
+  try {
+    localStorage.removeItem(draftKey())
+  } catch {
+    /* ignore */
+  }
+}
+watch([motherValues, babyStates], scheduleDraft, { deep: true })
+function offerDraft() {
+  let raw: string | null = null
+  try {
+    raw = localStorage.getItem(draftKey())
+  } catch {
+    /* ignore */
+  }
+  if (!raw) return void (draftReady = true)
+  let d: { at: number; version: number | null; mother: Record<string, unknown>; babies: typeof babyStates.value; documentId: string | null; aiBabyId: string | null }
+  try {
+    d = JSON.parse(raw)
+  } catch {
+    return void (draftReady = true)
+  }
+  // 草稿之后别人又保存过（版本号变了）就不再提示，避免用旧内容盖掉新的
+  if (d.version !== (day.value?.record?.version ?? null) || Date.now() - d.at > 3 * 86_400_000) {
+    clearDraft()
+    draftReady = true
+    return
+  }
+  const when = new Date(d.at)
+  dialog.info({
+    title: '发现上次没保存的内容',
+    content: `${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')} 填写/识别的内容还没有保存，要恢复吗？`,
+    positiveText: '恢复',
+    negativeText: '不要了',
+    closable: false,
+    maskClosable: false,
+    onPositiveClick: () => {
+      motherValues.value = d.mother
+      const bs = { ...babyStates.value }
+      for (const [id, st] of Object.entries(d.babies)) if (bs[id]) bs[id] = st
+      babyStates.value = bs
+      aiBabyId.value = d.aiBabyId
+      if (d.documentId) careDocumentApi.get(d.documentId).then((x) => ((doc.value = x), (warnings.value = x.extractWarnings ?? []))).catch(() => undefined)
+      draftReady = true
+    },
+    onNegativeClick: () => {
+      clearDraft()
+      draftReady = true
+    },
+  })
+}
+
+// 某个子组件渲染出错时，别让整页白屏丢内容：提示一下，草稿已自动保存
+const renderError = ref('')
+onErrorCaptured((err) => {
+  renderError.value = (err as Error)?.message ?? String(err)
+  writeDraft()
+  return false
+})
+
 function stopPolling() {
   if (timer) clearInterval(timer)
   timer = null
@@ -71,6 +151,8 @@ function fill(d: DailyDay) {
 
 async function load() {
   loading.value = true
+  draftReady = false
+  renderError.value = ''
   stopPolling()
   doc.value = null
   warnings.value = []
@@ -82,6 +164,7 @@ async function load() {
     fill(d)
     photoBabyId.value = d.babies[0]?.baby.id ?? null
     if (d.record?.documentId) careDocumentApi.get(d.record.documentId).then((x) => (doc.value = x)).catch(() => undefined)
+    offerDraft()
   } finally {
     loading.value = false
   }
@@ -227,7 +310,9 @@ async function save() {
       babies: day.value.babies.map((b) => ({ babyProfileId: b.baby.id, values: babyStates.value[b.baby.id].values, feedings: babyStates.value[b.baby.id].feedings })),
     })
     message.success('当天的日常护理记录已保存')
+    clearDraft()
     fill(saved)
+    draftReady = true
     warnings.value = []
     emit('saved')
   } finally {
@@ -263,6 +348,7 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
             <span class="dr-tip">宝宝和妈妈在同一张纸上，拍一次（可多张）就全部预填；不拍照也可以直接在下面填写。</span>
           </n-space>
         </div>
+        <n-alert v-if="renderError" type="error" :bordered="false" style="margin-top: 8px">页面显示出了点问题（{{ renderError }}）。已填的内容自动保存了草稿，关掉再打开这一天就能恢复；如果反复出现请告诉我。</n-alert>
         <n-alert v-if="day && day.babies.length === 0" type="warning" :bordered="false" style="margin-top: 8px">
           <n-space align="center" :wrap="true">
             <span><b>这位妈妈还没有宝宝档案</b>，所以下面只有妈妈的内容，看不到宝宝的体征、体温和 24 小时喂养记录。先添加宝宝，这里就会出现“宝宝”页签。</span>

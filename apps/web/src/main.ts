@@ -15,11 +15,19 @@ createApp(App).use(pinia).use(router).mount('#app')
 // 正在输入内容（光标在输入框里）时不刷新，避免丢掉没保存的内容，下次打开/刷新就是新版。
 if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
   let reloaded = false
+  // 有弹窗打开、或光标在输入框/按钮上（正在填内容）时不刷新，等用户关掉弹窗/离开后再换新版，避免丢掉没保存的内容
+  const busy = () => {
+    const el = document.activeElement as HTMLElement | null
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return true
+    return !!document.querySelector('.n-modal-container, .n-drawer-container, .n-dialog')
+  }
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloaded) return
-    const el = document.activeElement as HTMLElement | null
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
     reloaded = true
-    window.location.reload()
+    const tryReload = () => {
+      if (busy()) return void setTimeout(tryReload, 5000)
+      window.location.reload()
+    }
+    tryReload()
   })
 }

@@ -39,7 +39,11 @@ onMounted(() => {
 })
 onBeforeUnmount(() => mq?.removeEventListener('change', onMq))
 
-const flat = (groups: { fields: FieldSpec[] }[]) => Object.fromEntries(groups.flatMap((g) => g.fields).map((f) => [f.key, f])) as Record<string, FieldSpec>
+// 说明书里缺了某个字段（比如前后端版本不一致）时，用一个普通文本框顶上，别让整页渲染报错白屏
+const flat = (groups: { fields: FieldSpec[] }[]) => {
+  const map = Object.fromEntries(groups.flatMap((g) => g.fields).map((f) => [f.key, f])) as Record<string, FieldSpec>
+  return new Proxy(map, { get: (t, k) => t[k as string] ?? ({ key: String(k), label: String(k), kind: 'text' } as FieldSpec) })
+}
 const bf = computed(() => flat(props.specs.baby))
 const mf = computed(() => flat(props.specs.mother))
 
