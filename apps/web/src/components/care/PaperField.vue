@@ -157,4 +157,30 @@ const outOfRange = computed(() => {
   font-size: 12px;
   cursor: help;
 }
+
+/* 手机：控件放大，方便手指点 */
+@media (max-width: 767px) {
+  .pf {
+    font-size: 14px;
+    gap: 4px 8px;
+    padding: 4px 2px;
+  }
+  .pf-chip {
+    padding: 5px 12px;
+    border-color: #e1e1e1;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .pf-in {
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid #cfcfcf;
+    border-radius: 6px;
+    font-size: 16px;
+  }
+  .pf-ta {
+    font-size: 15px;
+  }
+}
 </style>

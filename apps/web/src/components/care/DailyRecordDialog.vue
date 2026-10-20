@@ -463,4 +463,13 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
   max-height: 72vh;
   overflow: auto;
 }
+@media (max-width: 767px) {
+  .dr-tip {
+    display: none;
+  }
+  :deep(.n-card__content) {
+    max-height: calc(100vh - 190px);
+    padding: 8px 10px;
+  }
+}
 </style>

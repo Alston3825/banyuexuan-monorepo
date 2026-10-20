@@ -66,7 +66,7 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <th>用药</th>
           <th class="w-n">喂水<small>ml</small></th>
           <th class="w-c">小便</th>
-          <th class="w-stool">大便（颜色/量/性）</th>
+          <th class="w-stool">大便 颜色/量/性</th>
           <th class="w-nurse">责护签字</th>
           <th class="w-remark">备注</th>
           <th class="w-x"></th>
@@ -140,13 +140,13 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
   font-weight: 400;
   font-size: 11px;
 }
-.w-time { width: 78px; }
-.w-n { width: 58px; }
-.w-c { width: 46px; }
-.w-stool { width: 210px; }
-.w-nurse { width: 86px; }
-.w-remark { width: 110px; }
-.w-x { width: 28px; }
+.w-time { width: 64px; }
+.w-n { width: 46px; }
+.w-c { width: 40px; }
+.w-stool { width: 178px; }
+.w-nurse { width: 66px; }
+.w-remark { width: 84px; }
+.w-x { width: 22px; }
 .fg-t input:not([type='time']),
 .fg-t select {
   width: 100%;
@@ -172,7 +172,7 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
   background: #f6fbf8;
 }
 .fg-t select {
-  width: 56px;
+  width: 48px;
   margin-left: 2px;
   border: 1px solid #ddd;
   border-radius: 4px;

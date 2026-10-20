@@ -4,9 +4,11 @@
  * 值的约定：文本=string，整数/小数=number，日期='YYYY-MM-DD'，单选=选项代码，多选=代码数组。
  * warnings 是 AI 识别时给出的"需要人工核对"的提醒：对应字段会标黄并显示原因，核对改动后自动消除。
  */
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { NButton, NDatePicker, NInput, NInputNumber, NSpace } from 'naive-ui'
 import type { ExtractWarning, FieldSpec, GroupSpec } from '../../api/types/care-archive'
+import { useNarrow } from '../../composables/useNarrow'
+import SheetSection from './SheetSection.vue'
 
 const props = defineProps<{
   spec: { groups: GroupSpec[] }
@@ -15,6 +17,17 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: Record<string, unknown>] }>()
+
+// 手机上每组是一张可折叠的卡片，折叠时一行摘要（已填多少）；电脑端始终展开
+const narrow = useNarrow()
+const openMap = reactive<Record<string, boolean>>({})
+const isOpen = (title: string, idx: number) => openMap[title] ?? idx === 0
+const has = (v: unknown) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
+const groupSummary = (g: GroupSpec) => {
+  const n = g.fields.filter((f) => has(props.modelValue[f.key])).length
+  return n ? `已填 ${n}/${g.fields.length}` : '还没填'
+}
+const groupState = (g: GroupSpec) => (g.fields.some((f) => has(props.modelValue[f.key])) ? 'done' : props.readonly ? 'plain' : 'empty')
 
 /** 用户改过的字段不再显示 AI 提醒（认为已核对） */
 const touched = new Set<string>()
@@ -91,8 +104,7 @@ function readonlyText(f: FieldSpec): string {
 
 <template>
   <div class="sf">
-    <section v-for="g in spec.groups" :key="g.title" class="sf-group">
-      <h4 class="sf-title">{{ g.title }}</h4>
+    <SheetSection v-for="(g, gi) in spec.groups" :key="g.title" :title="g.title" :summary="groupSummary(g)" :state="groupState(g)" :open="isOpen(g.title, gi)" :collapsible="narrow" @toggle="openMap[g.title] = !isOpen(g.title, gi)">
       <div class="sf-grid">
         <template v-for="f in g.fields" :key="f.key">
         <div class="sf-cell" :class="{ 'sf-wide': wide(f), 'sf-warn': !!warnMap[f.key] }">
@@ -164,7 +176,7 @@ function readonlyText(f: FieldSpec): string {
         </div>
         </template>
       </div>
-    </section>
+    </SheetSection>
   </div>
 </template>
 
@@ -181,8 +193,8 @@ function readonlyText(f: FieldSpec): string {
 }
 .sf-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 10px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 12px;
 }
 .sf-cell {
   padding: 4px 6px;
