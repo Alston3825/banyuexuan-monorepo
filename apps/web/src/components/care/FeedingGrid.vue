@@ -63,13 +63,13 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <th class="w-n">亲喂<small>分</small></th>
           <th class="w-n">母乳<small>ml</small></th>
           <th class="w-n">奶粉<small>ml</small></th>
-          <th>用药</th>
+          <th class="w-med">用药</th>
           <th class="w-n">喂水<small>ml</small></th>
           <th class="w-c">小便</th>
           <th class="w-stool">大便 颜色/量/性</th>
           <th class="w-nurse">责护签字</th>
           <th class="w-remark">备注</th>
-          <th class="w-x"></th>
+          <th class="w-x">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -82,17 +82,17 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <td :class="{ bad: warnOf(i, 'waterMl') }"><input class="n" inputmode="numeric" :value="r.waterMl ?? ''" @change="(e) => num(i, 'waterMl', e)" /></td>
           <td class="c"><button type="button" class="tick" :class="{ on: r.urine === 'YES' }" @click="toggle(i, 'urine')">✓</button></td>
           <td :class="{ bad: warnOf(i, 'stoolColor') || warnOf(i, 'stoolAmount') || warnOf(i, 'stoolTexture') || warnOf(i, 'stool') }">
-            <button type="button" class="tick" :class="{ on: r.stool === 'YES' }" @click="toggle(i, 'stool')">✓</button>
+            <div class="stool-cell"><button type="button" class="tick" :class="{ on: r.stool === 'YES' }" @click="toggle(i, 'stool')">✓</button>
             <template v-if="r.stool === 'YES'">
               <select v-for="k in ['stoolColor', 'stoolAmount', 'stoolTexture']" :key="k" :value="(r[k] as string) ?? ''" @change="(e) => setRow(i, { [k]: (e.target as HTMLSelectElement).value || null })">
                 <option value="">{{ k === 'stoolColor' ? '颜色' : k === 'stoolAmount' ? '量' : '性状' }}</option>
                 <option v-for="o in opts(k)" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
-            </template>
+            </template></div>
           </td>
           <td :class="{ bad: warnOf(i, 'nurseName') }"><input :value="(r.nurseName as string) ?? ''" @input="(e) => setRow(i, { nurseName: (e.target as HTMLInputElement).value })" /></td>
           <td :class="{ bad: warnOf(i, 'remark') }"><input :value="(r.remark as string) ?? ''" @input="(e) => setRow(i, { remark: (e.target as HTMLInputElement).value })" /></td>
-          <td class="c"><button type="button" class="del" title="删除这一行" @click="removeRow(i)">×</button></td>
+          <td class="c"><button type="button" class="del" title="删除这一行" @click="removeRow(i)">删除</button></td>
         </tr>
         <tr v-if="modelValue.length === 0">
           <td colspan="11" class="empty">还没有记录，点下面“＋ 添加一行”，或拍照识别。</td>
@@ -140,13 +140,21 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
   font-weight: 400;
   font-size: 11px;
 }
-.w-time { width: 64px; }
-.w-n { width: 46px; }
-.w-c { width: 40px; }
-.w-stool { width: 178px; }
-.w-nurse { width: 66px; }
-.w-remark { width: 84px; }
-.w-x { width: 22px; }
+.w-time { width: 84px; }
+.w-n { width: 52px; }
+.w-med { width: 150px; }
+.w-c { width: 48px; }
+.w-stool { width: 250px; }
+.w-nurse { width: 76px; }
+.w-remark { width: 110px; }
+.w-x { width: 64px; }
+.stool-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
 .fg-t input:not([type='time']),
 .fg-t select {
   width: 100%;
@@ -172,8 +180,8 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
   background: #f6fbf8;
 }
 .fg-t select {
-  width: 48px;
-  margin-left: 2px;
+  width: 62px;
+  margin-left: 0;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 12px;
@@ -194,11 +202,16 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
   font-weight: 700;
 }
 .del {
-  border: 0;
-  background: transparent;
+  padding: 1px 8px;
+  border: 1px solid #f0c0c0;
+  border-radius: 4px;
+  background: #fff;
   color: #c33;
-  font-size: 16px;
+  font-size: 12px;
   cursor: pointer;
+}
+.del:hover {
+  background: #fdeeee;
 }
 td.bad {
   background: #fff3dc;
