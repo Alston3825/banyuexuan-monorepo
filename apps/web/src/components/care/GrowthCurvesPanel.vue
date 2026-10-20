@@ -4,33 +4,58 @@
  * 生成曲线图。可以“生成客户链接”（客户手机打开看，随记录更新）或“下载图片”（微信里直接发）。
  * 日常护理记录里记的体重会自动并入曲线，不用重复录；身长、头围在这里记。
  */
-import { computed, onMounted, ref, watch } from 'vue'
-import { NAlert, NButton, NCard, NDatePicker, NEmpty, NInput, NInputNumber, NModal, NSelect, NSpace, NSpin, NTag } from 'naive-ui'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { NAlert, NButton, NCard, NDatePicker, NEmpty, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NSpace, NSpin, NTag } from 'naive-ui'
 import { careGrowthApi } from '../../api/modules/care-growth.api'
-import type { GrowthReport } from '../../api/types/care-growth'
+import type { GrowthReport, GrowthStandard } from '../../api/types/care-growth'
 import { buildGrowthSvg, downloadSvgAsPng } from '../../utils/growth-chart'
 import { dialog, message } from '../../utils/discrete-api'
 
 const props = defineProps<{ babies: { id: string; sequenceNo: number; name: string | null }[]; customerName?: string }>()
 
 const babyId = ref<string | null>(props.babies[0]?.id ?? null)
+const standard = ref<GrowthStandard>('CN')
+const months = ref(3)
+const standardOptions = [
+  { label: '国家卫健委标准', value: 'CN' },
+  { label: 'WHO 标准', value: 'WHO' },
+]
+const monthOptions = [
+  { label: '前 1 个月', value: 1 },
+  { label: '前 2 个月', value: 2 },
+  { label: '前 3 个月', value: 3 },
+]
 const report = ref<GrowthReport | null>(null)
 const loading = ref(false)
 const babyOptions = computed(() => props.babies.map((b) => ({ label: `宝宝${b.sequenceNo}${b.name ? '：' + b.name : ''}`, value: b.id })))
 
-async function load() {
+async function load(silent = false) {
   if (!babyId.value) return
-  loading.value = true
+  if (!silent) loading.value = true
   try {
-    report.value = await careGrowthApi.report(babyId.value)
+    report.value = await careGrowthApi.report(babyId.value, standard.value)
+  } catch (e) {
+    if (!silent) throw e
   } finally {
     loading.value = false
   }
 }
-watch(babyId, load)
-onMounted(load)
+watch([babyId, standard], () => load())
 
-const svg = computed(() => (report.value && report.value.ready ? buildGrowthSvg(report.value) : ''))
+// 日常护理记录里新记了体重、别的同事录了测量，这里自动刷新，不用手动刷新页面
+let timer: ReturnType<typeof setInterval> | undefined
+const onFocus = () => load(true)
+onMounted(() => {
+  load()
+  timer = setInterval(() => !document.hidden && !form.value && load(true), 30000)
+  window.addEventListener('focus', onFocus)
+})
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  window.removeEventListener('focus', onFocus)
+})
+
+const svg = computed(() => (report.value && report.value.ready ? buildGrowthSvg(report.value, { months: months.value }) : ''))
 const hasPoints = computed(() => !!report.value && (['weight', 'length', 'head'] as const).some((m) => report.value!.points[m].length > 0))
 
 // ---- 记录一次测量 ----
@@ -105,7 +130,7 @@ async function download() {
   if (!svg.value || !report.value) return
   try {
     const nm = report.value.baby.name ?? `宝宝${report.value.baby.sequenceNo}`
-    await downloadSvgAsPng(svg.value, `${nm}-生长曲线-${new Date().toISOString().slice(0, 10)}.png`)
+    await downloadSvgAsPng(svg.value, `${nm}-生长曲线-${standard.value === 'WHO' ? 'WHO' : '国标'}-${new Date().toISOString().slice(0, 10)}.png`)
   } catch (e) {
     message.error((e as Error).message)
   }
@@ -118,6 +143,12 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
   <n-spin :show="loading">
     <n-space align="center" :wrap="true" style="margin-bottom: 10px">
       <n-select v-if="babies.length > 1" v-model:value="babyId" :options="babyOptions" style="width: 200px" />
+      <n-radio-group v-model:value="standard" size="small">
+        <n-radio-button v-for="o in standardOptions" :key="o.value" :value="o.value" :label="o.label" />
+      </n-radio-group>
+      <n-radio-group v-model:value="months" size="small">
+        <n-radio-button v-for="o in monthOptions" :key="o.value" :value="o.value" :label="o.label" />
+      </n-radio-group>
       <n-button type="primary" @click="open">＋ 记录一次测量（体重/身长/头围）</n-button>
       <n-button :disabled="!svg" @click="download">⬇ 下载图片</n-button>
       <n-button :disabled="!svg" :loading="sharing" @click="createShare">🔗 生成客户链接</n-button>
@@ -131,7 +162,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
 
       <template v-else>
         <n-alert type="info" :show-icon="false" style="margin-bottom: 10px">
-          对比标准：{{ report.source }}。日常护理记录里记的体重会自动画到曲线上；身长、头围请点上面“记录一次测量”。{{ report.baby.preterm ? '该宝宝是早产儿，月龄按矫正月龄计算。' : '' }}
+          对比标准：{{ report.source }}（可在上方切换国家卫健委 / WHO 两套标准，曲线最多展示到第 3 个月）。日常护理记录里记的体重会自动画到曲线上并实时更新；身长、头围请点上面“记录一次测量”。{{ report.baby.preterm ? '该宝宝是早产儿，月龄按矫正月龄计算。' : '' }}
         </n-alert>
 
         <div v-if="report.latest.length > 0" class="gc-latest">
@@ -139,7 +170,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
             <div class="gc-name">{{ l.name }} <small>{{ l.date }}</small></div>
             <div class="gc-val">{{ l.value }}<small>{{ l.unit }}</small></div>
             <n-tag size="small" :type="ratingType(l.rating)" :bordered="false">{{ l.pctText }} · {{ l.rating }}</n-tag>
-            <div class="gc-std">标准 P3 {{ l.p3 }} / P50 {{ l.p50 }} / P97 {{ l.p97 }}</div>
+            <div class="gc-std">{{ report.standardLabel }} P3 {{ l.p3 }} / P50 {{ l.p50 }} / P97 {{ l.p97 }}</div>
           </div>
         </div>
 

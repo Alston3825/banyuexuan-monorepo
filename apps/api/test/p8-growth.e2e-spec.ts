@@ -105,4 +105,23 @@ describe('P8 宝宝生长曲线 (e2e)', () => {
     await request(server).get(`/api/v1/public/growth/${b.token}`).expect(410);
     await request(server).get('/api/v1/public/growth/not-a-token').expect(404);
   });
+  it('5. 两套标准可切换：WHO 按日表（出生当天男宝体重 P50=3.346）、曲线只到 3 个月；默认是国家标准；客户链接同样支持 standard 参数', async () => {
+    const cn = await get();
+    expect(cn.standard).toBe('CN');
+    expect(cn.maxMonths).toBe(3);
+    expect(cn.curves.weight.ages).toEqual([0, 1, 2, 3]);
+    const who = (await request(server).get(`/api/v1/care/growth/baby/${babyId}?standard=WHO`).set(authed()).expect(200)).body as Json;
+    expect(who.standard).toBe('WHO');
+    expect(who.standardLabel).toContain('WHO');
+    expect(who.curves.weight.ages[0]).toBe(0);
+    expect(who.curves.weight.ages.at(-1)).toBe(3);
+    expect(who.curves.weight.rows[0]).toEqual([2.507, 2.758, 3.027, 3.346, 3.687, 4.011, 4.35]); // WHO 男宝体重第 0 天
+    expect(who.points.weight.some((p: Json) => p.row)).toBe(true);
+    // 出生当天 3.5kg：WHO 的 P50 是 3.346，所以评价按 WHO 的行算
+    const w0 = who.points.weight.find((p: Json) => p.ageDays === 0);
+    expect(w0.row[3]).toBe(3.346);
+    const link = (await request(server).post(`/api/v1/care/growth/baby/${babyId}/share`).set(authed()).expect(201)).body as Json;
+    const pw = (await request(server).get(`/api/v1/public/growth/${link.token}?standard=who`).expect(200)).body as Json;
+    expect(pw.standard).toBe('WHO');
+  });
 });

@@ -3,8 +3,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { randomToken, sha256 } from '../care-signature/signature.util';
-import { ageInMonths, describeMetric, maxAgeMonths, METRIC_LABEL, rate, standardRow } from './growth.util';
-import { GrowthMetric, GrowthSex, WS423_SOURCE } from './ws423-data';
+import { ageInMonths, describeMetric, GrowthStandard, METRIC_LABEL, MONTH_DAYS, parseStandard, rate, standardRow, STANDARD_INFO } from './growth.util';
+import { GrowthMetric, GrowthSex } from './ws423-data';
+
+/** 展示最多到第 3 个月（月子中心的宝宝用得到的范围；两套标准都覆盖 0～3 月） */
+const MAX_MONTHS = 3;
 
 const DAY_MS = 86_400_000;
 const SHARE_TTL_DAYS = 90;
@@ -27,7 +30,7 @@ export interface GrowthPoint {
   row: number[] | null;
 }
 
-/** 宝宝生长曲线：和 WS/T 423-2022 国家标准的百分位对比。内部页面和发给客户的链接共用这一份数据。 */
+/** 宝宝生长曲线：和国家卫健委 WS/T 423-2022、WHO 两套标准的百分位对比（可选）。内部页面和发给客户的链接共用这一份数据。 */
 @Injectable()
 export class CareGrowthService {
   constructor(
@@ -43,7 +46,8 @@ export class CareGrowthService {
   }
 
   /** 报告数据（不依赖登录上下文，内部页面和客户链接共用）。 */
-  async buildReport(babyId: string, tenantId: string) {
+  async buildReport(babyId: string, tenantId: string, standardRaw?: string) {
+    const standard: GrowthStandard = parseStandard(standardRaw);
     const b = await this.prisma.babyProfile.findFirst({ where: { id: babyId, tenantId }, include: { motherProfile: { select: { gestationalWeeks: true } } } });
     if (!b) throw new NotFoundException('宝宝档案不存在');
     const sex: GrowthSex | null = b.gender === 'MALE' || b.gender === 'FEMALE' ? b.gender : null;
@@ -75,24 +79,23 @@ export class CareGrowthService {
       for (const [date, v] of [...raw[m].entries()].sort((x, y) => x[0].localeCompare(y[0]))) {
         const at = new Date(`${date}T00:00:00.000Z`);
         const age = birth ? ageInMonths(birth, at, ga) : { months: null, days: 0, corrected: false };
-        const row = sex && age.months !== null ? standardRow(m, sex, age.months) : null;
+        const row = sex && age.months !== null ? standardRow(m, sex, age.months, standard) : null;
         const d = row ? describeMetric(m, v.value, row) : null;
         points[m].push({ date, ageDays: age.days, ageMonths: age.months === null ? null : Math.round(age.months * 100) / 100, value: v.value, source: v.source, recordId: v.recordId, rating: d?.rating ?? null, pctText: d?.pctText ?? null, row });
       }
     }
 
-    // 标准曲线：整月龄一个点，画到“最大月龄 + 1 个月”，至少画到 3 个月
-    const maxPtAge = Math.max(0, ...METRICS.flatMap((m) => points[m].map((p) => p.ageMonths ?? 0)));
-    const lastMonth = Math.min(36, Math.max(3, Math.ceil(maxPtAge) + 1));
+    // 标准曲线（0～3 个月）：国家标准只给整月龄，每月一个点；WHO 有按日表，每 7 天一个点（再补满 3 个月整点）
     const curves: Record<GrowthMetric, { ages: number[]; rows: number[][] } | null> = { weight: null, length: null, head: null };
     if (sex) {
+      const ageList = standard === 'WHO' ? [...Array.from({ length: 13 }, (_, i) => (i * 7) / MONTH_DAYS), MAX_MONTHS] : Array.from({ length: MAX_MONTHS + 1 }, (_, i) => i);
       for (const m of METRICS) {
         const ages: number[] = [];
         const rows: number[][] = [];
-        for (let a = 0; a <= Math.min(lastMonth, maxAgeMonths(m)); a++) {
-          const r = standardRow(m, sex, a);
+        for (const a of ageList) {
+          const r = standardRow(m, sex, a, standard);
           if (r) {
-            ages.push(a);
+            ages.push(Math.round(a * 1000) / 1000);
             rows.push(r);
           }
         }
@@ -118,14 +121,17 @@ export class CareGrowthService {
         .slice()
         .reverse()
         .map((g) => ({ id: g.id, date: ymd(g.measuredAt), weightKg: g.weightKg, lengthCm: g.lengthCm, headCm: g.headCm, measuredByName: g.measuredByName, note: g.note })),
-      source: WS423_SOURCE,
+      standard,
+      standardLabel: STANDARD_INFO[standard].label,
+      source: STANDARD_INFO[standard].source,
+      maxMonths: MAX_MONTHS,
       generatedAt: new Date().toISOString(),
     };
   }
 
-  async report(babyId: string) {
+  async report(babyId: string, standard?: string) {
     await this.baby(babyId);
-    return this.buildReport(babyId, this.ctx.tenantId!);
+    return this.buildReport(babyId, this.ctx.tenantId!, standard);
   }
 
   async addRecord(dto: { babyProfileId: string; measuredAt: string; weightKg?: number | null; lengthCm?: number | null; headCm?: number | null; note?: string | null }) {
@@ -213,13 +219,13 @@ export class CareGrowthService {
   }
 
   /** 客户打开链接：不需要登录；链接作废/过期给明确提示。 */
-  async publicReport(token: string) {
+  async publicReport(token: string, standard?: string) {
     const link = await this.prisma.babyGrowthShare.findUnique({ where: { tokenHash: sha256(token ?? '') } });
     if (!link) throw new NotFoundException('链接无效，请联系月子中心重新发送');
     if (link.revokedAt) throw new GoneException('这个链接已经失效，请联系月子中心获取最新链接');
     if (link.expiresAt.getTime() < Date.now()) throw new GoneException('链接已过期，请联系月子中心重新发送');
     await this.prisma.babyGrowthShare.update({ where: { id: link.id }, data: { openCount: { increment: 1 }, lastOpenedAt: new Date() } });
-    return this.buildReport(link.babyProfileId, link.tenantId);
+    return this.buildReport(link.babyProfileId, link.tenantId, standard);
   }
 }
 

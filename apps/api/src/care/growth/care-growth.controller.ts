@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -22,8 +22,8 @@ export class CareGrowthController {
   /** 宝宝的生长曲线数据：测量点 + 国家标准曲线 + 最新评价 */
   @Get('baby/:babyId')
   @RequirePermission('care.profile.view')
-  report(@Param('babyId') babyId: string) {
-    return this.service.report(babyId);
+  report(@Param('babyId') babyId: string, @Query('standard') standard?: string) {
+    return this.service.report(babyId, standard);
   }
 
   @Post('records')
@@ -61,7 +61,7 @@ export class PublicGrowthController {
   constructor(private readonly service: CareGrowthService) {}
 
   @Get(':token')
-  report(@Param('token') token: string) {
-    return this.service.publicReport(token);
+  report(@Param('token') token: string, @Query('standard') standard?: string) {
+    return this.service.publicReport(token, standard);
   }
 }

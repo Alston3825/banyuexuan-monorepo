@@ -29,6 +29,8 @@ export interface GrowthLatest {
   p97: number
 }
 
+export type GrowthStandard = 'CN' | 'WHO'
+
 export interface GrowthReport {
   baby: { id: string; name: string | null; sequenceNo: number; sex: 'MALE' | 'FEMALE' | null; birthDate: string | null; preterm: boolean; gestationalWeeks: number | null }
   ready: boolean
@@ -37,6 +39,11 @@ export interface GrowthReport {
   curves: Record<GrowthMetric, { ages: number[]; rows: number[][] } | null>
   latest: GrowthLatest[]
   records: { id: string; date: string; weightKg: number | null; lengthCm: number | null; headCm: number | null; measuredByName: string | null; note: string | null }[]
+  /** 当前对比用的标准：CN=国家卫健委 WS/T 423—2022，WHO=世界卫生组织 */
+  standard: GrowthStandard
+  standardLabel: string
   source: string
+  /** 曲线最多展示到第几个月 */
+  maxMonths: number
   generatedAt: string
 }

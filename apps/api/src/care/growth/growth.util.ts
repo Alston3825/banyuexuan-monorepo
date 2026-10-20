@@ -1,4 +1,13 @@
-import { GrowthMetric, GrowthSex, WS423, WS423_PERCENTILES } from './ws423-data';
+import { GrowthMetric, GrowthSex, WS423, WS423_PERCENTILES, WS423_SOURCE } from './ws423-data';
+import { WHO_DAILY, WHO_MAX_DAYS, WHO_SOURCE } from './who-data';
+
+/** CN = 国家卫健委 WS/T 423—2022；WHO = 世界卫生组织儿童生长标准 */
+export type GrowthStandard = 'CN' | 'WHO';
+export const STANDARD_INFO: Record<GrowthStandard, { label: string; source: string }> = {
+  CN: { label: '国家卫健委标准', source: WS423_SOURCE },
+  WHO: { label: 'WHO 标准', source: WHO_SOURCE },
+};
+export const parseStandard = (v: unknown): GrowthStandard => (String(v).toUpperCase() === 'WHO' ? 'WHO' : 'CN');
 
 const DAY_MS = 86_400_000;
 export const MONTH_DAYS = 30.4375;
@@ -24,7 +33,8 @@ function agesOf(metric: GrowthMetric, sex: GrowthSex): number[] {
 export const maxAgeMonths = (metric: GrowthMetric) => agesOf(metric, 'MALE').at(-1)!;
 
 /** 某个（可以带小数的）月龄上的 P3..P97，相邻两个标准月龄之间线性插值；超出标准范围返回 null */
-export function standardRow(metric: GrowthMetric, sex: GrowthSex, ageMonths: number): number[] | null {
+export function standardRow(metric: GrowthMetric, sex: GrowthSex, ageMonths: number, standard: GrowthStandard = 'CN'): number[] | null {
+  if (standard === 'WHO') return whoRow(metric, sex, ageMonths);
   const ages = agesOf(metric, sex);
   if (ageMonths < 0 || ageMonths > ages.at(-1)!) return null;
   const table = WS423[metric][sex];
@@ -38,6 +48,18 @@ export function standardRow(metric: GrowthMetric, sex: GrowthSex, ageMonths: num
     }
   }
   return table[lo];
+}
+
+/** WHO 按日表：按天数线性插值；超过 91 天（约 3 个月）没有数据 */
+function whoRow(metric: GrowthMetric, sex: GrowthSex, ageMonths: number): number[] | null {
+  const days = ageMonths * MONTH_DAYS;
+  if (days < 0 || days > WHO_MAX_DAYS + 1) return null;
+  const t = WHO_DAILY[metric][sex];
+  const d = Math.min(days, WHO_MAX_DAYS);
+  const lo = Math.floor(d);
+  const hi = Math.min(lo + 1, WHO_MAX_DAYS);
+  const f = d - lo;
+  return t[lo].map((v, i) => Math.round((v + (t[hi][i] - v) * f) * 1000) / 1000);
 }
 
 export type Rating = '上' | '中上' | '中' | '中下' | '下';
