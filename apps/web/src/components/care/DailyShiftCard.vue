@@ -46,9 +46,7 @@ const emit = defineEmits<{ toggle: []; 'update:values': [value: Record<string, u
   gap: 12px;
 }
 .sc-box {
-  padding: 8px 10px 10px;
-  border: 1px solid #dcdcdc;
-  border-radius: 12px;
+  min-width: 0;
 }
 .sc-t {
   margin-bottom: 4px;
