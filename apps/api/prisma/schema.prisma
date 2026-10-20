@@ -2064,6 +2064,8 @@ model CareDailyBabyRecord {
   documentId        String?  @map("document_id")
   ageDays           Int?     @map("age_days") // 出生天数
   weightKg          Float?   @map("weight_kg") // 宝宝体重
+  lengthCm          Float?   @map("length_cm") // 宝宝身长（选填，进生长曲线）
+  headCm            Float?   @map("head_cm") // 宝宝头围（选填，进生长曲线）
   tempMorning       Float?   @map("temp_morning") // 体温(早)
   tempEvening       Float?   @map("temp_evening") // 体温(晚)
   eye               Json?    @map("eye") // 眼

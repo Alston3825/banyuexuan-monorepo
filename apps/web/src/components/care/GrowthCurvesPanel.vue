@@ -162,7 +162,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
 
       <template v-else>
         <n-alert type="info" :show-icon="false" style="margin-bottom: 10px">
-          对比标准：{{ report.source }}（可在上方切换国家卫健委 / WHO 两套标准，曲线最多展示到第 3 个月）。日常护理记录里记的体重会自动画到曲线上并实时更新；身长、头围请点上面“记录一次测量”。{{ report.baby.preterm ? '该宝宝是早产儿，月龄按矫正月龄计算。' : '' }}
+          对比标准：{{ report.source }}（可在上方切换国家卫健委 / WHO 两套标准，曲线最多展示到第 3 个月）。日常护理记录里填的宝宝体重、身长、头围会自动画到曲线上并实时更新；也可以点上面“记录一次测量”单独补录。{{ report.baby.preterm ? '该宝宝是早产儿，月龄按矫正月龄计算。' : '' }}
         </n-alert>
 
         <div v-if="report.latest.length > 0" class="gc-latest">

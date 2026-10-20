@@ -124,4 +124,19 @@ describe('P8 宝宝生长曲线 (e2e)', () => {
     const pw = (await request(server).get(`/api/v1/public/growth/${link.token}?standard=who`).expect(200)).body as Json;
     expect(pw.standard).toBe('WHO');
   });
+  it('6. 日常护理记录里填的宝宝身长、头围也自动进曲线（同一天手工测量优先）', async () => {
+    const d = day(-1);
+    await request(server)
+      .put('/api/v1/care/daily/day')
+      .set(authed())
+      .send({ motherProfileId: motherId, date: d, mother: {}, babies: [{ babyProfileId: babyId, values: { weightKg: 4.1, lengthCm: 52.5, headCm: 36.1 } }] })
+      .expect(200);
+    let r = await get();
+    expect(r.points.length.find((p: Json) => p.date === d)).toMatchObject({ value: 52.5, source: 'DAILY' });
+    expect(r.points.head.find((p: Json) => p.date === d)).toMatchObject({ value: 36.1, source: 'DAILY' });
+    await add({ measuredAt: d, lengthCm: 53 }).expect(201);
+    r = await get();
+    expect(r.points.length.find((p: Json) => p.date === d)).toMatchObject({ value: 53, source: 'GROWTH' });
+    expect(r.points.head.find((p: Json) => p.date === d).source).toBe('DAILY');
+  });
 });

@@ -59,14 +59,19 @@ export class CareGrowthService {
 
     const growth = await this.prisma.babyGrowthRecord.findMany({ where: { tenantId, babyProfileId: babyId }, orderBy: { measuredAt: 'asc' } });
     const daily = await this.prisma.careDailyBabyRecord.findMany({
-      where: { tenantId, babyProfileId: babyId, weightKg: { not: null } },
-      select: { weightKg: true, dailyRecord: { select: { recordDate: true } } },
+      where: { tenantId, babyProfileId: babyId, OR: [{ weightKg: { not: null } }, { lengthCm: { not: null } }, { headCm: { not: null } }] },
+      select: { weightKg: true, lengthCm: true, headCm: true, dailyRecord: { select: { recordDate: true } } },
     });
 
-    // 每个指标、每个日期只保留一个值：手工测量 > 日常护理记录里的体重 > 出生体重
+    // 每个指标、每个日期只保留一个值：手工测量 > 日常护理记录里的体重/身长/头围 > 出生体重
     const raw: Record<GrowthMetric, Map<string, { value: number; source: GrowthPoint['source']; recordId?: string }>> = { weight: new Map(), length: new Map(), head: new Map() };
     if (b.birthWeightGrams && birth) raw.weight.set(ymd(birth), { value: Math.round(b.birthWeightGrams) / 1000, source: 'BIRTH' });
-    for (const d of daily) if (d.weightKg != null) raw.weight.set(ymd(d.dailyRecord.recordDate), { value: d.weightKg, source: 'DAILY' });
+    for (const d of daily) {
+      const k = ymd(d.dailyRecord.recordDate);
+      if (d.weightKg != null) raw.weight.set(k, { value: d.weightKg, source: 'DAILY' });
+      if (d.lengthCm != null) raw.length.set(k, { value: d.lengthCm, source: 'DAILY' });
+      if (d.headCm != null) raw.head.set(k, { value: d.headCm, source: 'DAILY' });
+    }
     for (const g of growth) {
       const k = ymd(g.measuredAt);
       if (g.weightKg != null) raw.weight.set(k, { value: g.weightKg, source: 'GROWTH', recordId: g.id });
