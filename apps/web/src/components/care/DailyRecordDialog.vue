@@ -11,8 +11,7 @@ import type { CareDocument, DailyDay, DailySpecs, ExtractWarning, FeedingEntry }
 import { useAuthStore } from '../../stores/auth'
 import { dialog, message } from '../../utils/discrete-api'
 import CareDocImages from './CareDocImages.vue'
-import FeedingTable from './FeedingTable.vue'
-import SpecForm from './SpecForm.vue'
+import DailyPaperSheet from './DailyPaperSheet.vue'
 import DailySignPanel from './DailySignPanel.vue'
 
 const props = defineProps<{ show: boolean; motherProfileId: string; date: string }>()
@@ -242,7 +241,7 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 
 <template>
   <n-modal :show="show" :mask-closable="false" @update:show="(v) => emit('update:show', v)">
-    <n-card :title="title" style="width: min(1100px, 100vw)" :bordered="false" role="dialog" aria-modal="true" closable @close="close">
+    <n-card :title="title" style="width: min(1280px, 100vw)" :bordered="false" role="dialog" aria-modal="true" closable @close="close">
       <template #header-extra>
         <n-space :size="6">
           <n-tag v-if="day?.roomNo" type="info" size="small" round>房号 {{ day.roomNo }}</n-tag>
@@ -288,23 +287,17 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
             <n-button size="tiny" secondary @click="jump('dr-mother')">🤱 产妇日常护理</n-button>
           </div>
 
-          <section v-for="b in day.babies" :id="`dr-baby-${b.baby.id}`" :key="b.baby.id" class="dr-sec">
-            <div class="dr-sectitle">👶 新生儿日常护理记录<small>{{ babyLabel(b.baby.id) }}</small></div>
-            <SpecForm v-model="babyStates[b.baby.id].values" :spec="{ groups: specs.baby }" :warnings="aiBabyId === b.baby.id ? warnings : []" />
-            <h4 class="dr-h">24 小时宝宝喂养记录单</h4>
-            <FeedingTable
-              v-model="babyStates[b.baby.id].feedings"
-              :columns="specs.feeding"
-              :warnings="aiBabyId === b.baby.id ? warnings : []"
-              :default-nurse="nurse"
-              :active-medications="b.activeMedications"
-            />
-          </section>
-
-          <section id="dr-mother" class="dr-sec">
-            <div class="dr-sectitle">🤱 产妇日常护理</div>
-            <SpecForm v-model="motherValues" :spec="{ groups: specs.mother }" :warnings="warnings" />
-          </section>
+          <DailyPaperSheet
+            v-model:baby-states="babyStates"
+            v-model:mother-values="motherValues"
+            :specs="specs"
+            :day="day"
+            :date="date"
+            :nurse="nurse"
+            :warnings="warnings"
+            :ai-baby-id="aiBabyId"
+            :baby-label="babyLabel"
+          />
         </div>
 
         <!-- 护理师签字 + 客户确认：记录保存后才出现；记录一保存（版本号变了）就重新载入，签字是否过期立刻可见 -->

@@ -60,6 +60,7 @@ export class CareDailyService {
     const m = await this.prisma.motherProfile.findFirst({
       where: { id, tenantId: this.ctx.tenantId },
       include: {
+        customer: { select: { name: true } },
         babies: { orderBy: { sequenceNo: 'asc' } },
         occupancy: { select: { plannedCheckIn: true, plannedCheckOut: true, actualCheckInAt: true, actualCheckOutAt: true, room: { select: { roomNo: true } } } },
       },
@@ -146,6 +147,7 @@ export class CareDailyService {
       motherProfileId,
       date,
       roomNo: m.occupancy?.room?.roomNo ?? null,
+      motherName: m.customer?.name ?? null,
       defaults: { stayDay },
       record: record ? { ...record, babies: undefined } : null,
       babies: m.babies.map((b) => {

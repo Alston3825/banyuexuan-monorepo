@@ -164,6 +164,7 @@ export interface DailyDay {
   motherProfileId: string
   date: string
   roomNo: string | null
+  motherName: string | null
   defaults: { stayDay: number }
   record: ({ id: string; version: number; stayDay: number | null; documentId: string | null } & Record<string, unknown>) | null
   babies: {
