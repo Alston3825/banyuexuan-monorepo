@@ -50,6 +50,8 @@ export default defineConfig({
     }),
   ],
   server: {
+    // 同时监听 IPv4 和 IPv6：只监听 ::1 时，浏览器/代理按 127.0.0.1 访问就会“无法访问此网站”
+    host: true,
     proxy: {
       // 后端目前没有开 CORS，开发环境用 Vite 代理让浏览器视角是同源请求，
       // 绕开 CORS；生产部署如果前后端分属不同源，需要后端加 app.enableCors(...)。
