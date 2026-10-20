@@ -314,16 +314,21 @@ async def extract_care_form(
         obj["_model"] = model
         return obj
 
-    results = await asyncio.gather(*[one(s) for s in READ_SIZES], return_exceptions=True)
+    # 整页读图（两种清晰度）和“体征行逐词判断”同时发出，总耗时 = 最慢的那一个，而不是相加
+    async def signs_task() -> Tuple[Dict[str, List[str]], List[str]]:
+        try:
+            return await _read_sign_rows(vision, [p.jpeg for p in pages], fields)
+        except ModelProviderError:
+            return {}, []
+
+    gathered = await asyncio.gather(signs_task(), *[one(s) for s in READ_SIZES], return_exceptions=True)
+    signs, sign_differ = gathered[0] if isinstance(gathered[0], tuple) else ({}, [])
+    results = list(gathered[1:])
     reads = [r for r in results if isinstance(r, dict)]
     if not reads:
         err = next((r for r in results if isinstance(r, Exception)), None)
         raise ModelProviderError("识别失败：%s" % (err or "未知错误"))
     data, warnings = merge_reads(fields, reads)
-    try:
-        signs, sign_differ = await _read_sign_rows(vision, [p.jpeg for p in pages], fields)
-    except ModelProviderError:
-        signs, sign_differ = {}, []
     labels = {f["key"]: f["label"] for f in fields}
     for k, v in signs.items():
         data[k] = v
