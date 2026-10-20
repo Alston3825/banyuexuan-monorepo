@@ -39,6 +39,8 @@ const flat = (groups: { fields: FieldSpec[] }[]) => {
 }
 const bf = computed(() => flat(props.specs.baby))
 const mf = computed(() => flat(props.specs.mother))
+// 黄疸三个部位在这一行里只显示“前额/眼角/前胸”（前面已有“黄疸”标题）
+const jf = (key: string, label: string): FieldSpec => ({ ...bf.value[key], label })
 
 const warnMap = computed(() => {
   const m: Record<string, string> = {}
@@ -50,7 +52,6 @@ const warnFor = (babyId: string, key: string) => (props.aiBabyId === babyId ? wa
 function setBaby(id: string, patch: Partial<BabyState>) {
   emit('update:babyStates', { ...props.babyStates, [id]: { ...props.babyStates[id], ...patch } })
 }
-const setValues = (id: string) => (v: Record<string, unknown>) => setBaby(id, { values: v })
 const setMother = (v: Record<string, unknown>) => emit('update:motherValues', v)
 
 // ---------- 折叠状态（只在手机上起作用） ----------
@@ -130,29 +131,29 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
       <div class="ps-row1">
         <SheetSection title="基本与体温" :summary="basicSummary(b.baby.id)" :state="stateOf(countFilled(babyStates[b.baby.id].values, BASIC_KEYS))" :open="isOpen(`${b.baby.id}:basic`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:basic`)">
           <div class="ps-line">
-            <PaperField :field="bf.ageDays" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'ageDays')" width="44px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.weightG" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'weightG')" width="62px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.lengthCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'lengthCm')" width="52px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.headCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'headCm')" width="52px" @update:model-value="setValues(b.baby.id)" />
+            <PaperField :field="bf.ageDays" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'ageDays')" width="44px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="bf.weightG" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'weightG')" width="62px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="bf.lengthCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'lengthCm')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="bf.headCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'headCm')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
           </div>
           <div class="ps-line">
-            <PaperField :field="bf.tempMorning" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'tempMorning')" width="52px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.tempEvening" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'tempEvening')" width="52px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.healthAssessment" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'healthAssessment')" width="150px" @update:model-value="setValues(b.baby.id)" />
+            <PaperField :field="bf.tempMorning" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'tempMorning')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="bf.tempEvening" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'tempEvening')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="bf.healthAssessment" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'healthAssessment')" width="150px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
           </div>
-          <div class="ps-line">
-            <span class="ps-k">黄疸</span>
-            <PaperField :field="bf.jaundiceForehead" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceForehead')" width="40px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.jaundiceCanthus" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceCanthus')" width="40px" @update:model-value="setValues(b.baby.id)" />
-            <PaperField :field="bf.jaundiceChest" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceChest')" width="40px" @update:model-value="setValues(b.baby.id)" />
-            <span class="ps-sub">前额·眼角·前胸，平均 {{ avg(b.baby.id) }}</span>
+          <div class="ps-jaun">
+            <span class="ps-jt">黄疸</span>
+            <PaperField :field="jf('jaundiceForehead', '前额')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceForehead')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="jf('jaundiceCanthus', '眼角')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceCanthus')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <PaperField :field="jf('jaundiceChest', '前胸')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceChest')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
+            <span class="ps-javg">平均 {{ avg(b.baby.id) }}</span>
           </div>
         </SheetSection>
 
         <SheetSection title="体征" :summary="signSummary(b.baby.id)" state="done" :open="isOpen(`${b.baby.id}:signs`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:signs`)">
           <div class="ps-signtop"><button type="button" class="ps-btn" @click="allNormal(b.baby.id)">全部无异常</button><span class="ps-sub">不勾 = 无异常；有异常的点一下选中</span></div>
           <div class="ps-signgrid">
-            <PaperField v-for="k in SIGN_KEYS" :key="k" part :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="setValues(b.baby.id)" />
+            <PaperField v-for="k in SIGN_KEYS" :key="k" part :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
           </div>
         </SheetSection>
       </div>
@@ -176,7 +177,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
           :active-medications="b.activeMedications"
           @update:model-value="(v) => setBaby(b.baby.id, { feedings: v })"
         />
-        <div class="ps-plan"><PaperField :field="bf.babyPlan" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyPlan')" :rows="2" @update:model-value="setValues(b.baby.id)" /></div>
+        <div class="ps-plan"><PaperField :field="bf.babyPlan" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyPlan')" :rows="2" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
       </SheetSection>
 
       <!-- 手机上班次总结跟在宝宝后面 -->
@@ -191,7 +192,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
         :values="babyStates[b.baby.id].values"
         :warn="(k) => warnFor(b.baby.id, k)"
         @toggle="toggle(`${b.baby.id}:shift`)"
-        @update:values="setValues(b.baby.id)"
+        @update:values="(v) => setBaby(b.baby.id, { values: v })"
       />
     </div>
 
@@ -251,7 +252,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
         :fields="bf"
         :values="babyStates[b.baby.id].values"
         :warn="(k) => warnFor(b.baby.id, k)"
-        @update:values="setValues(b.baby.id)"
+        @update:values="(v) => setBaby(b.baby.id, { values: v })"
       />
     </template>
   </div>
@@ -304,6 +305,23 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   align-items: center;
   gap: 2px 10px;
   margin-bottom: 4px;
+}
+.ps-jaun {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+}
+.ps-jt {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+}
+.ps-javg {
+  margin-left: 4px;
+  color: #185fa5;
+  font-size: 16px;
+  font-weight: 700;
 }
 .ps-k {
   font-size: 13px;
