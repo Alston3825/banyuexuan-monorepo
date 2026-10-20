@@ -268,7 +268,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-row1 {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
   gap: 10px;
   align-items: stretch;
 }
@@ -329,7 +329,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-signgrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px 14px;
 }
 .ps-plan {
@@ -378,6 +378,9 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 @media (max-width: 1099px) {
   .ps-row1 {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .ps-signgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .ps-mgrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
