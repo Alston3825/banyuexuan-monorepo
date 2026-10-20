@@ -122,12 +122,11 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   <div class="ps" :class="{ 'ps-narrow': narrow }">
     <div class="ps-info">房号 <b>{{ day.roomNo ?? '-' }}</b> · 妈妈 <b>{{ day.motherName ?? '-' }}</b> · 入住第 <b>{{ stay }}</b> 天 · {{ dateText }}</div>
 
-    <div class="ps-grid">
-      <!-- ============ 左栏：宝宝 ============ -->
-      <div class="ps-col">
-        <div v-for="b in day.babies" :id="`dr-baby-${b.baby.id}`" :key="b.baby.id" class="ps-baby">
-          <div class="ps-babytitle">👶 {{ babyLabel(b.baby.id) }}</div>
-
+    <!-- ============ 每个宝宝一块：左 = 基本与体温 + 喂养记录；右 = 体征 + 班次总结（两栏等高、上下对齐） ============ -->
+    <div v-for="b in day.babies" :id="`dr-baby-${b.baby.id}`" :key="b.baby.id" class="ps-baby">
+      <div class="ps-babytitle">👶 {{ babyLabel(b.baby.id) }}</div>
+      <div class="ps-grid">
+        <div class="ps-col">
           <SheetSection title="基本与体温" :summary="basicSummary(b.baby.id)" :state="stateOf(countFilled(babyStates[b.baby.id].values, BASIC_KEYS))" :open="isOpen(`${b.baby.id}:basic`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:basic`)">
             <div class="ps-line">
               <PaperField :field="bf.ageDays" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'ageDays')" width="44px" @update:model-value="setValues(b.baby.id)" />
@@ -149,14 +148,15 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             </div>
           </SheetSection>
 
-          <SheetSection title="体征" :summary="signSummary(b.baby.id)" state="done" :open="isOpen(`${b.baby.id}:signs`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:signs`)">
+          <!-- 手机上体征跟在基本信息后面；电脑端放右栏 -->
+          <SheetSection v-if="narrow" title="体征" :summary="signSummary(b.baby.id)" state="done" :open="isOpen(`${b.baby.id}:signs`)" :collapsible="true" @toggle="toggle(`${b.baby.id}:signs`)">
             <div class="ps-signtop"><button type="button" class="ps-btn" @click="allNormal(b.baby.id)">全部无异常</button><span class="ps-sub">不勾 = 无异常；有异常的点一下选中</span></div>
             <div class="ps-signgrid">
               <PaperField v-for="k in SIGN_KEYS" :key="k" part :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="setValues(b.baby.id)" />
             </div>
           </SheetSection>
 
-          <SheetSection title="24 小时喂养记录" :summary="feedSummary(b.baby.id)" :state="stateOf(babyStates[b.baby.id].feedings.length)" :open="isOpen(`${b.baby.id}:feed`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:feed`)">
+          <SheetSection class="ps-grow" title="24 小时喂养记录" :summary="feedSummary(b.baby.id)" :state="stateOf(babyStates[b.baby.id].feedings.length)" :open="isOpen(`${b.baby.id}:feed`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:feed`)">
             <FeedingTable
               v-if="narrow"
               :model-value="babyStates[b.baby.id].feedings"
@@ -178,7 +178,6 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             <div class="ps-plan"><PaperField :field="bf.babyPlan" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyPlan')" :rows="2" @update:model-value="setValues(b.baby.id)" /></div>
           </SheetSection>
 
-          <!-- 手机上班次总结跟在宝宝后面；电脑端放右栏 -->
           <SheetSection v-if="narrow" title="班次总结与签字" :summary="`已填 ${countFilled(babyStates[b.baby.id].values, SHIFT_KEYS)}/${SHIFT_KEYS.length}`" :state="stateOf(countFilled(babyStates[b.baby.id].values, SHIFT_KEYS))" :open="isOpen(`${b.baby.id}:shift`)" :collapsible="true" @toggle="toggle(`${b.baby.id}:shift`)">
             <div class="ps-cap">白班护理总结</div>
             <PaperField :field="bf.dayShiftSummary" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'dayShiftSummary')" :rows="4" @update:model-value="setValues(b.baby.id)" />
@@ -191,35 +190,65 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             <div class="ps-line"><PaperField :field="bf.nightNurseName" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'nightNurseName')" width="90px" @update:model-value="setValues(b.baby.id)" /></div>
           </SheetSection>
         </div>
-      </div>
 
-      <!-- ============ 右栏（电脑端）：班次总结 + 产妇 ============ -->
-      <div class="ps-col">
-        <template v-if="!narrow">
-          <SheetSection v-for="b in day.babies" :key="`sh-${b.baby.id}`" :title="`班次总结与签字${day.babies.length > 1 ? '：' + babyLabel(b.baby.id) : ''}`" :summary="`已填 ${countFilled(babyStates[b.baby.id].values, SHIFT_KEYS)}/${SHIFT_KEYS.length}`" :state="stateOf(countFilled(babyStates[b.baby.id].values, SHIFT_KEYS))" :open="true" :collapsible="false">
-            <div class="ps-cap">白班护理总结</div>
-            <PaperField :field="bf.dayShiftSummary" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'dayShiftSummary')" :rows="3" @update:model-value="setValues(b.baby.id)" />
-            <div class="ps-line">
-              <PaperField :field="bf.dayNurseName" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'dayNurseName')" width="80px" @update:model-value="setValues(b.baby.id)" />
-              <PaperField :field="bf.babyClientSigner" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyClientSigner')" width="80px" @update:model-value="setValues(b.baby.id)" />
+        <!-- 右栏（电脑端）：体征 + 班次总结 -->
+        <div v-if="!narrow" class="ps-col">
+          <SheetSection title="体征" :summary="signSummary(b.baby.id)" state="done" :open="true" :collapsible="false">
+            <div class="ps-signtop"><button type="button" class="ps-btn" @click="allNormal(b.baby.id)">全部无异常</button><span class="ps-sub">不勾 = 无异常；有异常的点一下选中</span></div>
+            <div class="ps-signgrid">
+              <PaperField v-for="k in SIGN_KEYS" :key="k" part :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="setValues(b.baby.id)" />
             </div>
-            <div class="ps-cap">夜班护理总结</div>
-            <PaperField :field="bf.nightShiftSummary" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'nightShiftSummary')" :rows="3" @update:model-value="setValues(b.baby.id)" />
-            <div class="ps-line"><PaperField :field="bf.nightNurseName" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'nightNurseName')" width="80px" @update:model-value="setValues(b.baby.id)" /></div>
           </SheetSection>
-        </template>
+          <SheetSection class="ps-grow" title="班次总结与签字" :summary="`已填 ${countFilled(babyStates[b.baby.id].values, SHIFT_KEYS)}/${SHIFT_KEYS.length}`" :state="stateOf(countFilled(babyStates[b.baby.id].values, SHIFT_KEYS))" :open="true" :collapsible="false">
+            <div class="ps-shifts">
+              <div>
+                <div class="ps-cap">白班护理总结</div>
+                <PaperField :field="bf.dayShiftSummary" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'dayShiftSummary')" :rows="3" @update:model-value="setValues(b.baby.id)" />
+                <div class="ps-line">
+                  <PaperField :field="bf.dayNurseName" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'dayNurseName')" width="80px" @update:model-value="setValues(b.baby.id)" />
+                  <PaperField :field="bf.babyClientSigner" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyClientSigner')" width="80px" @update:model-value="setValues(b.baby.id)" />
+                </div>
+              </div>
+              <div>
+                <div class="ps-cap">夜班护理总结</div>
+                <PaperField :field="bf.nightShiftSummary" no-label :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'nightShiftSummary')" :rows="3" @update:model-value="setValues(b.baby.id)" />
+                <div class="ps-line"><PaperField :field="bf.nightNurseName" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'nightNurseName')" width="80px" @update:model-value="setValues(b.baby.id)" /></div>
+              </div>
+            </div>
+          </SheetSection>
+        </div>
+      </div>
+    </div>
 
-        <div id="dr-mother">
-          <SheetSection title="🤱 产妇日常护理" :summary="motherSummary" :state="stateOf(motherFilled)" :open="isOpen('mother')" :collapsible="narrow" @toggle="toggle('mother')">
+    <!-- ============ 产妇日常护理：整行铺开，电脑端分三列 ============ -->
+    <div id="dr-mother" class="ps-mother">
+      <SheetSection title="🤱 产妇日常护理" :summary="motherSummary" :state="stateOf(motherFilled)" :open="isOpen('mother')" :collapsible="narrow" @toggle="toggle('mother')">
+        <div class="ps-mgrid">
+          <div class="ps-mg">
             <div class="ps-gh">乳房</div>
             <PaperField part :field="mf.breast" :model-value="motherValues" :warn="warnMap.breast" @update:model-value="setMother" />
             <PaperField part :field="mf.breastBody" :model-value="motherValues" :warn="warnMap.breastBody" @update:model-value="setMother" />
             <PaperField part :field="mf.milk" :model-value="motherValues" :warn="warnMap.milk" @update:model-value="setMother" />
-
+            <div class="ps-gh">体温血压</div>
+            <div class="ps-line">
+              <PaperField :field="mf.motherTemperature" :model-value="motherValues" :warn="warnMap.motherTemperature" width="48px" @update:model-value="setMother" />
+              <PaperField :field="mf.motherPulse" :model-value="motherValues" :warn="warnMap.motherPulse" width="48px" @update:model-value="setMother" />
+              <PaperField :field="mf.motherBpSystolic" :model-value="motherValues" :warn="warnMap.motherBpSystolic" width="48px" @update:model-value="setMother" />
+              <PaperField :field="mf.motherBpDiastolic" :model-value="motherValues" :warn="warnMap.motherBpDiastolic" width="48px" @update:model-value="setMother" />
+            </div>
+          </div>
+          <div class="ps-mg">
             <div class="ps-gh">伤口</div>
             <PaperField part :field="mf.woundCesarean" :model-value="motherValues" :warn="warnMap.woundCesarean" @update:model-value="setMother" />
             <PaperField part :field="mf.woundVaginal" :model-value="motherValues" :warn="warnMap.woundVaginal" @update:model-value="setMother" />
-
+            <div class="ps-gh">护理计划与签字</div>
+            <PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" />
+            <div class="ps-line">
+              <PaperField :field="mf.motherNurseName" :model-value="motherValues" :warn="warnMap.motherNurseName" width="80px" @update:model-value="setMother" />
+              <PaperField :field="mf.motherClientSigner" :model-value="motherValues" :warn="warnMap.motherClientSigner" width="80px" @update:model-value="setMother" />
+            </div>
+          </div>
+          <div class="ps-mg">
             <div class="ps-gh">恶露与二便</div>
             <PaperField part :field="mf.lochiaStatus" :model-value="motherValues" :warn="warnMap.lochiaStatus" @update:model-value="setMother" />
             <PaperField part :field="mf.lochiaColor" :model-value="motherValues" :warn="warnMap.lochiaColor" @update:model-value="setMother" />
@@ -229,24 +258,9 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
               <PaperField :field="mf.bowel" :model-value="motherValues" :warn="warnMap.bowel" width="70px" @update:model-value="setMother" />
               <PaperField :field="mf.urine" :model-value="motherValues" :warn="warnMap.urine" width="70px" @update:model-value="setMother" />
             </div>
-
-            <div class="ps-gh">体温血压</div>
-            <div class="ps-line">
-              <PaperField :field="mf.motherTemperature" :model-value="motherValues" :warn="warnMap.motherTemperature" width="48px" @update:model-value="setMother" />
-              <PaperField :field="mf.motherPulse" :model-value="motherValues" :warn="warnMap.motherPulse" width="48px" @update:model-value="setMother" />
-              <PaperField :field="mf.motherBpSystolic" :model-value="motherValues" :warn="warnMap.motherBpSystolic" width="48px" @update:model-value="setMother" />
-              <PaperField :field="mf.motherBpDiastolic" :model-value="motherValues" :warn="warnMap.motherBpDiastolic" width="48px" @update:model-value="setMother" />
-            </div>
-
-            <div class="ps-gh">护理计划与签字</div>
-            <PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" />
-            <div class="ps-line">
-              <PaperField :field="mf.motherNurseName" :model-value="motherValues" :warn="warnMap.motherNurseName" width="80px" @update:model-value="setMother" />
-              <PaperField :field="mf.motherClientSigner" :model-value="motherValues" :warn="warnMap.motherClientSigner" width="80px" @update:model-value="setMother" />
-            </div>
-          </SheetSection>
+          </div>
         </div>
-      </div>
+      </SheetSection>
     </div>
   </div>
 </template>
@@ -264,10 +278,35 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   gap: 10px;
-  align-items: start;
-  margin-top: 10px;
+  align-items: stretch;
 }
+/* 两栏等高：每栏是纵向 flex，最后一张卡片撑满，上下边框对齐 */
 .ps-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ps-col > :deep(.ss:last-child),
+.ps-col > :deep(.ps-grow) {
+  flex: 1;
+  margin-bottom: 0;
+}
+.ps-col > :deep(.ss:not(:last-child)) {
+  margin-bottom: 10px;
+}
+.ps-shifts {
+  display: grid;
+  gap: 8px;
+}
+.ps-mother {
+  margin-top: 12px;
+}
+.ps-mgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 18px;
+}
+.ps-mg {
   min-width: 0;
 }
 .ps-babytitle {
@@ -275,8 +314,10 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   font-size: 14px;
   font-weight: 700;
 }
+.ps-baby {
+  margin-top: 10px;
+}
 .ps-baby + .ps-baby {
-  margin-top: 6px;
   padding-top: 8px;
   border-top: 2px dashed #ddd;
 }
@@ -356,9 +397,20 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   min-width: 0;
 }
 
+/* ---------- 中等宽度（平板/小窗口）：两栏放不下喂养表，改上下排 ---------- */
+@media (max-width: 1099px) {
+  .ps-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ps-mgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---------- 手机 ---------- */
 @media (max-width: 767px) {
-  .ps-grid {
+  .ps-grid,
+  .ps-mgrid {
     display: block;
   }
   .ps-signgrid {

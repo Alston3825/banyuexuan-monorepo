@@ -341,10 +341,10 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
           <input ref="fileInput" type="file" multiple accept="image/*,application/pdf,.heic,.heif" style="display: none" @change="onPick" />
           <n-space align="center" :wrap="true">
             <n-select v-if="babyOptions.length > 1" v-model:value="photoBabyId" :options="babyOptions" size="small" style="width: 150px" placeholder="这张纸是哪个宝宝" />
-            <n-button size="small" :loading="uploading" :disabled="extracting || !specs" @click="fileInput?.click()">
+            <n-button type="primary" :loading="uploading" :disabled="extracting || !specs" @click="fileInput?.click()">
               📷 拍整张记录单，AI 一次识别宝宝和妈妈
             </n-button>
-            <n-button v-if="doc && !extracting" size="small" @click="retry">重新识别</n-button>
+            <n-button v-if="doc && !extracting" secondary type="primary" @click="retry">重新识别</n-button>
             <span class="dr-tip">宝宝和妈妈在同一张纸上，拍一次（可多张）就全部预填；不拍照也可以直接在下面填写。</span>
           </n-space>
         </div>
@@ -402,8 +402,13 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 
 <style scoped>
 .dr-bar {
-  padding-bottom: 8px;
-  border-bottom: 1px dashed #e5e5e5;
+  padding: 10px 12px;
+  border: 1px solid #b7e0c8;
+  border-radius: 8px;
+  background: #eaf6ee;
+}
+.dr-bar .dr-tip {
+  color: #4a7c5f;
 }
 .dr-tip {
   color: #999;
