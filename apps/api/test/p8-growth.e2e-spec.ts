@@ -45,45 +45,45 @@ describe('P8 宝宝生长曲线 (e2e)', () => {
     expect(r0.ready).toBe(false);
     expect(r0.notReady).toEqual(expect.arrayContaining(['宝宝性别', '出生日期']));
     await prisma.babyProfile.update({ where: { id: babyId }, data: { gender: 'MALE', birthDate: new Date(`${day(-20)}T00:00:00.000Z`) } });
-    await add({ measuredAt: day(-20), weightKg: 3.5, lengthCm: 51.2, headCm: 34.3 }).expect(201);
+    await add({ measuredAt: day(-20), weightG: 3500, lengthCm: 51.2, headCm: 34.3 }).expect(201);
     const r = await get();
     expect(r.ready).toBe(true);
     expect(r.latest).toHaveLength(3);
     for (const l of r.latest) expect(l).toMatchObject({ rating: '中', pctText: '约第 50 百分位' });
     expect(r.curves.weight.ages.slice(0, 4)).toEqual([0, 1, 2, 3]);
-    expect(r.curves.weight.rows[0]).toEqual([2.8, 3.0, 3.2, 3.5, 3.7, 4.0, 4.2]); // 标准表 A.1 男童 0 月
+    expect(r.curves.weight.rows[0]).toEqual([2800, 3000, 3200, 3500, 3700, 4000, 4200]); // 标准表 A.1 男童 0 月（克）
     expect(r.curves.head.rows[1]).toEqual([34.8, 35.5, 36.2, 37.0, 37.8, 38.5, 39.2]); // 表 A.11 男童 1 月
     expect(r.source).toContain('WS/T 423');
   });
 
   it('2. 之后复测：体重偏低标“下”、偏高标“上”；月龄之间线性插值；日常护理记录里的体重自动并入曲线', async () => {
-    await add({ measuredAt: day(-10), weightKg: 2.5, lengthCm: 50.0 }).expect(201); // 10 天，体重低于 P3
+    await add({ measuredAt: day(-10), weightG: 2500, lengthCm: 50.0 }).expect(201); // 10 天，体重低于 P3
     let r = await get();
     const w = r.points.weight.find((p: Json) => p.date === day(-10));
     expect(w).toMatchObject({ rating: '下', pctText: '低于第 3 百分位', source: 'GROWTH' });
     expect(w.ageMonths).toBeCloseTo(10 / 30.4375, 1);
-    await add({ measuredAt: day(-5), weightKg: 6.5 }).expect(201); // 偏高
+    await add({ measuredAt: day(-5), weightG: 6500 }).expect(201); // 偏高
     r = await get();
     expect(r.points.weight.find((p: Json) => p.date === day(-5))).toMatchObject({ rating: '上' });
 
     // 日常护理记录里记的体重：自动出现在体重曲线上，不用重复录
     const dailyDate = day(-2);
     const rec = await prisma.careDailyRecord.create({ data: { tenantId: (await prisma.motherProfile.findUniqueOrThrow({ where: { id: motherId } })).tenantId, storeId: (await prisma.motherProfile.findUniqueOrThrow({ where: { id: motherId } })).storeId, motherProfileId: motherId, recordDate: new Date(`${dailyDate}T00:00:00.000Z`), createdBy: 'E2E' } });
-    await prisma.careDailyBabyRecord.create({ data: { tenantId: rec.tenantId, storeId: rec.storeId, dailyRecordId: rec.id, babyProfileId: babyId, weightKg: 3.9, createdBy: 'E2E' } });
+    await prisma.careDailyBabyRecord.create({ data: { tenantId: rec.tenantId, storeId: rec.storeId, dailyRecordId: rec.id, babyProfileId: babyId, weightG: 3900, createdBy: 'E2E' } });
     r = await get();
-    expect(r.points.weight.find((p: Json) => p.date === dailyDate)).toMatchObject({ value: 3.9, source: 'DAILY' });
+    expect(r.points.weight.find((p: Json) => p.date === dailyDate)).toMatchObject({ value: 3900, source: 'DAILY' });
     // 同一天手工测量优先于日常记录
-    await add({ measuredAt: dailyDate, weightKg: 4.0 }).expect(201);
+    await add({ measuredAt: dailyDate, weightG: 4000 }).expect(201);
     r = await get();
-    expect(r.points.weight.find((p: Json) => p.date === dailyDate)).toMatchObject({ value: 4.0, source: 'GROWTH' });
+    expect(r.points.weight.find((p: Json) => p.date === dailyDate)).toMatchObject({ value: 4000, source: 'GROWTH' });
   });
 
   it('3. 数值校验：至少填一项、范围合理、不能是未来、不能早于出生日；可删除', async () => {
     await add({ measuredAt: day(-1) }).expect(400);
-    await add({ measuredAt: day(-1), weightKg: 99 }).expect(400);
+    await add({ measuredAt: day(-1), weightG: 99000 }).expect(400);
     await add({ measuredAt: day(-1), lengthCm: 5 }).expect(400);
-    await add({ measuredAt: day(3), weightKg: 4 }).expect(400);
-    await add({ measuredAt: day(-30), weightKg: 3.5 }).expect(400); // 早于出生
+    await add({ measuredAt: day(3), weightG: 4000 }).expect(400);
+    await add({ measuredAt: day(-30), weightG: 3500 }).expect(400); // 早于出生
     const r = await get();
     const one = r.records.find((x: Json) => x.date === day(-5));
     await request(server).delete(`/api/v1/care/growth/records/${one.id}`).set(authed()).expect(204);
@@ -115,11 +115,11 @@ describe('P8 宝宝生长曲线 (e2e)', () => {
     expect(who.standardLabel).toContain('WHO');
     expect(who.curves.weight.ages[0]).toBe(0);
     expect(who.curves.weight.ages.at(-1)).toBe(3);
-    expect(who.curves.weight.rows[0]).toEqual([2.507, 2.758, 3.027, 3.346, 3.687, 4.011, 4.35]); // WHO 男宝体重第 0 天
+    expect(who.curves.weight.rows[0]).toEqual([2507, 2758, 3027, 3346, 3687, 4011, 4350]); // WHO 男宝体重第 0 天
     expect(who.points.weight.some((p: Json) => p.row)).toBe(true);
     // 出生当天 3.5kg：WHO 的 P50 是 3.346，所以评价按 WHO 的行算
     const w0 = who.points.weight.find((p: Json) => p.ageDays === 0);
-    expect(w0.row[3]).toBe(3.346);
+    expect(w0.row[3]).toBe(3346);
     const link = (await request(server).post(`/api/v1/care/growth/baby/${babyId}/share`).set(authed()).expect(201)).body as Json;
     const pw = (await request(server).get(`/api/v1/public/growth/${link.token}?standard=who`).expect(200)).body as Json;
     expect(pw.standard).toBe('WHO');
@@ -129,7 +129,7 @@ describe('P8 宝宝生长曲线 (e2e)', () => {
     await request(server)
       .put('/api/v1/care/daily/day')
       .set(authed())
-      .send({ motherProfileId: motherId, date: d, mother: {}, babies: [{ babyProfileId: babyId, values: { weightKg: 4.1, lengthCm: 52.5, headCm: 36.1 } }] })
+      .send({ motherProfileId: motherId, date: d, mother: {}, babies: [{ babyProfileId: babyId, values: { weightG: 4100, lengthCm: 52.5, headCm: 36.1 } }] })
       .expect(200);
     let r = await get();
     expect(r.points.length.find((p: Json) => p.date === d)).toMatchObject({ value: 52.5, source: 'DAILY' });

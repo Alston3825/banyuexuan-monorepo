@@ -38,7 +38,7 @@ export interface GrowthReport {
   points: Record<GrowthMetric, GrowthPoint[]>
   curves: Record<GrowthMetric, { ages: number[]; rows: number[][] } | null>
   latest: GrowthLatest[]
-  records: { id: string; date: string; weightKg: number | null; lengthCm: number | null; headCm: number | null; measuredByName: string | null; note: string | null }[]
+  records: { id: string; date: string; weightG: number | null; lengthCm: number | null; headCm: number | null; measuredByName: string | null; note: string | null }[]
   /** 当前对比用的标准：CN=国家卫健委 WS/T 423—2022，WHO=世界卫生组织 */
   standard: GrowthStandard
   standardLabel: string

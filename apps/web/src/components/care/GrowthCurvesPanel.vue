@@ -59,20 +59,20 @@ const svg = computed(() => (report.value && report.value.ready ? buildGrowthSvg(
 const hasPoints = computed(() => !!report.value && (['weight', 'length', 'head'] as const).some((m) => report.value!.points[m].length > 0))
 
 // ---- 记录一次测量 ----
-const form = ref<{ date: number; weightKg: number | null; lengthCm: number | null; headCm: number | null; note: string } | null>(null)
+const form = ref<{ date: number; weightG: number | null; lengthCm: number | null; headCm: number | null; note: string } | null>(null)
 const saving = ref(false)
 const ymdOf = (ts: number) => {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-const open = () => (form.value = { date: Date.now(), weightKg: null, lengthCm: null, headCm: null, note: '' })
+const open = () => (form.value = { date: Date.now(), weightG: null, lengthCm: null, headCm: null, note: '' })
 async function save() {
   const f = form.value
   if (!f || !babyId.value) return
-  if (f.weightKg === null && f.lengthCm === null && f.headCm === null) return void message.warning('体重、身长、头围至少填一项')
+  if (f.weightG === null && f.lengthCm === null && f.headCm === null) return void message.warning('体重、身长、头围至少填一项')
   saving.value = true
   try {
-    await careGrowthApi.addRecord({ babyProfileId: babyId.value, measuredAt: ymdOf(f.date), weightKg: f.weightKg, lengthCm: f.lengthCm, headCm: f.headCm, note: f.note || null })
+    await careGrowthApi.addRecord({ babyProfileId: babyId.value, measuredAt: ymdOf(f.date), weightG: f.weightG, lengthCm: f.lengthCm, headCm: f.headCm, note: f.note || null })
     message.success('已记录')
     form.value = null
     await load()
@@ -181,7 +181,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
           <div v-for="r in report.records" :key="r.id" class="gc-rec">
             <div>
               <b>{{ r.date }}</b>
-              <span v-if="r.weightKg != null"> · 体重 {{ r.weightKg }}kg</span>
+              <span v-if="r.weightG != null"> · 体重 {{ r.weightG }}g</span>
               <span v-if="r.lengthCm != null"> · 身长 {{ r.lengthCm }}cm</span>
               <span v-if="r.headCm != null"> · 头围 {{ r.headCm }}cm</span>
               <span class="gc-sub"> {{ r.measuredByName ?? '' }}{{ r.note ? ' · ' + r.note : '' }}</span>
@@ -200,7 +200,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
         <n-space vertical :size="10">
           <div><div class="gc-lab">测量日期</div><n-date-picker v-model:value="form.date" type="date" style="width: 100%" :is-date-disabled="(ts: number) => ts > Date.now()" /></div>
           <div class="gc-two">
-            <div><div class="gc-lab">体重 kg</div><n-input-number v-model:value="form.weightKg" :min="0.5" :max="20" :precision="3" :show-button="false" placeholder="如 3.85" style="width: 100%" /></div>
+            <div><div class="gc-lab">体重 g</div><n-input-number v-model:value="form.weightG" :min="500" :max="20000" :precision="0" :show-button="false" placeholder="如 3850" style="width: 100%" /></div>
             <div><div class="gc-lab">身长 cm</div><n-input-number v-model:value="form.lengthCm" :min="25" :max="120" :precision="1" :show-button="false" placeholder="如 51.5" style="width: 100%" /></div>
             <div><div class="gc-lab">头围 cm</div><n-input-number v-model:value="form.headCm" :min="20" :max="60" :precision="1" :show-button="false" placeholder="如 35.2" style="width: 100%" /></div>
           </div>

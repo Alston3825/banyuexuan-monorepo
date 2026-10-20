@@ -13,7 +13,7 @@ const DAY_MS = 86_400_000;
 export const MONTH_DAYS = 30.4375;
 
 export const METRIC_LABEL: Record<GrowthMetric, { name: string; unit: string }> = {
-  weight: { name: '体重', unit: 'kg' },
+  weight: { name: '体重', unit: 'g' },
   length: { name: '身长', unit: 'cm' },
   head: { name: '头围', unit: 'cm' },
 };

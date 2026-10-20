@@ -133,7 +133,7 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     expect(adm).toMatchObject({ birthWeightG: 3750, jaundiceForehead: 8.3, skin: ['DRY'], babyProfileId: babyId });
     const cleared = (await patch(`/assessments/BABY_ADMISSION/${adm.id}`, { version: 0, values: { skin: [] } }).expect(200)).body;
     expect(cleared.skin).toBeNull();
-    await post('/assessments/BABY_DISCHARGE', { profileId: babyId, values: { dischargeWeightKg: 4.93, admissionWeightKg: 3.79 } }).expect(201);
+    await post('/assessments/BABY_DISCHARGE', { profileId: babyId, values: { dischargeWeightG: 4930, admissionWeightG: 3790 } }).expect(201);
     // 把妈妈档案 id 当宝宝档案 id 传 → 找不到
     await post('/assessments/BABY_ADMISSION', { profileId: motherId, values: {} }).expect(404);
 
@@ -142,7 +142,7 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     expect(ov.motherDischarge).toBeNull();
     expect(ov.babies).toHaveLength(1);
     expect(ov.babies[0].admission.formulaMl).toBe(60);
-    expect(ov.babies[0].discharge.dischargeWeightKg).toBe(4.93);
+    expect(ov.babies[0].discharge.dischargeWeightG).toBe(4930);
   });
 
   it('5. 资料留档：只留档类型上传即归档并可取回原图；已归档的不能删；坏文件被拒绝', async () => {
@@ -364,7 +364,7 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
       babies: [
         {
           babyProfileId: babyDailyId,
-          values: { weightKg: 3.85, tempMorning: 36.2, tempEvening: 36.5, umbilical: ['NOT_FALLEN'], jaundiceForehead: 7.0, babyPlan: '抚触、晒黄疸' },
+          values: { weightG: 3850, tempMorning: 36.2, tempEvening: 36.5, umbilical: ['NOT_FALLEN'], jaundiceForehead: 7.0, babyPlan: '抚触、晒黄疸' },
           feedings: [
             { time: '14:07', formulaMl: 60, urine: 'YES' },
             { time: '2:00', formulaMl: 60, urine: 'YES', stool: 'YES', stoolColor: 'YELLOW', stoolAmount: 'DOT' },
@@ -375,7 +375,7 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     };
     const saved = (await put(body).expect(200)).body;
     expect(saved.record).toMatchObject({ motherPulse: 93, motherBpSystolic: 127, lochiaStatus: 'NOT_CLEAN', version: 0 });
-    expect(saved.babies[0].record).toMatchObject({ weightKg: 3.85, babyPlan: '抚触、晒黄疸' });
+    expect(saved.babies[0].record).toMatchObject({ weightG: 3850, babyPlan: '抚触、晒黄疸' });
     expect(saved.babies[0].feedings.map((f: Json) => f.time)).toEqual(['02:00', '10:27', '14:07']);
     expect(saved.babies[0].summary).toMatchObject({ formulaTotalMl: 200, urineCount: 3, stoolCount: 2, feedCount: 3 });
     // 数据在独立列里，可直接筛选统计
@@ -650,8 +650,8 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     const baby = (await request(server).get(`/api/v1/care/mother-profiles/${mother.id}`).set(authed(adminToken)).expect(200)).body.babies[0].id;
     const put = (date: string, mom: Json, babyVals: Json, feedings: Json[]) =>
       request(server).put('/api/v1/care/daily/day').set(authed(adminToken)).send({ motherProfileId: mother.id, date, mother: mom, babies: [{ babyProfileId: baby, values: babyVals, feedings }] }).expect(200);
-    await put('2026-10-01', { motherTemperature: 36.5, motherBpSystolic: 118, motherBpDiastolic: 76 }, { jaundiceForehead: 8.2, jaundiceChest: 9.1, weightKg: 3.5, tempMorning: 36.4 }, [{ time: '08:00', formulaMl: 60, urine: 'YES' }]);
-    await put('2026-10-02', { motherTemperature: 37.8, motherBpSystolic: 145, motherBpDiastolic: 92 }, { jaundiceForehead: 13.4, jaundiceCanthus: 12.1, weightKg: 3.6, tempMorning: 37.6 }, [
+    await put('2026-10-01', { motherTemperature: 36.5, motherBpSystolic: 118, motherBpDiastolic: 76 }, { jaundiceForehead: 8.2, jaundiceChest: 9.1, weightG: 3500, tempMorning: 36.4 }, [{ time: '08:00', formulaMl: 60, urine: 'YES' }]);
+    await put('2026-10-02', { motherTemperature: 37.8, motherBpSystolic: 145, motherBpDiastolic: 92 }, { jaundiceForehead: 13.4, jaundiceCanthus: 12.1, weightG: 3600, tempMorning: 37.6 }, [
       { time: '08:00', formulaMl: 80, urine: 'YES', stool: 'YES' },
       { time: '12:00', formulaMl: 80, urine: 'YES' },
     ]);
@@ -674,12 +674,12 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     await request(server).get('/api/v1/care/stats/query?metric=BABY_WEIGHT&op=between&value=1').set(authed(staffToken)).expect(400);
 
     // 出所小结
-    await post('/assessments/BABY_DISCHARGE', { profileId: baby, values: { dischargeWeightKg: 4.1, dischargeTips: '回家多排气' } }).expect(201);
+    await post('/assessments/BABY_DISCHARGE', { profileId: baby, values: { dischargeWeightG: 4100, dischargeTips: '回家多排气' } }).expect(201);
     const sum = (await request(server).get(`/api/v1/care/summary/${mother.id}`).set(authed(staffToken)).expect(200)).body;
     expect(sum.customerName).toBe(`E2E统计客户${runTag}`);
     expect(sum.mother.daily).toMatchObject({ recordedDays: 2, maxSystolic: 145 });
     expect(sum.babies[0].daily).toMatchObject({ recordedDays: 2, jaundiceMax: 13.4, avgFormulaMlPerDay: 110 });
-    expect(sum.babies[0].daily.weightTrend.map((w: Json) => w.v)).toEqual([3.5, 3.6]);
-    expect(sum.babies[0].discharge).toMatchObject({ weightKg: 4.1, tips: '回家多排气' });
+    expect(sum.babies[0].daily.weightTrend.map((w: Json) => w.v)).toEqual([3500, 3600]);
+    expect(sum.babies[0].discharge).toMatchObject({ weightG: 4100, tips: '回家多排气' });
   });
 });

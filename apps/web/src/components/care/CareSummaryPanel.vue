@@ -68,13 +68,13 @@ defineExpose({ reload: load })
         <h3 class="cs-h">二、{{ b.label }}（{{ BABY_GENDER_LABEL_MAP[b.gender] ?? b.gender }}，出生 {{ d(b.birthDate) }}）</h3>
         <table class="cs-t">
           <tr><th></th><th>体重</th><th>身长</th><th>头围</th><th>黄疸值(最高)</th></tr>
-          <tr><td>入所</td><td>{{ b.admission?.weightG ? (b.admission.weightG / 1000).toFixed(2) + ' kg' : '-' }}</td><td>{{ n(b.admission?.lengthCm, ' cm') }}</td><td>{{ n(b.admission?.headCm, ' cm') }}</td><td>{{ n(b.admission?.jaundice) }}</td></tr>
-          <tr><td>出所</td><td>{{ n(b.discharge?.weightKg, ' kg') }}</td><td>{{ n(b.discharge?.lengthCm, ' cm') }}</td><td>{{ n(b.discharge?.headCm, ' cm') }}</td><td>{{ n(b.discharge?.jaundice) }}</td></tr>
-          <tr><td>增长</td><td>{{ diff(b.admission?.weightG ? b.admission.weightG / 1000 : null, b.discharge?.weightKg, ' kg') }}</td><td>{{ diff(b.admission?.lengthCm, b.discharge?.lengthCm, ' cm') }}</td><td>{{ diff(b.admission?.headCm, b.discharge?.headCm, ' cm') }}</td><td>—</td></tr>
+          <tr><td>入所</td><td>{{ n(b.admission?.weightG, ' g') }}</td><td>{{ n(b.admission?.lengthCm, ' cm') }}</td><td>{{ n(b.admission?.headCm, ' cm') }}</td><td>{{ n(b.admission?.jaundice) }}</td></tr>
+          <tr><td>出所</td><td>{{ n(b.discharge?.weightG, ' g') }}</td><td>{{ n(b.discharge?.lengthCm, ' cm') }}</td><td>{{ n(b.discharge?.headCm, ' cm') }}</td><td>{{ n(b.discharge?.jaundice) }}</td></tr>
+          <tr><td>增长</td><td>{{ diff(b.admission?.weightG ?? null, b.discharge?.weightG, ' g') }}</td><td>{{ diff(b.admission?.lengthCm, b.discharge?.lengthCm, ' cm') }}</td><td>{{ diff(b.admission?.headCm, b.discharge?.headCm, ' cm') }}</td><td>—</td></tr>
         </table>
         <div class="cs-line"><b>住店日常记录 {{ b.daily.recordedDays }} 天：</b>平均每天奶粉 {{ n(b.daily.avgFormulaMlPerDay, ' ml') }}，小便 {{ n(b.daily.avgUrinePerDay, ' 次') }}，大便 {{ n(b.daily.avgStoolPerDay, ' 次') }}；黄疸最高 {{ n(b.daily.jaundiceMax) }}</div>
         <div class="cs-line"><b>黄疸变化：</b>{{ trend(b.daily.jaundiceTrend) }}</div>
-        <div class="cs-line"><b>体重变化(kg)：</b>{{ trend(b.daily.weightTrend) }}</div>
+        <div class="cs-line"><b>体重变化(g)：</b>{{ trend(b.daily.weightTrend) }}</div>
         <div v-if="b.medications.length" class="cs-line">
           <b>用药委托：</b>
           <span v-for="(m, i) in b.medications" :key="i">{{ d(m.authDate) }}（{{ m.status === 'ACTIVE' ? '有效' : m.status === 'STOPPED' ? '已停药' : '已替换' }}）{{ m.items.join('、') }}{{ m.changeNote ? '，变更：' + m.changeNote : '' }}{{ m.stopNote ? '，停药：' + m.stopNote : '' }}；</span>

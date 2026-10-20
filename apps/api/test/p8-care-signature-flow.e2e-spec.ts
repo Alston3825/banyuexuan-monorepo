@@ -75,7 +75,7 @@ describe('P8 护理档案：电子签名 + 客户每日确认 (e2e)', () => {
           date,
           ...(version !== undefined ? { version } : {}),
           mother: { motherTemperature: value, motherPlan: '会阴擦洗消毒' },
-          babies: [{ babyProfileId: babyId, values: { weightKg: 3.5, dayShiftSummary: '精神好，吃奶好' }, feedings: [{ time: '08:00', formulaMl: 60, urine: 'YES' }] }],
+          babies: [{ babyProfileId: babyId, values: { weightG: 3500, dayShiftSummary: '精神好，吃奶好' }, feedings: [{ time: '08:00', formulaMl: 60, urine: 'YES' }] }],
         })
         .expect(200)
     ).body as Json;

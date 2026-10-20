@@ -8,7 +8,7 @@ import { CareGrowthService } from './care-growth.service';
 class GrowthRecordDto {
   @ApiProperty() @IsString() @IsNotEmpty() babyProfileId: string;
   @ApiProperty({ description: '测量日期 YYYY-MM-DD' }) @IsString() @IsNotEmpty() measuredAt: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsNumber() weightKg?: number | null;
+  @ApiProperty({ required: false }) @IsOptional() @IsNumber() weightG?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() lengthCm?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() headCm?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() note?: string | null;

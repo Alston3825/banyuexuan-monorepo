@@ -81,7 +81,7 @@ const dateText = computed(() => {
         <div class="ps-cell"><span class="ps-k">妈妈姓名</span><b>{{ day.motherName ?? '-' }}</b></div>
         <div class="ps-cell"><span class="ps-k">入住天数</span><b>{{ day.record?.stayDay ?? day.defaults.stayDay }}</b></div>
         <div class="ps-cell"><PaperField :field="bf.ageDays" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'ageDays')" width="44px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
-        <div class="ps-cell"><PaperField :field="bf.weightKg" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'weightKg')" width="58px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
+        <div class="ps-cell"><PaperField :field="bf.weightG" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'weightG')" width="62px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
         <div class="ps-cell"><PaperField :field="bf.lengthCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'lengthCm')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
         <div class="ps-cell"><PaperField :field="bf.headCm" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'headCm')" width="52px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
       </div>

@@ -410,7 +410,7 @@ export interface CareSummary {
     gender: string
     birthDate: string | null
     admission: { weightG: number | null; lengthCm: number | null; headCm: number | null; jaundice: number | null; feeding: string | null } | null
-    discharge: { weightKg: number | null; lengthCm: number | null; headCm: number | null; jaundice: number | null; tips: string | null } | null
+    discharge: { weightG: number | null; lengthCm: number | null; headCm: number | null; jaundice: number | null; tips: string | null } | null
     daily: {
       recordedDays: number
       jaundiceMax: number | null

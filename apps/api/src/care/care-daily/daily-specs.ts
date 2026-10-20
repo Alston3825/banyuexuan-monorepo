@@ -82,7 +82,7 @@ export const DAILY_BABY_FIELDS: GroupSpec[] = [
     title: '基本与体温',
     fields: [
       int('ageDays', '出生天数', { unit: '天', min: 0, max: 200 }),
-      dec('weightKg', '宝宝体重', { unit: 'kg', min: 1, max: 12, aiHint: '单位公斤，如 3.85；写 3850g 要换成 3.85' }),
+      int('weightG', '宝宝体重', { unit: 'g', min: 1000, max: 12000, aiHint: '单位是克，如 4340；纸上写 4340g 填 4340；写成 4.34kg 要换成 4340' }),
       dec('lengthCm', '宝宝身长', { unit: 'cm', min: 25, max: 120, aiHint: '纸质单上多半没有这一项，没写就留空；用于生长曲线' }),
       dec('headCm', '宝宝头围', { unit: 'cm', min: 20, max: 60, aiHint: '纸质单上多半没有这一项，没写就留空；用于生长曲线' }),
       dec('tempMorning', '体温(早)', { unit: '℃', min: 35, max: 40 }),

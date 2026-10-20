@@ -1848,8 +1848,8 @@ model CareBabyDischarge {
   respiration               Int?      @map("respiration") // 呼吸
   admissionLengthCm         Float?    @map("admission_length_cm") // 入所身长
   dischargeLengthCm         Float?    @map("discharge_length_cm") // 出所身长
-  admissionWeightKg         Float?    @map("admission_weight_kg") // 入所体重
-  dischargeWeightKg         Float?    @map("discharge_weight_kg") // 出所体重
+  admissionWeightG          Int?      @map("admission_weight_g") // 入所体重（克）
+  dischargeWeightG          Int?      @map("discharge_weight_g") // 出所体重（克）
   admissionHeadCm           Float?    @map("admission_head_cm") // 入所头围
   dischargeHeadCm           Float?    @map("discharge_head_cm") // 出所头围
   admissionJaundiceForehead Float?    @map("admission_jaundice_forehead") // 入所黄疸-前额
@@ -2063,7 +2063,7 @@ model CareDailyBabyRecord {
   babyProfileId     String   @map("baby_profile_id")
   documentId        String?  @map("document_id")
   ageDays           Int?     @map("age_days") // 出生天数
-  weightKg          Float?   @map("weight_kg") // 宝宝体重
+  weightG           Int?     @map("weight_g") // 宝宝体重（克）
   lengthCm          Float?   @map("length_cm") // 宝宝身长（选填，进生长曲线）
   headCm            Float?   @map("head_cm") // 宝宝头围（选填，进生长曲线）
   tempMorning       Float?   @map("temp_morning") // 体温(早)
@@ -4200,7 +4200,7 @@ model BabyGrowthRecord {
   motherProfileId String   @map("mother_profile_id")
   babyProfileId   String   @map("baby_profile_id")
   measuredAt      DateTime @map("measured_at") @db.Date
-  weightKg        Float?   @map("weight_kg")
+  weightG         Int?     @map("weight_g")  // 体重（克）
   lengthCm        Float?   @map("length_cm")
   headCm          Float?   @map("head_cm")
   measuredByName  String?  @map("measured_by_name")

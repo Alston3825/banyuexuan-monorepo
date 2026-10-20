@@ -17,7 +17,7 @@ export interface Metric {
 
 export const METRICS: Metric[] = [
   { code: 'BABY_JAUNDICE', label: '宝宝黄疸值（前额/眼角/前胸取最高）', subject: 'BABY', unit: '', presets: [{ label: '≥ 12', op: 'gte', value: 12 }, { label: '≥ 15', op: 'gte', value: 15 }] },
-  { code: 'BABY_WEIGHT', label: '宝宝体重', subject: 'BABY', unit: 'kg', presets: [{ label: '< 3', op: 'lt', value: 3 }] },
+  { code: 'BABY_WEIGHT', label: '宝宝体重', subject: 'BABY', unit: 'g', presets: [{ label: '< 3000', op: 'lt', value: 3000 }] },
   { code: 'BABY_TEMP', label: '宝宝体温（早晚取最高）', subject: 'BABY', unit: '℃', presets: [{ label: '≥ 37.5', op: 'gte', value: 37.5 }, { label: '< 36', op: 'lt', value: 36 }] },
   { code: 'BABY_FORMULA_DAY', label: '宝宝当天奶粉总量', subject: 'BABY', unit: 'ml', presets: [{ label: '< 300', op: 'lt', value: 300 }] },
   { code: 'BABY_URINE_DAY', label: '宝宝当天小便次数', subject: 'BABY', unit: '次', presets: [{ label: '< 6', op: 'lt', value: 6 }] },
@@ -81,7 +81,7 @@ export class CareStatsService {
           const sum = (k: 'formulaMl') => b.feedings.reduce((a, f) => a + (f[k] ?? 0), 0);
           const v =
             metric.code === 'BABY_JAUNDICE' ? max(b.jaundiceForehead, b.jaundiceCanthus, b.jaundiceChest)
-            : metric.code === 'BABY_WEIGHT' ? b.weightKg
+            : metric.code === 'BABY_WEIGHT' ? b.weightG
             : metric.code === 'BABY_TEMP' ? max(b.tempMorning, b.tempEvening)
             : b.feedings.length === 0 && metric.code.endsWith('_DAY') ? null
             : metric.code === 'BABY_FORMULA_DAY' ? sum('formulaMl')
@@ -127,7 +127,7 @@ export class CareStatsService {
     const babies = m.babies.map((b) => {
       const days = dailies.map((d) => ({ date: ymd(d.recordDate), rec: d.babies.find((x) => x.babyProfileId === b.id) })).filter((x) => x.rec);
       const jaundice = days.map((x) => ({ date: x.date, v: max(x.rec!.jaundiceForehead, x.rec!.jaundiceCanthus, x.rec!.jaundiceChest) })).filter((x): x is { date: string; v: number } => x.v !== null);
-      const weights = days.map((x) => ({ date: x.date, v: x.rec!.weightKg })).filter((x): x is { date: string; v: number } => typeof x.v === 'number');
+      const weights = days.map((x) => ({ date: x.date, v: x.rec!.weightG })).filter((x): x is { date: string; v: number } => typeof x.v === 'number');
       const formula = days.map((x) => x.rec!.feedings.reduce((a, f) => a + (f.formulaMl ?? 0), 0)).filter((v) => v > 0);
       const urine = days.map((x) => x.rec!.feedings.filter((f) => f.urine === 'YES').length);
       const stool = days.map((x) => x.rec!.feedings.filter((f) => f.stool === 'YES').length);
@@ -140,7 +140,7 @@ export class CareStatsService {
         birthDate: b.birthDate,
         admission: ba ? { weightG: ba.admissionWeightG, lengthCm: ba.admissionLengthCm, headCm: ba.headCircumferenceCm, jaundice: max(ba.jaundiceForehead, ba.jaundiceCanthus, ba.jaundiceChest), feeding: ba.feedingMethod } : null,
         discharge: bd
-          ? { weightKg: bd.dischargeWeightKg, lengthCm: bd.dischargeLengthCm, headCm: bd.dischargeHeadCm, jaundice: max(bd.dischargeJaundiceForehead, bd.dischargeJaundiceCanthus, bd.dischargeJaundiceChest), tips: bd.dischargeTips }
+          ? { weightG: bd.dischargeWeightG, lengthCm: bd.dischargeLengthCm, headCm: bd.dischargeHeadCm, jaundice: max(bd.dischargeJaundiceForehead, bd.dischargeJaundiceCanthus, bd.dischargeJaundiceChest), tips: bd.dischargeTips }
           : null,
         daily: {
           recordedDays: days.length,

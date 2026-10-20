@@ -14,7 +14,7 @@ const SHARE_TTL_DAYS = 90;
 const METRICS: GrowthMetric[] = ['weight', 'length', 'head'];
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 const today = () => new Date(`${new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10)}T00:00:00.000Z`);
-const RANGE: Record<GrowthMetric, [number, number]> = { weight: [0.5, 20], length: [25, 120], head: [20, 60] };
+const RANGE: Record<GrowthMetric, [number, number]> = { weight: [500, 20000], length: [25, 120], head: [20, 60] };
 
 export interface GrowthPoint {
   date: string;
@@ -59,8 +59,8 @@ export class CareGrowthService {
 
     const growth = await this.prisma.babyGrowthRecord.findMany({ where: { tenantId, babyProfileId: babyId }, orderBy: { measuredAt: 'asc' } });
     const daily = await this.prisma.careDailyBabyRecord.findMany({
-      where: { tenantId, babyProfileId: babyId, OR: [{ weightKg: { not: null } }, { lengthCm: { not: null } }, { headCm: { not: null } }] },
-      select: { weightKg: true, lengthCm: true, headCm: true, dailyRecord: { select: { recordDate: true } } },
+      where: { tenantId, babyProfileId: babyId, OR: [{ weightG: { not: null } }, { lengthCm: { not: null } }, { headCm: { not: null } }] },
+      select: { weightG: true, lengthCm: true, headCm: true, dailyRecord: { select: { recordDate: true } } },
     });
 
     // 每个指标、每个日期只保留一个值：手工测量 > 日常护理记录里的体重/身长/头围 > 出生体重
@@ -68,13 +68,13 @@ export class CareGrowthService {
     if (b.birthWeightGrams && birth) raw.weight.set(ymd(birth), { value: Math.round(b.birthWeightGrams) / 1000, source: 'BIRTH' });
     for (const d of daily) {
       const k = ymd(d.dailyRecord.recordDate);
-      if (d.weightKg != null) raw.weight.set(k, { value: d.weightKg, source: 'DAILY' });
+      if (d.weightG != null) raw.weight.set(k, { value: d.weightG / 1000, source: 'DAILY' });
       if (d.lengthCm != null) raw.length.set(k, { value: d.lengthCm, source: 'DAILY' });
       if (d.headCm != null) raw.head.set(k, { value: d.headCm, source: 'DAILY' });
     }
     for (const g of growth) {
       const k = ymd(g.measuredAt);
-      if (g.weightKg != null) raw.weight.set(k, { value: g.weightKg, source: 'GROWTH', recordId: g.id });
+      if (g.weightG != null) raw.weight.set(k, { value: g.weightG / 1000, source: 'GROWTH', recordId: g.id });
       if (g.lengthCm != null) raw.length.set(k, { value: g.lengthCm, source: 'GROWTH', recordId: g.id });
       if (g.headCm != null) raw.head.set(k, { value: g.headCm, source: 'GROWTH', recordId: g.id });
     }
@@ -85,8 +85,12 @@ export class CareGrowthService {
         const at = new Date(`${date}T00:00:00.000Z`);
         const age = birth ? ageInMonths(birth, at, ga) : { months: null, days: 0, corrected: false };
         const row = sex && age.months !== null ? standardRow(m, sex, age.months, standard) : null;
-        const d = row ? describeMetric(m, v.value, row) : null;
-        points[m].push({ date, ageDays: age.days, ageMonths: age.months === null ? null : Math.round(age.months * 100) / 100, value: v.value, source: v.source, recordId: v.recordId, rating: d?.rating ?? null, pctText: d?.pctText ?? null, row });
+        // 体重内部按 kg 对标准（标准表是 kg），对外统一用克
+        const toOut = (x: number) => (m === 'weight' ? Math.round(x * 1000) : x);
+        const outRow = row ? row.map(toOut) : null;
+        const outVal = toOut(v.value);
+        const d = outRow ? describeMetric(m, outVal, outRow) : null;
+        points[m].push({ date, ageDays: age.days, ageMonths: age.months === null ? null : Math.round(age.months * 100) / 100, value: outVal, source: v.source, recordId: v.recordId, rating: d?.rating ?? null, pctText: d?.pctText ?? null, row: outRow });
       }
     }
 
@@ -101,7 +105,7 @@ export class CareGrowthService {
           const r = standardRow(m, sex, a, standard);
           if (r) {
             ages.push(Math.round(a * 1000) / 1000);
-            rows.push(r);
+            rows.push(m === 'weight' ? r.map((x) => Math.round(x * 1000)) : r);
           }
         }
         curves[m] = { ages, rows };
@@ -125,7 +129,7 @@ export class CareGrowthService {
       records: growth
         .slice()
         .reverse()
-        .map((g) => ({ id: g.id, date: ymd(g.measuredAt), weightKg: g.weightKg, lengthCm: g.lengthCm, headCm: g.headCm, measuredByName: g.measuredByName, note: g.note })),
+        .map((g) => ({ id: g.id, date: ymd(g.measuredAt), weightG: g.weightG, lengthCm: g.lengthCm, headCm: g.headCm, measuredByName: g.measuredByName, note: g.note })),
       standard,
       standardLabel: STANDARD_INFO[standard].label,
       source: STANDARD_INFO[standard].source,
@@ -139,13 +143,13 @@ export class CareGrowthService {
     return this.buildReport(babyId, this.ctx.tenantId!, standard);
   }
 
-  async addRecord(dto: { babyProfileId: string; measuredAt: string; weightKg?: number | null; lengthCm?: number | null; headCm?: number | null; note?: string | null }) {
+  async addRecord(dto: { babyProfileId: string; measuredAt: string; weightG?: number | null; lengthCm?: number | null; headCm?: number | null; note?: string | null }) {
     const b = await this.baby(dto.babyProfileId);
     const day = String(dto.measuredAt ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(new Date(day).getTime())) throw new BadRequestException('测量日期格式不正确');
     if (day > ymd(today())) throw new BadRequestException('不能记录未来的日期');
     if (b.birthDate && day < ymd(new Date(b.birthDate.getTime() + 8 * 3600_000))) throw new BadRequestException('测量日期不能早于宝宝出生日期');
-    const vals = { weight: dto.weightKg ?? null, length: dto.lengthCm ?? null, head: dto.headCm ?? null };
+    const vals = { weight: dto.weightG == null ? null : Math.round(dto.weightG),  length: dto.lengthCm ?? null, head: dto.headCm ?? null };
     if (vals.weight === null && vals.length === null && vals.head === null) throw new BadRequestException('体重、身长、头围至少填一项');
     for (const m of METRICS) {
       const v = vals[m];
@@ -159,7 +163,7 @@ export class CareGrowthService {
         motherProfileId: b.motherProfileId,
         babyProfileId: b.id,
         measuredAt: new Date(`${day}T00:00:00.000Z`),
-        weightKg: vals.weight,
+        weightG: vals.weight,
         lengthCm: vals.length,
         headCm: vals.head,
         measuredByName: me?.realName ?? null,
@@ -189,7 +193,7 @@ export class CareGrowthService {
       action: 'DELETE',
       entityType: 'BabyGrowthRecord',
       entityId: id,
-      beforeData: { day: ymd(r.measuredAt), weightKg: r.weightKg, lengthCm: r.lengthCm, headCm: r.headCm },
+      beforeData: { day: ymd(r.measuredAt), weightG: r.weightG, lengthCm: r.lengthCm, headCm: r.headCm },
       tenantId: this.ctx.tenantId,
       storeId: r.storeId,
       accountId: this.ctx.accountId,

@@ -7,7 +7,7 @@ import type { GrowthMetric, GrowthReport } from '../api/types/care-growth'
 const W = 760
 const COLOR = { band: '#e6f0fb', band2: '#c9defa', p50: '#2f6fb5', edge: '#8fb4de', baby: '#e8590c', text: '#333', sub: '#888', grid: '#ececec' }
 const META: Record<GrowthMetric, { name: string; unit: string; pad: number }> = {
-  weight: { name: '体重', unit: 'kg', pad: 0.6 },
+  weight: { name: '体重', unit: 'g', pad: 500 },
   length: { name: '身长', unit: 'cm', pad: 2 },
   head: { name: '头围', unit: 'cm', pad: 1 },
 }
@@ -50,8 +50,10 @@ function panel(report: GrowthReport, m: GrowthMetric, top: number, months: numbe
   const ph = 230
   const maxAge = curve.ages[curve.ages.length - 1]
   const ys = [...curve.rows.map((r) => r[0]), ...curve.rows.map((r) => r[6]), ...pts.map((p) => p.value)]
-  const yMin = Math.floor((Math.min(...ys) - META[m].pad) * 2) / 2
-  const yMax = Math.ceil((Math.max(...ys) + META[m].pad) * 2) / 2
+  // 体重按 500g 取整，身长/头围按 0.5cm 取整，纵轴刻度才不会出现零碎小数
+  const unit = m === 'weight' ? 500 : 0.5
+  const yMin = Math.floor((Math.min(...ys) - META[m].pad) / unit) * unit
+  const yMax = Math.ceil((Math.max(...ys) + META[m].pad) / unit) * unit
   const x = (a: number) => left + (a / maxAge) * pw
   const y = (v: number) => top + 34 + ph - ((v - yMin) / (yMax - yMin)) * ph
   const line = (i: number) => curve.ages.map((a, k) => `${k === 0 ? 'M' : 'L'}${x(a).toFixed(1)},${y(curve.rows[k][i]).toFixed(1)}`).join(' ')
