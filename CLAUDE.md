@@ -26,5 +26,5 @@
 
 ## 测试与环境
 - 后端 e2e：`cd apps/api && npx jest --config test/jest-e2e.json --runInBand --forceExit`，**不要在 `banyuexuan_dev` 上跑**（里面是用户的测试数据）；用独立库（如 `banyuexuan_e2e_s`，跑前重建、`prisma migrate deploy` + seed，密码 `Passw0rd!23`），命令里用 `DATABASE_URL` 覆盖。
-- 前端发版前跑 `cd apps/web && npx vue-tsc -b`（服务器构建用的是这个，比 `--noEmit` 严格）。
+- 前端发版前跑 `cd apps/web && npx vue-tsc -b && npx vite build`（服务器构建用的就是这两步；vue-tsc 查不出模板标签没闭合，必须再跑 vite build，否则线上构建会失败）。
 - 占位/空置/“后面再做”的事项随时记进 `docs/待完善清单.md`。

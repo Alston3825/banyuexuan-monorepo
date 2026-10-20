@@ -220,7 +220,6 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             <div class="ps-gh">护理计划</div>
             <PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" />
           </div>
-          </div>
           <div class="ps-mg">
             <div class="ps-gh">恶露与二便</div>
             <PaperField part :field="mf.lochiaStatus" :model-value="motherValues" :warn="warnMap.lochiaStatus" @update:model-value="setMother" />
