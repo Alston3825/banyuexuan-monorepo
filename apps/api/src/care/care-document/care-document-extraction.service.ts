@@ -74,6 +74,21 @@ export class CareDocumentExtractionService implements OnModuleInit {
     return spec ? { formTitle: spec.title, description: spec.aiDescription, fields: allFields(spec).map(slim) } : null;
   }
 
+  /**
+   * 纸上“男：睾丸…”“女：阴道分泌物…”两套栏目都印着，AI 有时会把另一个性别栏也填上。
+   * 已知宝宝性别时，把另一个性别的栏目（标签以“男/女”开头）的识别结果和提醒去掉。
+   */
+  private async dropOtherSexFields(babyProfileId: string | null, fields: { key: string; label: string }[], result: { data: Record<string, unknown>; warnings: { field: string }[] }): Promise<void> {
+    if (!babyProfileId) return;
+    const baby = await this.prisma.babyProfile.findUnique({ where: { id: babyProfileId }, select: { gender: true } });
+    if (baby?.gender !== 'MALE' && baby?.gender !== 'FEMALE') return;
+    const other = baby.gender === 'MALE' ? '女' : '男';
+    const drop = new Set(fields.filter((f) => f.label.startsWith(other)).map((f) => f.key));
+    if (drop.size === 0) return;
+    for (const k of drop) delete result.data[k];
+    result.warnings = result.warnings.filter((w) => !drop.has(w.field));
+  }
+
   enqueue(documentId: string): void {
     void this.runQueued(documentId);
   }
@@ -105,6 +120,7 @@ export class CareDocumentExtractionService implements OnModuleInit {
 
     const files = await Promise.all(doc.files.map(async (f) => ({ name: f.fileName, data: await this.storage.readBuffer(f.storagePath) })));
     const result = await this.aiGateway.extractCareForm(spec, files);
+    await this.dropOtherSexFields(doc.babyProfileId, spec.fields as { key: string; label: string }[], result);
     await this.prisma.careDocument.update({
       where: { id: documentId },
       data: {
