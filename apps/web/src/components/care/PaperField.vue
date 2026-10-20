@@ -13,6 +13,8 @@ const props = defineProps<{
   warn?: string
   /** 不显示字段名（外面已经有表头了） */
   noLabel?: boolean
+  /** 部位行样式：左边是加粗的“部位”名（固定宽度），右边是可点的描述选项，层次分明（体征用） */
+  part?: boolean
   /** 文本框行数（longtext 用） */
   rows?: number
   width?: string
@@ -47,7 +49,7 @@ const outOfRange = computed(() => {
 </script>
 
 <template>
-  <div class="pf" :class="{ 'pf-warn': showWarn, 'pf-block': field.kind === 'longtext' }" :title="showWarn ? warn : outOfRange ? '超出常见范围，请核对' : ''">
+  <div class="pf" :class="{ 'pf-warn': showWarn, 'pf-block': field.kind === 'longtext', 'pf-part': part }" :title="showWarn ? warn : outOfRange ? '超出常见范围，请核对' : ''">
     <span v-if="!noLabel" class="pf-label">{{ field.label }}<small v-if="field.unit">{{ field.unit }}</small></span>
     <span v-if="field.kind === 'single' || field.kind === 'multi'" class="pf-opts">
       <button v-for="o in field.options" :key="o.value" type="button" class="pf-chip" :class="{ 'pf-on': isOn(o.value) }" @click="pick(o.value)">{{ o.label }}</button>
@@ -99,10 +101,10 @@ const outOfRange = computed(() => {
   gap: 2px 4px;
 }
 .pf-chip {
-  padding: 1px 7px;
-  border: 1px solid transparent;
+  padding: 1px 8px;
+  border: 1px solid #dadada;
   border-radius: 10px;
-  background: transparent;
+  background: #fafafa;
   color: #444;
   font-size: 13px;
   line-height: 20px;
@@ -110,6 +112,29 @@ const outOfRange = computed(() => {
 }
 .pf-chip:hover {
   background: #f0f0f0;
+}
+.pf-part {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 4px;
+}
+.pf-part .pf-label {
+  flex: 0 0 auto;
+  min-width: 52px;
+  max-width: 90px;
+  padding: 2px 6px 2px 0;
+  border-right: 3px solid #cfe0f5;
+  color: #2a64b0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.pf-part .pf-opts {
+  flex: 1;
+  gap: 4px 6px;
 }
 .pf-chip.pf-on {
   border-color: #18a058;

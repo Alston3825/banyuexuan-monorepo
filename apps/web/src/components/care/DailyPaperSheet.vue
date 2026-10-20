@@ -70,7 +70,7 @@ watch(
 const has = (v: unknown) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
 const countFilled = (vals: Record<string, unknown>, keys: string[]) => keys.filter((k) => has(vals[k])).length
 const BASIC_KEYS = ['ageDays', 'weightG', 'lengthCm', 'headCm', 'tempMorning', 'tempEvening']
-const SIGN_KEYS = ['eye', 'nose', 'genitalia', 'mouth', 'umbilical', 'skin']
+const SIGN_KEYS = ['eye', 'mouth', 'nose', 'umbilical', 'genitalia', 'skin']
 const SHIFT_KEYS = ['dayShiftSummary', 'dayNurseName', 'nightShiftSummary', 'nightNurseName', 'babyClientSigner']
 const MOTHER_KEYS = ['breast', 'breastBody', 'milk', 'woundCesarean', 'woundVaginal', 'lochiaStatus', 'lochiaColor', 'lochiaAmount', 'lochiaOdor', 'motherTemperature', 'motherBpSystolic', 'motherBpDiastolic', 'motherPlan', 'motherNurseName']
 
@@ -152,7 +152,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
           <SheetSection title="体征" :summary="signSummary(b.baby.id)" state="done" :open="isOpen(`${b.baby.id}:signs`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:signs`)">
             <div class="ps-signtop"><button type="button" class="ps-btn" @click="allNormal(b.baby.id)">全部无异常</button><span class="ps-sub">不勾 = 无异常；有异常的点一下选中</span></div>
             <div class="ps-signgrid">
-              <PaperField v-for="k in SIGN_KEYS" :key="k" :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="setValues(b.baby.id)" />
+              <PaperField v-for="k in SIGN_KEYS" :key="k" part :field="bf[k]" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, k)" @update:model-value="setValues(b.baby.id)" />
             </div>
           </SheetSection>
 
@@ -211,31 +211,36 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 
         <div id="dr-mother">
           <SheetSection title="🤱 产妇日常护理" :summary="motherSummary" :state="stateOf(motherFilled)" :open="isOpen('mother')" :collapsible="narrow" @toggle="toggle('mother')">
-            <div class="ps-mrow"><span class="ps-side">乳房</span>
-              <PaperField :field="mf.breast" :model-value="motherValues" :warn="warnMap.breast" @update:model-value="setMother" />
-              <PaperField :field="mf.breastBody" :model-value="motherValues" :warn="warnMap.breastBody" @update:model-value="setMother" />
-              <PaperField :field="mf.milk" :model-value="motherValues" :warn="warnMap.milk" @update:model-value="setMother" />
+            <div class="ps-gh">乳房</div>
+            <PaperField part :field="mf.breast" :model-value="motherValues" :warn="warnMap.breast" @update:model-value="setMother" />
+            <PaperField part :field="mf.breastBody" :model-value="motherValues" :warn="warnMap.breastBody" @update:model-value="setMother" />
+            <PaperField part :field="mf.milk" :model-value="motherValues" :warn="warnMap.milk" @update:model-value="setMother" />
+
+            <div class="ps-gh">伤口</div>
+            <PaperField part :field="mf.woundCesarean" :model-value="motherValues" :warn="warnMap.woundCesarean" @update:model-value="setMother" />
+            <PaperField part :field="mf.woundVaginal" :model-value="motherValues" :warn="warnMap.woundVaginal" @update:model-value="setMother" />
+
+            <div class="ps-gh">恶露与二便</div>
+            <PaperField part :field="mf.lochiaStatus" :model-value="motherValues" :warn="warnMap.lochiaStatus" @update:model-value="setMother" />
+            <PaperField part :field="mf.lochiaColor" :model-value="motherValues" :warn="warnMap.lochiaColor" @update:model-value="setMother" />
+            <PaperField part :field="mf.lochiaAmount" :model-value="motherValues" :warn="warnMap.lochiaAmount" @update:model-value="setMother" />
+            <PaperField part :field="mf.lochiaOdor" :model-value="motherValues" :warn="warnMap.lochiaOdor" @update:model-value="setMother" />
+            <div class="ps-line">
+              <PaperField :field="mf.bowel" :model-value="motherValues" :warn="warnMap.bowel" width="70px" @update:model-value="setMother" />
+              <PaperField :field="mf.urine" :model-value="motherValues" :warn="warnMap.urine" width="70px" @update:model-value="setMother" />
             </div>
-            <div class="ps-mrow"><span class="ps-side">伤口</span>
-              <PaperField :field="mf.woundCesarean" :model-value="motherValues" :warn="warnMap.woundCesarean" @update:model-value="setMother" />
-              <PaperField :field="mf.woundVaginal" :model-value="motherValues" :warn="warnMap.woundVaginal" @update:model-value="setMother" />
-            </div>
-            <div class="ps-mrow"><span class="ps-side">恶露</span>
-              <PaperField :field="mf.lochiaStatus" :model-value="motherValues" :warn="warnMap.lochiaStatus" @update:model-value="setMother" />
-              <PaperField :field="mf.lochiaColor" :model-value="motherValues" :warn="warnMap.lochiaColor" @update:model-value="setMother" />
-              <PaperField :field="mf.lochiaAmount" :model-value="motherValues" :warn="warnMap.lochiaAmount" @update:model-value="setMother" />
-              <PaperField :field="mf.lochiaOdor" :model-value="motherValues" :warn="warnMap.lochiaOdor" @update:model-value="setMother" />
-              <PaperField :field="mf.bowel" :model-value="motherValues" :warn="warnMap.bowel" width="60px" @update:model-value="setMother" />
-              <PaperField :field="mf.urine" :model-value="motherValues" :warn="warnMap.urine" width="60px" @update:model-value="setMother" />
-            </div>
-            <div class="ps-mrow"><span class="ps-side">体征</span>
+
+            <div class="ps-gh">体温血压</div>
+            <div class="ps-line">
               <PaperField :field="mf.motherTemperature" :model-value="motherValues" :warn="warnMap.motherTemperature" width="48px" @update:model-value="setMother" />
               <PaperField :field="mf.motherPulse" :model-value="motherValues" :warn="warnMap.motherPulse" width="48px" @update:model-value="setMother" />
               <PaperField :field="mf.motherBpSystolic" :model-value="motherValues" :warn="warnMap.motherBpSystolic" width="48px" @update:model-value="setMother" />
               <PaperField :field="mf.motherBpDiastolic" :model-value="motherValues" :warn="warnMap.motherBpDiastolic" width="48px" @update:model-value="setMother" />
             </div>
-            <div class="ps-mrow"><span class="ps-side">计划</span>
-              <div class="ps-grow"><PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" /></div>
+
+            <div class="ps-gh">护理计划与签字</div>
+            <PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" />
+            <div class="ps-line">
               <PaperField :field="mf.motherNurseName" :model-value="motherValues" :warn="warnMap.motherNurseName" width="80px" @update:model-value="setMother" />
               <PaperField :field="mf.motherClientSigner" :model-value="motherValues" :warn="warnMap.motherClientSigner" width="80px" @update:model-value="setMother" />
             </div>
@@ -307,7 +312,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 .ps-signgrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 8px;
+  gap: 2px 14px;
 }
 .ps-plan {
   margin-top: 6px;
@@ -316,6 +321,18 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   margin: 4px 0 3px;
   font-size: 13px;
   font-weight: 700;
+}
+.ps-gh {
+  margin: 8px 0 2px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eef3fa;
+  color: #2a64b0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ps-gh:first-child {
+  margin-top: 0;
 }
 .ps-mrow {
   display: flex;
