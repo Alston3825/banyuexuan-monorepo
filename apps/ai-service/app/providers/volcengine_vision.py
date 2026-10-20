@@ -26,6 +26,8 @@ class ArkVision:
         self._model = model
         self._video_model = video_model or model
         self._timeout = timeout
+        # 读图是“照着抄”的活，不需要深度思考；默认关掉思考，速度快很多。设为 None 则用模型默认
+        self._thinking: Optional[str] = "disabled"
 
     async def read_images(self, images: List[bytes], prompt: str, max_tokens: int = 2000) -> Tuple[str, str]:
         content = [
@@ -43,6 +45,8 @@ class ArkVision:
 
     async def _chat(self, model: str, content: list, max_tokens: int) -> Tuple[str, str]:
         payload = {"model": model, "max_tokens": max_tokens, "temperature": 0, "stream": False, "messages": [{"role": "user", "content": content}]}
+        if self._thinking:
+            payload["thinking"] = {"type": self._thinking}
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
         last_error = "未知错误"
         for attempt in range(3):
