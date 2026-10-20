@@ -23,6 +23,9 @@ import {
   text,
 } from '../care-assessment/assessment-specs';
 
+/** 体征行的统一读法：这几行纸上的习惯是“没问题就把那个词划掉”，所以被划掉的绝对不能当成选中 */
+const SIGN_HINT =
+  '体征各行的读法：只有被【圈出来 / 打了勾】的词才选中（=有异常）；被一条斜线或横线【划掉】的词表示“没有这个情况”，绝对不能选中；整行都没有圈出或打勾的，输出空数组 []。不要因为某个词旁边有笔迹就选它，要看笔迹是“圈/勾”还是“划掉”。';
 const MILK = [o('LITTLE', '少'), o('MEDIUM', '适中'), o('MUCH', '多')];
 const STOOL_COLOR = [o('YELLOW', '黄'), o('GREEN', '绿'), o('DARK_GREEN', '墨绿'), o('BROWN', '褐'), o('WHITE', '白陶土色'), o('RED', '带血')];
 const STOOL_AMOUNT = [o('DOT', '点'), o('LITTLE', '少'), o('MEDIUM', '中'), o('MUCH', '多')];
@@ -89,10 +92,10 @@ export const DAILY_BABY_FIELDS: GroupSpec[] = [
   {
     title: '体征（不勾 = 无异常）',
     fields: [
-      multi('eye', '眼', [o('SECRETION', '分泌物'), o('RED', '发红'), o('SWOLLEN', '肿胀')], { aiHint: '体征各行：被圈出的是有异常；被斜线划掉的表示没有' }),
+      multi('eye', '眼', [o('SECRETION', '分泌物'), o('RED', '发红'), o('SWOLLEN', '肿胀')], { aiHint: SIGN_HINT }),
       multi('mouth', '口', [o('THRUSH', '鹅口疮'), o('ULCER', '破溃'), o('OTHER', '其他')]),
       multi('nose', '鼻', [o('SECRETION', '分泌物'), o('OTHER', '其他')]),
-      multi('umbilical', '脐带', [o('FALLEN', '已脱'), o('NOT_FALLEN', '未脱'), o('BLEEDING', '渗血')], { aiHint: '“脐带：已脱 未脱 渗血”，被圈出/打勾的算选中，被划掉的不算' }),
+      multi('umbilical', '脐带', [o('FALLEN', '已脱'), o('NOT_FALLEN', '未脱'), o('BLEEDING', '渗血')], { aiHint: SIGN_HINT + '“脐带：已脱 未脱 渗血”——如果“未脱”被划掉就不要选 NOT_FALLEN；“已脱”没被划掉也没被圈出，不算选中，除非明显打了勾/圈了' }),
       multi('genitalia', '生殖器', [o('RED_SWOLLEN', '红肿'), o('OTHER', '其他')]),
       multi('skin', '皮肤', [o('ECZEMA', '湿疹/红斑'), o('RED_BUTTOCKS', '红臀'), o('OTHER', '其他')]),
       text('healthAssessment', '健康评估'),
@@ -121,10 +124,10 @@ export const DAILY_BABY_FIELDS: GroupSpec[] = [
 
 /** 喂养记录单的一行（一次喂养/一次排泄）。重复行，所以单独成表。 */
 export const FEEDING_COLUMNS: FieldSpec[] = [
-  text('time', '时间', { hint: 'HH:mm', aiHint: '24 小时制 HH:mm，如 14:20、2:00 写成 02:00' }),
-  int('directFeedMin', '亲喂(分钟)', { min: 0, max: 90, aiHint: '“亲喂”列，写了时长就填分钟数；只打勾没写时长填 0' }),
+  text('time', '时间', { hint: 'HH:mm', aiHint: '24 小时制 HH:mm，如 14:20、2:00 写成 02:00。只填开始时间：写了“18:30左右”或“18:30-18:41”只取 18:30，其余字样（左右/结束时间/时长）写进备注' }),
+  int('directFeedMin', '亲喂(分钟)', { min: 0, max: 90, aiHint: '“亲喂”列：只有这一行的亲喂格里真的有手写时长才填分钟数；只打了勾没写时长填 0；这一格是空的（比如这行喝的是奶粉）一定填 null，不要填 0' }),
   int('breastMilkMl', '母乳(ml)', { min: 0, max: 300 }),
-  int('formulaMl', '奶粉(ml)', { min: 0, max: 300, aiHint: '“奶粉”列，如 60ml 填 60' }),
+  int('formulaMl', '奶粉(ml)', { min: 0, max: 300, aiHint: '“奶粉”列的毫升数，如 80ml 填 80；前面带“补”“(补)”等字样也照样填数字，字样写进备注；这一列有字就一定要读出来，不要漏' }),
   text('medication', '用药'),
   int('waterMl', '喂水(ml)', { min: 0, max: 200 }),
   single('urine', '小便', [o('YES', '有')], { aiHint: '“小便”列打了勾填 YES，没有则 null' }),

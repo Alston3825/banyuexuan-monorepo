@@ -244,6 +244,55 @@ def merge_reads(fields: List[Dict[str, Any]], reads: List[Dict[str, Any]]) -> Tu
     return data, warnings
 
 
+# 体征行（眼/口/鼻/脐带/生殖器/皮肤）：纸上习惯“没问题就把词划掉”，整页一次读时模型很容易把“划掉”当成“选中”，
+# 所以这几行单独再问一遍（逐词判断：划掉 / 圈出或打勾 / 无标记），只把“圈出或打勾”的当作选中。
+SIGN_ROW_KEYS = ("eye", "mouth", "nose", "umbilical", "genitalia", "skin")
+
+
+async def _read_sign_rows(vision, images: List[bytes], fields: List[Dict[str, Any]], rounds: int = 3) -> Tuple[Dict[str, List[str]], List[str]]:
+    """返回 ({行key: 选中的选项值}, 两次判断不一致的行key)。每个词都要归到“划掉 / 圈出或打勾 / 无标记”三类之一，逼模型逐词看。"""
+    rows = [f for f in fields if f.get("key") in SIGN_ROW_KEYS and f.get("kind") == "multi" and f.get("options")]
+    if not rows:
+        return {}, []
+    listing = "\n".join("- %s（key=%s）：%s" % (f["label"], f["key"], "、".join(o["label"] for o in f["options"])) for f in rows)
+    prompt = (
+        "这是新生儿护理记录单的“体征”区。每一行是一个部位，后面印着几个选项词。护理师的习惯：词被一条斜线/横线贯穿（划掉）= 该情况不存在；"
+        "词被圆圈圈出或旁边打勾 = 该情况存在；没有任何笔迹的词 = 没有标记。\n"
+        "请逐行、逐词判断，每个词必须归入三类之一：struck（被划掉）、marked（被圈出/打勾）、none（没有任何标记）。\n"
+        '只输出 JSON，不要解释、不要 markdown：{"行key": {"struck": [词...], "marked": [词...], "none": [词...]}, ...}\n行和选项如下：\n' + listing
+    )
+
+    async def once() -> Optional[Dict[str, List[str]]]:
+        text, _ = await vision.read_images(images, prompt, 1500)
+        obj = _parse_json(text)
+        if not isinstance(obj, dict):
+            return None
+        out: Dict[str, List[str]] = {}
+        for f in rows:
+            r = obj.get(f["key"])
+            if not isinstance(r, dict):
+                continue
+            marked = {str(x).strip() for x in (r.get("marked") or [])}
+            out[f["key"]] = [o["value"] for o in f["options"] if o["label"] in marked]
+        return out
+
+    reads = [r for r in await asyncio.gather(*[once() for _ in range(rounds)], return_exceptions=True) if isinstance(r, dict)]
+    if not reads:
+        return {}, []
+    result: Dict[str, List[str]] = {}
+    differ: List[str] = []
+    for f in rows:
+        k = f["key"]
+        got = [sorted(r[k]) for r in reads if k in r]
+        if not got:
+            continue
+        if any(g != got[0] for g in got[1:]):
+            differ.append(k)
+        # 少数服从多数：一个选项至少过半次数被判为“圈出/打勾”才算选中
+        result[k] = [o["value"] for o in f["options"] if sum(o["value"] in g for g in got) * 2 > len(got)]
+    return result, differ
+
+
 async def extract_care_form(
     files: List[Tuple[str, bytes]],
     vision,
@@ -271,6 +320,16 @@ async def extract_care_form(
         err = next((r for r in results if isinstance(r, Exception)), None)
         raise ModelProviderError("识别失败：%s" % (err or "未知错误"))
     data, warnings = merge_reads(fields, reads)
+    try:
+        signs, sign_differ = await _read_sign_rows(vision, [p.jpeg for p in pages], fields)
+    except ModelProviderError:
+        signs, sign_differ = {}, []
+    labels = {f["key"]: f["label"] for f in fields}
+    for k, v in signs.items():
+        data[k] = v
+        warnings = [w for w in warnings if w.get("field") != k]
+        if k in sign_differ:
+            warnings.append({"field": k, "level": "warn", "message": "%s：多次识别不一致（划掉/圈出不好分辨），请对照原图核对" % labels.get(k, k)})
     if len(reads) < len(results):
         warnings.append({"field": "_all", "level": "info", "message": "有一次读图失败，只用了一次识别结果，请更仔细地核对"})
     return {"data": data, "warnings": warnings, "model": reads[0].get("_model"), "page_count": len(pages)}

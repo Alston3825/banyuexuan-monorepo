@@ -175,6 +175,15 @@ export class CareDailyService {
       if (!babyIds.has(b.babyProfileId)) throw new BadRequestException('宝宝不属于这个母婴档案');
       const feedings = (b.feedings ?? []).map((f, i) => {
         const data = toDbData(feedingSpec, f);
+        // 纸上常写“18:30左右”“18:30-18:41”：只取开始时间，原文并进备注，免得整张记录存不了
+        if (data.time && !TIME_RE.test(String(data.time))) {
+          const m = String(data.time).match(/(\d{1,2})\s*[:：.]\s*(\d{2})/);
+          if (m) {
+            const raw = String(data.time);
+            data.time = `${m[1].padStart(2, '0')}:${m[2]}`;
+            data.remark = [data.remark, `时间：${raw}`].filter(Boolean).join('；');
+          }
+        }
         if (data.time && !TIME_RE.test(String(data.time))) throw new BadRequestException(`第 ${i + 1} 行喂养记录的时间「${data.time}」格式不对，应为 HH:mm（如 14:20）`);
         if (!data.time) throw new BadRequestException(`第 ${i + 1} 行喂养记录没有填时间`);
         const t = String(data.time);
