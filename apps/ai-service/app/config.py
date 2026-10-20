@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     volcengine_endpoint_id: Optional[str] = None  # 控制台创建的推理接入点 ID，如 ep-xxxxxxxx-xxxxx
     volcengine_embedding_endpoint_id: Optional[str] = None  # embedding 模型的推理接入点 ID
 
+    # 方舟按量计费：读图（纸质合同/护理表格拍照）和读视频用的模型，填推理接入点 ID(ep-xxxx) 或模型名称。
+    # 配了这个就优先用按量计费通道读图；留空则退回下面的 Agent Plan 通道。视频模型不填就和读图用同一个。
+    volcengine_vision_model: Optional[str] = None
+    volcengine_video_model: Optional[str] = None
+
     # MiniMax
     minimax_api_key: Optional[str] = None
     minimax_group_id: Optional[str] = None
