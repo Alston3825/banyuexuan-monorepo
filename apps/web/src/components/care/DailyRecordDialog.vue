@@ -16,7 +16,7 @@ import SpecForm from './SpecForm.vue'
 import DailySignPanel from './DailySignPanel.vue'
 
 const props = defineProps<{ show: boolean; motherProfileId: string; date: string }>()
-const emit = defineEmits<{ 'update:show': [value: boolean]; saved: [] }>()
+const emit = defineEmits<{ 'update:show': [value: boolean]; saved: []; 'add-baby': [] }>()
 
 const auth = useAuthStore()
 const nurse = computed(() => (auth.account as { realName?: string } | null)?.realName ?? '')
@@ -269,6 +269,12 @@ const close = () => emit('update:show', false)
             <span class="dr-tip">不拍照也可以直接在下面填写。</span>
           </n-space>
         </div>
+        <n-alert v-if="day && day.babies.length === 0" type="warning" :bordered="false" style="margin-top: 8px">
+          <n-space align="center" :wrap="true">
+            <span><b>这位妈妈还没有宝宝档案</b>，所以下面只有妈妈的内容，看不到宝宝的体征、体温和 24 小时喂养记录。先添加宝宝，这里就会出现“宝宝”页签。</span>
+            <n-button size="small" type="primary" @click="emit('update:show', false); emit('add-baby')">去添加宝宝</n-button>
+          </n-space>
+        </n-alert>
         <n-alert v-if="extracting" type="info" :bordered="false" style="margin-top: 8px"><n-space align="center"><n-spin size="small" />AI 正在识别，一般 20～40 秒…</n-space></n-alert>
         <n-alert v-else-if="doc?.extractStatus === 'FAILED'" type="error" :bordered="false" style="margin-top: 8px">AI 识别失败：{{ doc.extractError }}，可点“重新识别”或手工填写。</n-alert>
         <n-alert v-else-if="doc?.extractStatus === 'DONE' && aiBabyId" type="warning" :bordered="false" style="margin-top: 8px">

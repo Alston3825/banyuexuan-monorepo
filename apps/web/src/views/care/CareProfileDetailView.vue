@@ -752,7 +752,7 @@ onMounted(fetchAll)
       </n-tab-pane>
 
       <n-tab-pane name="daily" tab="日常护理记录">
-        <DailyRecordsPanel :mother-profile-id="motherProfileId" />
+        <DailyRecordsPanel :mother-profile-id="motherProfileId" @add-baby="pickTab('overview'); openAddBaby()" />
       </n-tab-pane>
 
       <n-tab-pane name="medication" tab="用药委托书">

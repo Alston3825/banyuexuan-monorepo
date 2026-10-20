@@ -12,6 +12,7 @@ import ConfirmLinkDialog from './ConfirmLinkDialog.vue'
 import { careSignApi, type SignOverviewRow } from '../../api/modules/care-sign.api'
 
 const props = defineProps<{ motherProfileId: string }>()
+const emit = defineEmits<{ 'add-baby': [] }>()
 
 const data = ref<DailyDays | null>(null)
 const loading = ref(false)
@@ -82,7 +83,7 @@ onMounted(load)
       <n-empty v-if="data && data.days.length === 0" description="暂无记录" />
     </div>
 
-    <DailyRecordDialog v-model:show="dlg.show" :mother-profile-id="motherProfileId" :date="dlg.date" @saved="load" />
+    <DailyRecordDialog v-model:show="dlg.show" :mother-profile-id="motherProfileId" :date="dlg.date" @saved="load" @add-baby="emit('add-baby')" />
     <ConfirmLinkDialog v-model:show="linkDlg" :mother-profile-id="motherProfileId" @update:show="(v) => !v && load()" />
   </n-spin>
 </template>
