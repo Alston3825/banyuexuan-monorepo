@@ -59,7 +59,7 @@ export class CareDocumentExtractionService implements OnModuleInit {
       return {
         formTitle: '新生儿和产妇日常护理记录',
         description: DAILY_AI_DESCRIPTION,
-        fields: [...dailyFlatFields().map(slim), { key: 'feedings', label: '24小时宝宝喂养记录单', kind: 'table', columns: FEEDING_COLUMNS.map(slim) }],
+        fields: [{ key: 'sheetDate', label: '纸上的日期', kind: 'text', aiHint: '右上角“日期：”后手写的日期，如 10.18，原样抄下来' }, ...dailyFlatFields().map(slim), { key: 'feedings', label: '24小时宝宝喂养记录单', kind: 'table', columns: FEEDING_COLUMNS.map(slim) }],
       };
     }
     if (docType === 'CARE_PLAN') return serviceSheetAiSpec(); // 产妇常规护理计划统计表 → 服务执行记录

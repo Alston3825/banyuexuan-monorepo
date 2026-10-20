@@ -5,7 +5,7 @@
  * 人工核对（标黄的是没把握的）后保存——保存之前不会写进数据库。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { NAlert, NButton, NCard, NModal, NSelect, NSpace, NSpin, NTabPane, NTabs, NTag } from 'naive-ui'
+import { NAlert, NButton, NCard, NModal, NSelect, NSpace, NSpin, NTag } from 'naive-ui'
 import { careDailyApi, careDocumentApi } from '../../api/modules/care-archive.api'
 import type { CareDocument, DailyDay, DailySpecs, ExtractWarning, FeedingEntry } from '../../api/types/care-archive'
 import { useAuthStore } from '../../stores/auth'
@@ -31,14 +31,12 @@ const motherValues = ref<Record<string, unknown>>({})
 const babyStates = ref<Record<string, { values: Record<string, unknown>; feedings: FeedingEntry[] }>>({})
 const warnings = ref<ExtractWarning[]>([])
 const aiBabyId = ref<string | null>(null)
-const activeTab = ref('')
 
 // 拍照识别
 const doc = ref<CareDocument | null>(null)
 const photoBabyId = ref<string | null>(null)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
-const feedInput = ref<HTMLInputElement | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 const extracting = computed(() => doc.value?.extractStatus === 'PENDING' || doc.value?.extractStatus === 'RUNNING')
 const warnCount = computed(() => warnings.value.filter((w) => w.level !== 'info' && !w.field.includes('.')).length)
@@ -70,7 +68,6 @@ function fill(d: DailyDay) {
     bs[b.baby.id] = { values: v, feedings: b.feedings.map((f) => ({ ...f })) }
   }
   babyStates.value = bs
-  if (!bs[activeTab.value] && activeTab.value !== 'mother') activeTab.value = d.babies[0]?.baby.id ?? 'mother'
 }
 
 async function load() {
@@ -83,7 +80,6 @@ async function load() {
     if (!specsCache) specsCache = await careDailyApi.specs()
     specs.value = specsCache
     const d = await careDailyApi.day(props.motherProfileId, props.date)
-    activeTab.value = ''
     fill(d)
     photoBabyId.value = d.babies[0]?.baby.id ?? null
     if (d.record?.documentId) careDocumentApi.get(d.record.documentId).then((x) => (doc.value = x)).catch(() => undefined)
@@ -122,12 +118,22 @@ function applyExtraction(d: CareDocument) {
       feedings: Array.isArray(data.feedings) ? (data.feedings as FeedingEntry[]) : babyStates.value[id].feedings,
     }
     aiBabyId.value = id
-    activeTab.value = id
   }
   warnings.value = d.extractWarnings ?? []
+  checkSheetDate(data)
 }
 
 const feedingCount = (e: FeedingEntry[]) => e.length
+
+/** 纸上的日期（只写“月.日”）和当前这一天对不上，提醒一下，防止拍错日子的记录单 */
+function checkSheetDate(data: Record<string, unknown>) {
+  const sd = String(data.sheetDate ?? '').match(/(\d{1,2})\s*[.\-/月]\s*(\d{1,2})/)
+  if (!sd) return
+  const [, , pm, pd] = props.date.match(/(\d{4})-(\d{2})-(\d{2})/) ?? []
+  if (pm && (Number(sd[1]) !== Number(pm) || Number(sd[2]) !== Number(pd))) {
+    message.warning(`注意：纸上的日期是 ${sd[1]}月${sd[2]}日，和当前记录日期 ${Number(pm)}月${Number(pd)}日 对不上，请确认拍的是这一天的记录单`, { duration: 10000, closable: true })
+  }
+}
 
 /** 宝宝单页（喂养记录单）识别结果：宝宝体征 + 喂养表填进当前宝宝；原来已有喂养记录时问“替换还是追加” */
 function applyBabySheet(d: CareDocument) {
@@ -145,17 +151,9 @@ function applyBabySheet(d: CareDocument) {
     // 追加时新行的提醒下标要整体后移，这里简单处理：追加就不再标黄
     warnings.value = append ? [] : d.extractWarnings ?? []
     aiBabyId.value = id
-    activeTab.value = id
     message.info(`已填入 ${rows.length} 条喂养记录，请对照原图核对后保存`)
   }
-  // 纸上的日期和当前这一天对不上，先提醒（纸上只写“月.日”）
-  const sd = String(data.sheetDate ?? '').match(/(\d{1,2})\s*[.\-/月]\s*(\d{1,2})/)
-  if (sd) {
-    const [, , pm, pd] = props.date.match(/(\d{4})-(\d{2})-(\d{2})/) ?? []
-    if (pm && (Number(sd[1]) !== Number(pm) || Number(sd[2]) !== Number(pd))) {
-      message.warning(`注意：纸上的日期是 ${sd[1]}月${sd[2]}日，和当前记录日期 ${Number(pm)}月${Number(pd)}日 对不上，请确认拍的是这一天的记录单`, { duration: 10000, closable: true })
-    }
-  }
+  checkSheetDate(data)
   if (old.length === 0) return put(rows, false)
   dialog.warning({
     title: '识别到 ' + rows.length + ' 条喂养记录',
@@ -190,13 +188,12 @@ function startPolling(id: string) {
   }, 2500)
 }
 
-async function onPick(e: Event, babySheet = false) {
+async function onPick(e: Event) {
   const input = e.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
   input.value = ''
   if (files.length === 0) return
-  // 喂养记录单旁边的按钮：照片归当前标签页的宝宝，只识别宝宝单页
-  const babyId = babySheet && babyOptions.value.some((o) => o.value === activeTab.value) ? activeTab.value : photoBabyId.value
+  const babyId = photoBabyId.value
   uploading.value = true
   try {
     doc.value = await careDocumentApi.upload(files, {
@@ -204,7 +201,6 @@ async function onPick(e: Event, babySheet = false) {
       motherProfileId: props.motherProfileId,
       babyProfileId: babyId ?? undefined,
       docDate: props.date,
-      ...(babySheet ? { scope: 'BABY_FEEDING' as const } : {}),
     })
     startPolling(doc.value.id)
     message.success('照片已上传，AI 正在识别…')
@@ -241,6 +237,7 @@ async function save() {
 }
 
 const close = () => emit('update:show', false)
+const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 </script>
 
 <template>
@@ -257,16 +254,14 @@ const close = () => emit('update:show', false)
       <n-spin :show="loading">
         <!-- 拍照识别 -->
         <div class="dr-bar">
-          <input ref="fileInput" type="file" multiple accept="image/*,application/pdf,.heic,.heif" style="display: none" @change="(e) => onPick(e, false)" />
-          <!-- 喂养记录单旁边的“拍照识别”：手机上可直接拍照，也能从相册选（可多张） -->
-          <input ref="feedInput" type="file" multiple accept="image/*,application/pdf,.heic,.heif" style="display: none" @change="(e) => onPick(e, true)" />
+          <input ref="fileInput" type="file" multiple accept="image/*,application/pdf,.heic,.heif" style="display: none" @change="onPick" />
           <n-space align="center" :wrap="true">
             <n-select v-if="babyOptions.length > 1" v-model:value="photoBabyId" :options="babyOptions" size="small" style="width: 150px" placeholder="这张纸是哪个宝宝" />
             <n-button size="small" :loading="uploading" :disabled="extracting || !specs" @click="fileInput?.click()">
-              📷 拍整张记录单（宝宝+妈妈），AI 识别预填
+              📷 拍整张记录单，AI 一次识别宝宝和妈妈
             </n-button>
             <n-button v-if="doc && !extracting" size="small" @click="retry">重新识别</n-button>
-            <span class="dr-tip">不拍照也可以直接在下面填写。</span>
+            <span class="dr-tip">宝宝和妈妈在同一张纸上，拍一次（可多张）就全部预填；不拍照也可以直接在下面填写。</span>
           </n-space>
         </div>
         <n-alert v-if="day && day.babies.length === 0" type="warning" :bordered="false" style="margin-top: 8px">
@@ -278,21 +273,25 @@ const close = () => emit('update:show', false)
         <n-alert v-if="extracting" type="info" :bordered="false" style="margin-top: 8px"><n-space align="center"><n-spin size="small" />AI 正在识别，一般 20～40 秒…</n-space></n-alert>
         <n-alert v-else-if="doc?.extractStatus === 'FAILED'" type="error" :bordered="false" style="margin-top: 8px">AI 识别失败：{{ doc.extractError }}，可点“重新识别”或手工填写。</n-alert>
         <n-alert v-else-if="doc?.extractStatus === 'DONE' && aiBabyId" type="warning" :bordered="false" style="margin-top: 8px">
-          AI 已预填（{{ babyLabel(aiBabyId) }}{{ doc?.extractScope === 'BABY_FEEDING' ? ' 的体征和喂养记录' : ' 和妈妈栏' }}）。<b>请对照原图逐项核对</b>，标黄的 {{ warnCount }} 项 AI 没把握；<b>点底部“保存”前不会写入。</b>
+          AI 已预填（{{ babyLabel(aiBabyId) }}{{ doc?.extractScope === 'BABY_FEEDING' ? ' 的体征和喂养记录' : ' 的体征、喂养记录，以及妈妈栏' }}）。<b>请对照原图逐项核对</b>，标黄的 {{ warnCount }} 项 AI 没把握；<b>点底部“保存”前不会写入。</b>
         </n-alert>
         <details v-if="doc && doc.files.length > 0" class="dr-photo">
           <summary>查看纸质原件照片</summary>
           <CareDocImages :document-id="doc.id" :files="doc.files" :width="420" />
         </details>
 
-        <n-tabs v-if="day && specs" v-model:value="activeTab" type="segment" style="margin-top: 10px" animated>
-          <n-tab-pane v-for="b in day.babies" :key="b.baby.id" :name="b.baby.id" :tab="`👶 ${babyLabel(b.baby.id)}`">
+        <!-- 一张页面 = 一张纸：先是宝宝（体征/体温/24小时喂养记录单/班次总结），再是产妇日常护理；拍一次照两边一起识别 -->
+        <div v-if="day && specs" class="dr-sheet">
+          <div class="dr-nav">
+            <span class="dr-tip">快速跳转：</span>
+            <n-button v-for="b in day.babies" :key="b.baby.id" size="tiny" secondary @click="jump(`dr-baby-${b.baby.id}`)">👶 {{ babyLabel(b.baby.id) }}</n-button>
+            <n-button size="tiny" secondary @click="jump('dr-mother')">🤱 产妇日常护理</n-button>
+          </div>
+
+          <section v-for="b in day.babies" :id="`dr-baby-${b.baby.id}`" :key="b.baby.id" class="dr-sec">
+            <div class="dr-sectitle">👶 新生儿日常护理记录<small>{{ babyLabel(b.baby.id) }}</small></div>
             <SpecForm v-model="babyStates[b.baby.id].values" :spec="{ groups: specs.baby }" :warnings="aiBabyId === b.baby.id ? warnings : []" />
-            <div class="dr-feedhead">
-              <h4 class="dr-h" style="margin: 0">24 小时宝宝喂养记录单</h4>
-              <n-button type="primary" size="small" :loading="uploading" :disabled="extracting" @click="activeTab = b.baby.id; feedInput?.click()">📷 拍照识别喂养记录</n-button>
-            </div>
-            <div class="dr-tip" style="margin: 4px 0 8px">拍下《新生儿日常护理记录》这张纸（可多拍几张），AI 自动把每一行喂养/排泄记录填进下面，核对后点底部“保存”。</div>
+            <h4 class="dr-h">24 小时宝宝喂养记录单</h4>
             <FeedingTable
               v-model="babyStates[b.baby.id].feedings"
               :columns="specs.feeding"
@@ -300,11 +299,13 @@ const close = () => emit('update:show', false)
               :default-nurse="nurse"
               :active-medications="b.activeMedications"
             />
-          </n-tab-pane>
-          <n-tab-pane name="mother" tab="🤱 妈妈">
+          </section>
+
+          <section id="dr-mother" class="dr-sec">
+            <div class="dr-sectitle">🤱 产妇日常护理</div>
             <SpecForm v-model="motherValues" :spec="{ groups: specs.mother }" :warnings="warnings" />
-          </n-tab-pane>
-        </n-tabs>
+          </section>
+        </div>
 
         <!-- 护理师签字 + 客户确认：记录保存后才出现；记录一保存（版本号变了）就重新载入，签字是否过期立刻可见 -->
         <DailySignPanel v-if="day" :key="`${props.date}-${day.record?.version ?? 'new'}`" :mother-profile-id="motherProfileId" :date="date" :can-sign="!!day.record" @changed="emit('saved')" />
@@ -337,6 +338,32 @@ const close = () => emit('update:show', false)
   cursor: pointer;
   color: #2a64b0;
   margin-bottom: 6px;
+}
+.dr-sec {
+  margin-top: 14px;
+  padding: 10px 12px 14px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  background: #fff;
+  scroll-margin-top: 8px;
+}
+.dr-sectitle {
+  margin: -2px 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2a64b0;
+}
+.dr-sectitle small {
+  margin-left: 8px;
+  font-weight: 400;
+  color: #888;
+}
+.dr-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
 }
 .dr-feedhead {
   display: flex;
