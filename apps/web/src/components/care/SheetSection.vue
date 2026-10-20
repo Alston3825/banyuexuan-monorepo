@@ -22,8 +22,8 @@ defineEmits<{ toggle: [] }>()
 <style scoped>
 .ss {
   margin-bottom: 10px;
-  border: 1px solid #dcdcdc;
-  border-radius: 8px;
+  border: 1px solid #cfcfcf;
+  border-radius: 12px;
   background: #fff;
   overflow: hidden;
 }

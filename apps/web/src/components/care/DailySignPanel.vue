@@ -131,11 +131,11 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
 
 <style scoped>
 .ds-box {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid #e3e8ef;
-  border-radius: 10px;
-  background: #fafcff;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #cfcfcf;
+  border-radius: 12px;
+  background: #fff;
 }
 .ds-title {
   margin-bottom: 8px;
