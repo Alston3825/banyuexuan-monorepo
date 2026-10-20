@@ -2083,7 +2083,8 @@ model CareDailyBabyRecord {
   nightShiftSummary String?  @map("night_shift_summary") @db.Text // 夜班护理总结
   dayNurseName      String?  @map("day_nurse_name") // 护理师签字（白班）
   nightNurseName    String?  @map("night_nurse_name") // 护理师签字（夜班）
-  babyClientSigner  String?  @map("baby_client_signer") // 客户签字（宝宝）
+  babyClientSigner  String?  @map("baby_client_signer") // 客户签字（白班）
+  nightClientSigner String?  @map("night_client_signer") // 客户签字（夜班）
   createdBy         String   @map("created_by")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")

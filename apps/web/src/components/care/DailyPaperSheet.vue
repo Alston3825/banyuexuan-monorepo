@@ -73,8 +73,8 @@ const has = (v: unknown) => v !== null && v !== undefined && v !== '' && !(Array
 const countFilled = (vals: Record<string, unknown>, keys: string[]) => keys.filter((k) => has(vals[k])).length
 const BASIC_KEYS = ['ageDays', 'weightG', 'lengthCm', 'headCm', 'tempMorning', 'tempEvening']
 const SIGN_KEYS = ['eye', 'mouth', 'nose', 'umbilical', 'genitalia', 'skin']
-const SHIFT_KEYS = ['dayShiftSummary', 'dayNurseName', 'nightShiftSummary', 'nightNurseName', 'babyClientSigner']
-const MOTHER_KEYS = ['breast', 'breastBody', 'milk', 'woundCesarean', 'woundVaginal', 'lochiaStatus', 'lochiaColor', 'lochiaAmount', 'lochiaOdor', 'motherTemperature', 'motherBpSystolic', 'motherBpDiastolic', 'motherPlan', 'motherNurseName']
+const SHIFT_KEYS = ['dayShiftSummary', 'dayNurseName', 'babyClientSigner', 'nightShiftSummary', 'nightNurseName', 'nightClientSigner']
+const MOTHER_KEYS = ['breast', 'breastBody', 'milk', 'woundCesarean', 'woundVaginal', 'lochiaStatus', 'lochiaColor', 'lochiaAmount', 'lochiaOdor', 'motherTemperature', 'motherBpSystolic', 'motherBpDiastolic', 'motherPlan']
 
 function basicSummary(id: string) {
   const v = props.babyStates[id].values
@@ -217,12 +217,9 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             <div class="ps-gh">伤口</div>
             <PaperField part :field="mf.woundCesarean" :model-value="motherValues" :warn="warnMap.woundCesarean" @update:model-value="setMother" />
             <PaperField part :field="mf.woundVaginal" :model-value="motherValues" :warn="warnMap.woundVaginal" @update:model-value="setMother" />
-            <div class="ps-gh">护理计划与签字</div>
+            <div class="ps-gh">护理计划</div>
             <PaperField :field="mf.motherPlan" no-label :model-value="motherValues" :warn="warnMap.motherPlan" :rows="2" @update:model-value="setMother" />
-            <div class="ps-line">
-              <PaperField :field="mf.motherNurseName" :model-value="motherValues" :warn="warnMap.motherNurseName" width="80px" @update:model-value="setMother" />
-              <PaperField :field="mf.motherClientSigner" :model-value="motherValues" :warn="warnMap.motherClientSigner" width="80px" @update:model-value="setMother" />
-            </div>
+          </div>
           </div>
           <div class="ps-mg">
             <div class="ps-gh">恶露与二便</div>

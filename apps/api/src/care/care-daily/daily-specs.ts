@@ -68,11 +68,9 @@ export const DAILY_MOTHER_FIELDS: GroupSpec[] = [
     ],
   },
   {
-    title: '妈妈护理计划与签名',
+    title: '妈妈护理计划',
     fields: [
       longtext('motherPlan', '妈妈护理计划', { aiHint: '“产妇日常护理”区最下面“护理计划”一行的手写内容，如 会阴擦洗消毒' }),
-      text('motherNurseName', '护理师签字（产妇）'),
-      text('motherClientSigner', '客户签字（产妇）'),
     ],
   },
 ];
@@ -115,9 +113,10 @@ export const DAILY_BABY_FIELDS: GroupSpec[] = [
       longtext('babyPlan', '宝宝护理计划', { aiHint: '“总结”下面“护理计划”一行（宝宝的），如 抚触、晒黄疸' }),
       longtext('dayShiftSummary', '白班护理总结', { aiHint: '右侧“白班护理总结”大框里的手写内容（黄疸值数字单独放进黄疸字段，不要重复）' }),
       longtext('nightShiftSummary', '夜班护理总结'),
-      text('dayNurseName', '护理师签字（白班）'),
-      text('nightNurseName', '护理师签字（夜班）'),
-      text('babyClientSigner', '客户签字（宝宝）'),
+      text('dayNurseName', '护理师签字（白班）', { aiHint: '“白班护理总结”下面的“护理师签字”' }),
+      text('babyClientSigner', '客户签字（白班）', { aiHint: '“白班护理总结”下面的“客户签字”' }),
+      text('nightNurseName', '护理师签字（夜班）', { aiHint: '“夜班护理总结”下面的“护理师签字”（右下角）' }),
+      text('nightClientSigner', '客户签字（夜班）', { aiHint: '“夜班护理总结”下面的“客户签字”（右下角）' }),
     ],
   },
 ];

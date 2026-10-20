@@ -33,6 +33,7 @@ const emit = defineEmits<{ toggle: []; 'update:values': [value: Record<string, u
         <PaperField no-label :field="fields.nightShiftSummary" :model-value="values" :warn="warn('nightShiftSummary')" :rows="4" @update:model-value="(v) => emit('update:values', v)" />
         <div class="sc-sign">
           <PaperField :field="fields.nightNurseName" :model-value="values" :warn="warn('nightNurseName')" width="90px" @update:model-value="(v) => emit('update:values', v)" />
+          <PaperField :field="fields.nightClientSigner" :model-value="values" :warn="warn('nightClientSigner')" width="90px" @update:model-value="(v) => emit('update:values', v)" />
         </div>
       </div>
     </div>

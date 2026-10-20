@@ -135,7 +135,6 @@ function stopPolling() {
 function fill(d: DailyDay) {
   day.value = d
   const m: Record<string, unknown> = { ...(d.record ?? {}) }
-  if (!d.record && !m.motherNurseName) m.motherNurseName = nurse.value
   motherValues.value = m
   const bs: typeof babyStates.value = {}
   for (const b of d.babies) {

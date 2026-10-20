@@ -21,7 +21,7 @@ const dayDiff = (a: string, b: string) => Math.round((new Date(`${a}T00:00:00Z`)
 /** 至少要“看”这么久才允许确认：基础 6 秒 + 每多一天 2 秒（封顶 30 秒），防止一进来就连点 */
 const minDwellMs = (days: number) => Math.min(30_000, 6_000 + 2_000 * days);
 
-const HIDDEN_KEYS = new Set(['motherNurseName', 'motherClientSigner', 'dayNurseName', 'nightNurseName', 'babyClientSigner']);
+const HIDDEN_KEYS = new Set(['motherNurseName', 'motherClientSigner', 'dayNurseName', 'nightNurseName', 'babyClientSigner', 'nightClientSigner']);
 
 function fmt(f: FieldSpec, v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null;
