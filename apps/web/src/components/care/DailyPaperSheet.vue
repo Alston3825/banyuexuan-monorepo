@@ -146,7 +146,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
             <PaperField :field="jf('jaundiceForehead', '前额')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceForehead')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
             <PaperField :field="jf('jaundiceCanthus', '眼角')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceCanthus')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
             <PaperField :field="jf('jaundiceChest', '前胸')" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'jaundiceChest')" width="46px" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" />
-            <span class="ps-javg">平均 {{ avg(b.baby.id) }}</span>
+            <span class="ps-javg" title="由前额、眼角、前胸三项自动算出，不用填写">平均 <b class="ps-javv">{{ avg(b.baby.id) }}</b></span>
           </div>
         </SheetSection>
 
@@ -320,8 +320,17 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 .ps-javg {
   margin-left: 4px;
   color: #185fa5;
-  font-size: 16px;
+  font-size: 13px;
+}
+.ps-javv {
+  display: inline-block;
+  min-width: 52px;
+  height: 24px;
+  border-bottom: 1px solid #888;
+  text-align: center;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 24px;
 }
 .ps-k {
   font-size: 13px;
