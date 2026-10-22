@@ -12,6 +12,7 @@ import type { StockIssue, StockIssueItemInput, StockIssueType, Warehouse, Invent
 import type { Store } from '../../api/types/store'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP, STOCK_ISSUE_TYPE_LABEL_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const router = useRouter()
 const ISSUE_TYPE_OPTIONS = Object.entries(STOCK_ISSUE_TYPE_LABEL_MAP).map(([value, label]) => ({ label, value }))
@@ -37,6 +38,10 @@ const model = ref({
   items: [] as (StockIssueItemInput & { key: number })[],
 })
 let itemRowKey = 0
+// 单据填到一半被刷新/闪退/误关：重新打开能恢复
+const draft = useFormDraft('stock-issue-create', model, (m) => m.items.length === 0 && !m.remark && !m.warehouseId, (m) => {
+  itemRowKey = Math.max(itemRowKey, ...m.items.map((i) => i.key + 1), 0)
+})
 
 // 选了仓库后取这个仓库每种物品的现有库存：下拉里和每一行都显示，领用数量超过库存就拦住
 const warehouseRef = computed(() => model.value.warehouseId)
@@ -62,6 +67,7 @@ async function fetchAll() {
 function openCreateModal() {
   model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, issueType: 'ISSUE', remark: '', items: [] }
   formVisible.value = true
+  draft.start()
 }
 
 function createItemRow() {
@@ -88,6 +94,7 @@ async function handleSubmit() {
       items: model.value.items.map(({ key: _key, ...i }) => i),
     })
     message.success('出库/领用单已创建')
+    draft.clear()
     formVisible.value = false
     await fetchAll()
   } finally {

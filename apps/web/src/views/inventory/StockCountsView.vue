@@ -12,6 +12,7 @@ import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const router = useRouter()
 
@@ -33,6 +34,10 @@ const model = ref({
   items: [] as (StockCountItemInput & { key: number })[],
 })
 let itemRowKey = 0
+// 单据填到一半被刷新/闪退/误关：重新打开能恢复
+const draft = useFormDraft('stock-count-create', model, (m) => m.items.length === 0 && !m.remark && !m.warehouseId, (m) => {
+  itemRowKey = Math.max(itemRowKey, ...m.items.map((i) => i.key + 1), 0)
+})
 
 const keyword = ref('')
 const shown = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.countNo, r.warehouse?.name, r.remark], r.items)))
@@ -59,6 +64,7 @@ async function fetchAll() {
 function openCreateModal() {
   model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, remark: '', items: [] }
   formVisible.value = true
+  draft.start()
 }
 
 function createItemRow() {
@@ -79,6 +85,7 @@ async function handleSubmit() {
       items: model.value.items.map(({ key: _key, ...i }) => i),
     })
     message.success('盘点单已创建')
+    draft.clear()
     formVisible.value = false
     await fetchAll()
   } finally {

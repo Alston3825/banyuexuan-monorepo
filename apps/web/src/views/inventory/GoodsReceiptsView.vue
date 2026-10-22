@@ -18,6 +18,7 @@ import ItemSelect from '../../components/inventory/ItemSelect.vue'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, GOODS_RECEIPT_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -67,6 +68,10 @@ const model = ref({
   items: [] as (GoodsReceiptItemInput & { key: number })[],
 })
 let itemRowKey = 0
+// 单据填到一半被刷新/闪退/误关：重新打开能恢复
+const draft = useFormDraft('goods-receipt-create', model, (m) => m.items.length === 0 && !m.remark && !m.warehouseId && !m.purchaseOrderId, (m) => {
+  itemRowKey = Math.max(itemRowKey, ...m.items.map((i) => i.key + 1), 0)
+})
 
 async function fetchAll() {
   loading.value = true
@@ -91,6 +96,7 @@ async function fetchAll() {
 function openCreateModal() {
   model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, purchaseOrderId: null, remark: '', items: [] }
   formVisible.value = true
+  draft.start()
 }
 function onPurchaseOrderChange(poId: string | null) {
   const po = purchaseOrders.value.find((p) => p.id === poId)
@@ -115,6 +121,7 @@ async function handleSubmit() {
       items: model.value.items.map(({ key: _key, ...i }) => ({ ...i, unitCost: Math.round((i.unitCost ?? 0) * 100) })), // 界面填“元”，接口按“分”
     })
     message.success('入库单已创建')
+    draft.clear()
     formVisible.value = false
     await fetchAll()
   } finally {

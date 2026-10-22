@@ -16,6 +16,7 @@ import type { PurchaseOrder, PurchaseOrderItemInput, Supplier, Warehouse, Invent
 import type { Store } from '../../api/types/store'
 import { renderStatusBadge, PURCHASE_ORDER_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -61,6 +62,9 @@ const model = ref({
   createMissing: true,
 })
 
+// 采购单填到一半被刷新/闪退/误关：重新打开能恢复
+const draft = useFormDraft('purchase-order-create', model, (m) => m.items.length === 0 && !m.remark && !m.supplierId && !m.warehouseId)
+
 async function fetchAll() {
   loading.value = true
   try {
@@ -84,6 +88,7 @@ async function fetchAll() {
 function openCreateModal() {
   model.value = { storeId: stores.value[0]?.id ?? null, warehouseId: null, supplierId: null, remark: '', items: [], createMissing: true }
   formVisible.value = true
+  draft.start()
 }
 
 async function handleSubmit() {
@@ -111,6 +116,7 @@ async function handleSubmit() {
       })),
     })
     message.success('采购单已创建')
+    draft.clear()
     formVisible.value = false
     await fetchAll()
   } finally {

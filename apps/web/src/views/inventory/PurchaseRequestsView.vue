@@ -22,6 +22,7 @@ import type {
 } from '../../api/types/inventory'
 import { renderStatusBadge, PURCHASE_REQUEST_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const money = (v: string | number | null | undefined) => (v === null || v === undefined ? '-' : (Math.round(Number(v) * 100) / 100).toFixed(2))
 const price = (v: string | number | null | undefined) => (v === null || v === undefined ? '待询价' : String(Number(v)))
@@ -100,10 +101,20 @@ const deptVisible = ref(false)
 const deptSaving = ref(false)
 const deptLines = ref<ItemLine[]>([])
 const deptRemark = ref('')
+// 部门申购单填到一半被刷新/闪退/误关：重新打开能恢复
+const deptDraftModel = computed({
+  get: () => ({ lines: deptLines.value, remark: deptRemark.value }),
+  set: (v) => {
+    deptLines.value = v.lines
+    deptRemark.value = v.remark
+  },
+})
+const deptDraft = useFormDraft('purchase-request-dept', deptDraftModel, (m) => m.lines.length === 0 && !m.remark)
 function openDept() {
   deptLines.value = []
   deptRemark.value = ''
   deptVisible.value = true
+  deptDraft.start()
 }
 /** 编辑器里的明细 → 接口的申购行 */
 function toBody(lines: ItemLine[]) {
@@ -133,6 +144,7 @@ async function saveDept(submit: boolean) {
   deptSaving.value = true
   try {
     await purchaseRequestApi.createDepartment({ submit, remark: deptRemark.value.trim() || undefined, items: toBody(deptLines.value) })
+    deptDraft.clear()
     deptVisible.value = false
     message.success(submit ? '已提交，客服会在“待汇总”里看到' : '已保存为草稿，确认无误后再提交')
     await fetchList()
@@ -146,10 +158,19 @@ const manualVisible = ref(false)
 const manualSaving = ref(false)
 const manual = ref({ storeId: null as string | null, date: Date.now() as number | null, remark: '', createMissingItems: true })
 const manualLines = ref<ItemLine[]>([])
+const manualDraftModel = computed({
+  get: () => ({ m: manual.value, lines: manualLines.value }),
+  set: (v) => {
+    manual.value = v.m
+    manualLines.value = v.lines
+  },
+})
+const manualDraft = useFormDraft('purchase-request-manual', manualDraftModel, (d) => d.lines.length === 0 && !d.m.remark)
 function openManual() {
   manual.value = { storeId: filterStore.value ?? stores.value[0]?.value ?? null, date: Date.now(), remark: '', createMissingItems: true }
   manualLines.value = []
   manualVisible.value = true
+  manualDraft.start()
 }
 async function saveManual() {
   if (!manual.value.storeId) return void message.error('请选择门店')
@@ -160,6 +181,7 @@ async function saveManual() {
     const d = new Date(manual.value.date ?? Date.now())
     const requestDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const created = await purchaseRequestApi.create({ storeId: manual.value.storeId, requestDate, remark: manual.value.remark.trim() || undefined, items: toBody(manualLines.value), createMissingItems: manual.value.createMissingItems })
+    manualDraft.clear()
     manualVisible.value = false
     message.success('申购单已保存为草稿：可以点开补单价、改数量，没问题再提交审批')
     await fetchList()

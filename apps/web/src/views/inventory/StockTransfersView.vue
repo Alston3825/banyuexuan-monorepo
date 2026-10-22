@@ -10,6 +10,7 @@ import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
 import { docMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useFormDraft } from '../../composables/useFormDraft'
 
 const router = useRouter()
 
@@ -29,6 +30,10 @@ const model = ref({
   items: [] as (StockTransferItemInput & { key: number })[],
 })
 let itemRowKey = 0
+// 单据填到一半被刷新/闪退/误关：重新打开能恢复
+const draft = useFormDraft('stock-transfer-create', model, (m) => m.items.length === 0 && !m.remark && !m.fromWarehouseId && !m.toWarehouseId, (m) => {
+  itemRowKey = Math.max(itemRowKey, ...m.items.map((i) => i.key + 1), 0)
+})
 
 const keyword = ref('')
 const shown = computed(() => rows.value.filter((r) => docMatches(keyword.value, [r.transferNo, r.fromWarehouse?.name, r.toWarehouse?.name, r.remark], r.items)))
@@ -56,6 +61,7 @@ async function fetchAll() {
 function openCreateModal() {
   model.value = { fromWarehouseId: null, toWarehouseId: null, remark: '', items: [] }
   formVisible.value = true
+  draft.start()
 }
 
 function createItemRow() {
@@ -85,6 +91,7 @@ async function handleSubmit() {
       items: model.value.items.map(({ key: _key, ...i }) => i),
     })
     message.success('调拨单已创建')
+    draft.clear()
     formVisible.value = false
     await fetchAll()
   } finally {
