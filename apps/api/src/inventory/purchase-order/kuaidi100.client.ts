@@ -16,6 +16,7 @@ export interface TraceResult {
 }
 
 export const LOGISTICS_STATE_LABEL: Record<number, string> = {
+  [-1]: '暂无物流信息',
   0: '运输中',
   1: '已揽收',
   2: '疑难件',
@@ -81,6 +82,10 @@ export class Kuaidi100Client {
     } catch (e) {
       this.logger.warn(`快递100 请求失败：${(e as Error).message}`);
       throw new ServiceUnavailableException('快递100 暂时连不上，稍后再试');
+    }
+    // 刚发出的快递、或单号/快递公司不对时：{result:false, returnCode:'500', message:'查询无结果，请隔段时间再查'}——不算故障，显示“暂无物流信息”
+    if (body.result === false && String(body.returnCode) === '500' && /无结果/.test(String(body.message ?? ''))) {
+      return { state: -1, events: [], company, num };
     }
     // 出错时返回 {result:false, returnCode, message}；没有轨迹时 message 常是“ok”但 data 为空，或 status 非 200
     if (body.result === false || (body.status !== undefined && String(body.status) !== '200')) {

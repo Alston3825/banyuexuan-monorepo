@@ -70,6 +70,17 @@ describe('P8 采购单物流 / 快递100 (e2e)', () => {
     }
   });
 
+  it('1b. 快递100 返回“查询无结果”（刚发出/单号不对）不算故障，状态是“暂无物流信息”', async () => {
+    const orig = global.fetch;
+    global.fetch = (async () => new Response(JSON.stringify({ result: false, returnCode: '500', message: '查询无结果，请隔段时间再查' }))) as typeof fetch;
+    try {
+      const r = await app.get(Kuaidi100Client).query('yuantong', 'YT_NONE', null);
+      expect(r).toMatchObject({ state: -1, events: [] });
+    } finally {
+      global.fetch = orig;
+    }
+  });
+
   it('2. 登记平台和单号后自动查一次：轨迹/状态存起来；元数据里有快递公司列表；草稿状态的采购单不能登记', async () => {
     const meta = (await request(server).get('/api/v1/inventory/purchase-orders/logistics-meta').set(authed()).expect(200)).body as Json;
     expect(meta.configured).toBe(true);

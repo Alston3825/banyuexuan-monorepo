@@ -199,7 +199,7 @@ function actionButtons(row: PurchaseOrder): VNode[] {
   return b
 }
 
-const LOGISTICS_LABEL: Record<number, string> = { 0: '运输中', 1: '已揽收', 2: '疑难件', 3: '已签收', 4: '已退签', 5: '派件中', 6: '退回中', 7: '转投中', 8: '清关中', 14: '已拒签' }
+const LOGISTICS_LABEL: Record<number, string> = { [-1]: '暂无信息', 0: '运输中', 1: '已揽收', 2: '疑难件', 3: '已签收', 4: '已退签', 5: '派件中', 6: '退回中', 7: '转投中', 8: '清关中', 14: '已拒签' }
 const columns: DataTableColumns<PurchaseOrder> = [
   { key: 'orderNo', title: '采购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => (detail.value = r) }, r.orderNo) },
   { key: 'supplier', title: '供应商', width: 140, render: (r) => r.supplier.name },

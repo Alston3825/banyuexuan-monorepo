@@ -111,7 +111,7 @@ const fmtTime = (s: string | null) => (s ? s.replace('T', ' ').slice(0, 16) : ''
     <n-timeline v-if="info && info.trace.length > 0" style="margin-top: 12px">
       <n-timeline-item v-for="(t, i) in info.trace" :key="i" :type="i === 0 ? 'success' : 'default'" :title="t.context" :content="t.location" :time="t.time" />
     </n-timeline>
-    <div v-else-if="info?.expressNo" class="pl-sub" style="margin-top: 8px">暂时还没有物流轨迹（刚发出的快递可能要几小时后才有）。</div>
+    <div v-else-if="info?.expressNo" class="pl-sub" style="margin-top: 8px">暂时还没有物流轨迹（刚发出的快递可能要几小时后才有；如果一直没有，请核对快递公司和单号是否填对）。</div>
   </div>
 </template>
 
