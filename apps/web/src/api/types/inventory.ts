@@ -159,6 +159,9 @@ export interface PurchaseOrder {
   purchasedById?: string | null
   expressNo?: string | null
   purchaseNote?: string | null
+  platform?: string | null
+  platformOrderNo?: string | null
+  logisticsState?: number | null
   supplier: Supplier
   warehouse: Warehouse
   items: PurchaseOrderItem[]

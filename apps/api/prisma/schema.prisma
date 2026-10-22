@@ -3192,6 +3192,16 @@ model PurchaseOrder {
   purchasedById String?            @map("purchased_by_id")
   expressNo     String?            @map("express_no")
   purchaseNote  String?            @map("purchase_note") @db.Text
+  /// 采购平台（1688/TAOBAO/PDD/OTHER）与平台订单号；物流：快递公司（快递100编码）、收/寄件手机尾号（顺丰需要）、
+  /// 快递100 返回的状态码、轨迹（JSON）、最近一次查询时间/出错信息
+  platform         String?   @map("platform") @db.VarChar(20)
+  platformOrderNo  String?   @map("platform_order_no") @db.VarChar(64)
+  expressCompany   String?   @map("express_company") @db.VarChar(40)
+  expressPhoneTail String?   @map("express_phone_tail") @db.VarChar(8)
+  logisticsState   Int?      @map("logistics_state")
+  logisticsTrace   Json?     @map("logistics_trace")
+  logisticsCheckedAt DateTime? @map("logistics_checked_at")
+  logisticsError   String?   @map("logistics_error") @db.VarChar(255)
   createdBy     String             @map("created_by")
   createdAt     DateTime           @default(now()) @map("created_at")
   updatedAt     DateTime           @updatedAt @map("updated_at")

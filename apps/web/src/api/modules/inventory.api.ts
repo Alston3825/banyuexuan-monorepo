@@ -84,6 +84,27 @@ export const stockBatchApi = {
     http.get<StockBatchExpiryAlert[]>('/inventory/stock-batches/expiry-alerts', { params }).then((r) => r.data),
 }
 
+export interface LogisticsMeta {
+  configured: boolean
+  companies: { code: string; name: string }[]
+  platforms: string[]
+  stateLabels: Record<string, string>
+}
+export interface PurchaseLogistics {
+  id: string
+  platform: string | null
+  platformOrderNo: string | null
+  expressNo: string | null
+  expressCompany: string | null
+  expressCompanyName: string | null
+  expressPhoneTail: string | null
+  logisticsState: number | null
+  logisticsStateLabel: string | null
+  trace: { time: string; context: string; location?: string }[]
+  checkedAt: string | null
+  error: string | null
+}
+
 export const purchaseOrderApi = {
   list: (params?: { storeId?: string; warehouseId?: string; supplierId?: string; status?: string }) =>
     http.get<PurchaseOrder[]>('/inventory/purchase-orders', { params }).then((r) => r.data),
@@ -93,6 +114,12 @@ export const purchaseOrderApi = {
   /** 采购员确认已完成采购：采购单变“已采购”，并自动生成待收货的入库单 */
   confirmPurchase: (id: string, body: { version: number; expressNo?: string; note?: string }) =>
     http.post<{ order: PurchaseOrder; receipt: { id: string; receiptNo: string } }>(`/inventory/purchase-orders/${id}/confirm-purchase`, body).then((r) => r.data),
+  /** 物流：下拉选项、登记平台/单号、查看和刷新轨迹（快递100） */
+  logisticsMeta: () => http.get<LogisticsMeta>('/inventory/purchase-orders/logistics-meta').then((r) => r.data),
+  logistics: (id: string) => http.get<PurchaseLogistics>(`/inventory/purchase-orders/${id}/logistics`).then((r) => r.data),
+  saveLogistics: (id: string, body: Partial<Pick<PurchaseLogistics, 'platform' | 'platformOrderNo' | 'expressNo' | 'expressCompany' | 'expressPhoneTail'>>) =>
+    http.patch<PurchaseLogistics>(`/inventory/purchase-orders/${id}/logistics`, body).then((r) => r.data),
+  refreshLogistics: (id: string) => http.post<PurchaseLogistics>(`/inventory/purchase-orders/${id}/logistics/refresh`).then((r) => r.data),
   cancel: (id: string, cancelReason: string, version: number) =>
     http.post<PurchaseOrder>(`/inventory/purchase-orders/${id}/cancel`, { cancelReason, version }).then((r) => r.data),
 }

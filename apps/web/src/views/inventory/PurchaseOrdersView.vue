@@ -11,6 +11,7 @@ import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
+import PurchaseLogisticsPanel from '../../components/inventory/PurchaseLogisticsPanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { PurchaseOrder, PurchaseOrderItemInput, Supplier, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
@@ -198,12 +199,14 @@ function actionButtons(row: PurchaseOrder): VNode[] {
   return b
 }
 
+const LOGISTICS_LABEL: Record<number, string> = { 0: '运输中', 1: '已揽收', 2: '疑难件', 3: '已签收', 4: '已退签', 5: '派件中', 6: '退回中', 7: '转投中', 8: '清关中', 14: '已拒签' }
 const columns: DataTableColumns<PurchaseOrder> = [
   { key: 'orderNo', title: '采购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => (detail.value = r) }, r.orderNo) },
   { key: 'supplier', title: '供应商', width: 140, render: (r) => r.supplier.name },
   { key: 'warehouse', title: '入库仓库', width: 120, render: (r) => r.warehouse.name },
   { key: 'totalAmount', title: '金额（元）', width: 100, render: (r) => yuan(r.totalAmount) },
   { key: 'status', title: '状态', width: 130, render: (r) => renderStatusBadge(r.status, PURCHASE_ORDER_STATUS_MAP) },
+  { key: 'logistics', title: '物流', width: 90, render: (r) => (r.logisticsState === null || r.logisticsState === undefined ? (r.expressNo ? '已登记' : '-') : LOGISTICS_LABEL[r.logisticsState] ?? '运输中') },
   { key: 'purchasedAt', title: '采购时间', width: 140, render: (r) => dt(r.purchasedAt) },
   { key: 'createdAt', title: '创建时间', width: 140, render: (r) => dt(r.createdAt) },
   { key: 'actions', title: '操作', width: 200, fixed: 'right', render: (r) => h(NSpace, { size: 6 }, { default: () => actionButtons(r) }) },
@@ -227,6 +230,7 @@ onMounted(fetchAll)
       <div v-for="r in shown" :key="r.id" class="po-card" @click="detail = r">
         <div class="po-top"><b>{{ r.orderNo }}</b><component :is="() => renderStatusBadge(r.status, PURCHASE_ORDER_STATUS_MAP)" /></div>
         <div class="po-line">{{ r.supplier.name }} · {{ r.warehouse.name }} · <b>{{ yuan(r.totalAmount) }} 元</b></div>
+        <div v-if="r.logisticsState !== null && r.logisticsState !== undefined" class="po-line">🚚 {{ LOGISTICS_LABEL[r.logisticsState] ?? '运输中' }}</div>
         <n-space v-if="r.status === 'APPROVED' && canPurchase" style="margin-top: 6px" @click.stop>
           <n-button size="small" type="primary" @click="openBuy(r)">确认采购</n-button>
         </n-space>
@@ -250,6 +254,7 @@ onMounted(fetchAll)
           <n-descriptions-item v-if="detail.cancelReason" label="取消原因" :span="2">{{ detail.cancelReason }}</n-descriptions-item>
           <n-descriptions-item v-if="receiptOf(detail)" label="入库单" :span="2"><a style="cursor: pointer; color: #2080f0" @click="router.push('/inventory/goods-receipts')">{{ receiptOf(detail)!.receiptNo }}（去入库单页面收货）</a></n-descriptions-item>
         </n-descriptions>
+        <PurchaseLogisticsPanel v-if="detail.status !== 'DRAFT' && detail.status !== 'CANCELLED'" :order-id="detail.id" :can-edit="canPurchase" @changed="fetchAll" />
         <n-input v-if="detail.items.length > 6" v-model:value="lineKeyword" clearable placeholder="🔍 在这张采购单里搜物品（名称 / 拼音首字母）" style="margin-bottom: 8px" />
         <table class="po-table">
           <thead><tr><th>物品</th><th>规格</th><th>数量</th><th>单价（元）</th><th>小计（元）</th></tr></thead>
