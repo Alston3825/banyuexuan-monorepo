@@ -35,6 +35,7 @@ export const LOGISTICS_FINAL_STATES = [3, 4, 6, 14];
 export const EXPRESS_COMPANIES: { code: string; name: string }[] = [
   { code: 'yuantong', name: '圆通' },
   { code: 'zhongtong', name: '中通' },
+  { code: 'zhongtongkuaiyun', name: '中通快运' },
   { code: 'shentong', name: '申通' },
   { code: 'yunda', name: '韵达' },
   { code: 'jtexpress', name: '极兔' },

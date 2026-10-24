@@ -11,6 +11,7 @@ import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import ItemLinesEditor, { type ItemLine } from '../../components/inventory/ItemLinesEditor.vue'
+import Import1688Modal from '../../components/inventory/Import1688Modal.vue'
 import PurchaseLogisticsPanel from '../../components/inventory/PurchaseLogisticsPanel.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { PurchaseOrder, PurchaseOrderItemInput, Supplier, Warehouse, InventoryItem } from '../../api/types/inventory'
@@ -222,7 +223,10 @@ onMounted(fetchAll)
         <n-input v-model:value="keyword" clearable placeholder="🔍 搜索：采购单号 / 供应商 / 物品名称（支持拼音首字母）/ 运单号" style="width: min(400px, 94vw)" />
         <n-select v-model:value="filterStatus" :options="statusOptions" clearable placeholder="全部状态" style="width: 150px" />
       </n-space>
-      <n-button v-if="canCreate" type="primary" @click="openCreateModal">手工新建采购单（需审批）</n-button>
+      <n-space :wrap="true">
+        <Import1688Modal v-if="canPurchase" @done="fetchAll" />
+        <n-button v-if="canCreate" type="primary" @click="openCreateModal">手工新建采购单（需审批）</n-button>
+      </n-space>
     </n-space>
 
     <template v-if="isMobile">

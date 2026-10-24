@@ -105,7 +105,58 @@ export interface PurchaseLogistics {
   error: string | null
 }
 
+export interface Import1688Order {
+  orderNo: string
+  seller: string
+  sellerMember: string
+  status: string
+  createdAt: string | null
+  goodsTotal: number
+  freight: number
+  paid: number
+  titles: string[]
+  expressCompanyRaw: string
+  expressCompany: string | null
+  expressNos: string[]
+}
+export interface Import1688PoBrief {
+  id: string
+  orderNo: string
+  supplierName: string
+  status: string
+  totalAmount: number
+  createdAt: string
+  itemsText: string
+  expressNo: string | null
+  platformOrderNo: string | null
+}
+export interface Import1688Row {
+  order: Import1688Order
+  confidence: 'high' | 'medium' | 'none'
+  score: number
+  reasons: string[]
+  match: Import1688PoBrief | null
+  alternatives: Import1688PoBrief[]
+  alreadyLinked: boolean
+  notes: string[]
+}
+export interface Import1688CommitItem {
+  purchaseOrderId: string
+  platformOrderNo: string
+  expressNo?: string | null
+  expressCompany?: string | null
+  extraExpressNos?: string[]
+}
+
 export const purchaseOrderApi = {
+  /** 导入 1688 导出的订单表：第一步智能对应（不写库），第二步确认后登记订单号和运单号 */
+  import1688Preview: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post<{ rows: Import1688Row[]; total: number }>('/inventory/purchase-orders/import-1688/preview', form, { timeout: 60_000 }).then((r) => r.data)
+  },
+  import1688Commit: (items: Import1688CommitItem[]) =>
+    http.post<{ results: { purchaseOrderId: string; platformOrderNo: string; ok: boolean; error?: string }[]; okCount: number }>('/inventory/purchase-orders/import-1688/commit', { items }, { timeout: 120_000 }).then((r) => r.data),
   list: (params?: { storeId?: string; warehouseId?: string; supplierId?: string; status?: string }) =>
     http.get<PurchaseOrder[]>('/inventory/purchase-orders', { params }).then((r) => r.data),
   get: (id: string) => http.get<PurchaseOrder>(`/inventory/purchase-orders/${id}`).then((r) => r.data),
