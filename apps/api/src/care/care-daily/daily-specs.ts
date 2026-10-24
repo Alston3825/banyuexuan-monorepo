@@ -10,7 +10,6 @@ import {
   FieldSpec,
   GroupSpec,
   LOCHIA_AMOUNT,
-  LOCHIA_COLOR,
   LOCHIA_ODOR,
   columnName,
   date,
@@ -22,6 +21,9 @@ import {
   single,
   text,
 } from '../care-assessment/assessment-specs';
+
+/** 日常记录里的恶露颜色（入所/出所评估表仍用 LOCHIA_COLOR） */
+const DAILY_LOCHIA_COLOR = [o('BRIGHT_RED', '鲜红'), o('PINK', '粉红'), o('DARK_RED', '暗红'), o('BROWN', '褐色')];
 
 /** 体征行的统一读法：这几行纸上的习惯是“没问题就把那个词划掉”，所以被划掉的绝对不能当成选中 */
 const SIGN_HINT =
@@ -60,7 +62,7 @@ export const DAILY_MOTHER_FIELDS: GroupSpec[] = [
     title: '恶露与二便',
     fields: [
       single('lochiaStatus', '恶露状态', [o('CLEAN', '已净'), o('NOT_CLEAN', '未净')]),
-      single('lochiaColor', '恶露颜色', LOCHIA_COLOR, { aiHint: '手写如“淡红”对应 PINK' }),
+      single('lochiaColor', '恶露颜色', DAILY_LOCHIA_COLOR, { aiHint: '手写如“淡红”对应 PINK，“鲜红/红”对应 BRIGHT_RED，“暗红”对应 DARK_RED' }),
       single('lochiaAmount', '恶露量', LOCHIA_AMOUNT),
       single('lochiaOdor', '恶露气味', LOCHIA_ODOR),
       text('bowel', '大便'),
