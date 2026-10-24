@@ -68,6 +68,24 @@ export class PurchaseOrderController {
     return this.purchaseOrderService.findMany(query);
   }
 
+  @Get(':id/shipments')
+  @RequirePermission('inventory.purchase-order.view')
+  shipments(@Param('id') id: string) {
+    return this.logistics.shipments(id);
+  }
+
+  @Post(':id/shipments/refresh')
+  @RequirePermission('inventory.purchase-order.view')
+  refreshShipments(@Param('id') id: string) {
+    return this.logistics.refreshShipments(id);
+  }
+
+  @Post(':id/shipments/:sid/refresh')
+  @RequirePermission('inventory.purchase-order.view')
+  refreshShipment(@Param('id') id: string, @Param('sid') sid: string) {
+    return this.logistics.refreshShipment(id, sid);
+  }
+
   @Get(':id/logistics')
   @RequirePermission('inventory.purchase-order.view')
   getLogistics(@Param('id') id: string) {

@@ -18,6 +18,7 @@ const includeOrder = {
   warehouse: true,
   items: { include: { item: true } },
   goodsReceipts: { select: { id: true, receiptNo: true, status: true, tracked: true } },
+  shipments: { select: { id: true, logisticsState: true, expressNo: true } },
 };
 
 /**

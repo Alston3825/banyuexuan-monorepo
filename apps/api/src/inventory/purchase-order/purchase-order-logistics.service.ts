@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
-import { EXPRESS_COMPANIES, Kuaidi100Client, LOGISTICS_STATE_LABEL } from './kuaidi100.client';
+import { EXPRESS_COMPANIES, Kuaidi100Client, LOGISTICS_FINAL_STATES, LOGISTICS_STATE_LABEL } from './kuaidi100.client';
 import { PurchaseOrderLogisticsCore } from './purchase-order-logistics.core';
 
 export const PURCHASE_PLATFORMS = ['1688', 'TAOBAO', 'PDD', 'OTHER'] as const;
@@ -86,5 +86,30 @@ export class PurchaseOrderLogisticsService {
 
   async get(id: string) {
     return this.core.view(await this.order(id));
+  }
+
+  /** 采购单下的 1688 订单/包裹明细（带物流轨迹） */
+  async shipments(id: string) {
+    await this.order(id);
+    const rows = await this.prisma.purchaseOrderShipment.findMany({ where: { purchaseOrderId: id }, orderBy: [{ createdAt: 'asc' }, { platformOrderNo: 'asc' }] });
+    return rows.map((r) => this.core.shipmentView(r));
+  }
+
+  /** 刷新这张采购单下所有还没签收的包裹；后台依次查，立即返回 */
+  async refreshShipments(id: string) {
+    await this.order(id);
+    const rows = await this.prisma.purchaseOrderShipment.findMany({
+      where: { purchaseOrderId: id, expressNo: { not: '' }, expressCompany: { not: null }, OR: [{ logisticsState: null }, { logisticsState: { notIn: LOGISTICS_FINAL_STATES } }] },
+      select: { id: true },
+    });
+    void this.core.refreshShipments(rows.map((r) => r.id));
+    return { queued: rows.length };
+  }
+
+  async refreshShipment(id: string, shipmentId: string) {
+    await this.order(id);
+    const sh = await this.prisma.purchaseOrderShipment.findFirst({ where: { id: shipmentId, purchaseOrderId: id } });
+    if (!sh) throw new NotFoundException('平台订单不存在');
+    return this.core.refreshShipment(shipmentId, true);
   }
 }

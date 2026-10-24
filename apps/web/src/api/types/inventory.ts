@@ -162,6 +162,8 @@ export interface PurchaseOrder {
   platform?: string | null
   platformOrderNo?: string | null
   logisticsState?: number | null
+  /** 采购单下的 1688 订单/包裹（列表里只带状态） */
+  shipments?: { id: string; logisticsState: number | null; expressNo: string }[]
   supplier: Supplier
   warehouse: Warehouse
   items: PurchaseOrderItem[]

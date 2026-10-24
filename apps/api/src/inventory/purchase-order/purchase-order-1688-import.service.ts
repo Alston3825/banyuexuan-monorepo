@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { CellValue, readXlsx } from '../../common/utils/xlsx-reader';
-import { PurchaseOrderLogisticsService } from './purchase-order-logistics.service';
+import { PurchaseOrderLogisticsCore } from './purchase-order-logistics.core';
 
 /** 1688 导出的订单（同一订单号的多行货品已合并） */
 export interface Import1688Order {
@@ -48,9 +48,13 @@ export interface Import1688Row {
 export interface Import1688CommitItem {
   purchaseOrderId: string;
   platformOrderNo: string;
-  expressNo?: string | null;
+  sellerName?: string | null;
+  goodsTitle?: string | null;
+  /** 实付，元 */
+  paid?: number;
+  orderStatus?: string | null;
   expressCompany?: string | null;
-  extraExpressNos?: string[];
+  expressNos?: string[];
 }
 
 /** 1688 里的快递公司名 → 快递100 编码 */
@@ -135,7 +139,7 @@ export class PurchaseOrder1688ImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ctx: RequestContextService,
-    private readonly logistics: PurchaseOrderLogisticsService,
+    private readonly core: PurchaseOrderLogisticsCore,
   ) {}
 
   parse(buf: Buffer): Import1688Order[] {
@@ -206,85 +210,63 @@ export class PurchaseOrder1688ImportService {
       expressNo: p.expressNo,
       platformOrderNo: p.platformOrderNo,
     });
+    // 之前登记过的 1688 订单号 → 采购单
+    const linked = await this.prisma.purchaseOrderShipment.findMany({
+      where: { tenantId: this.ctx.tenantId, platformOrderNo: { in: orders.map((o) => o.orderNo) } },
+      select: { platformOrderNo: true, purchaseOrderId: true },
+    });
+    const linkedMap = new Map(linked.map((l) => [l.platformOrderNo, l.purchaseOrderId]));
 
-    type Pair = { o: number; p: number; score: number; reasons: string[] };
-    const pairs: Pair[] = [];
-    const linkedPo = new Map<number, number>();
-    orders.forEach((o, oi) => {
+    // 一张采购单常常对应 1688 上的很多笔订单，所以不做“一对一”，每笔订单各自找最像的采购单
+    const rows: Import1688Row[] = orders.map((o) => {
       const sellerNames = [o.seller, o.sellerMember].filter(Boolean);
       const allTitles = o.titles.join(' ');
       const amounts = [o.goodsTotal, o.paid, o.goodsTotal + o.freight].map(fen);
-      pos.forEach((p, pi) => {
-        if (p.platformOrderNo === o.orderNo) {
-          pairs.push({ o: oi, p: pi, score: 200, reasons: ['已经登记过这张 1688 订单号'] });
-          linkedPo.set(oi, pi);
-          return;
-        }
-        if (p.platformOrderNo) return; // 已对上别的 1688 订单
+      const scored = pos.map((p) => {
         let score = 0;
         const reasons: string[] = [];
-        if (amounts.includes(p.totalAmount) && p.totalAmount > 0) {
+        if (linkedMap.get(o.orderNo) === p.id || p.platformOrderNo === o.orderNo) return { p, score: 200, reasons: ['已经登记过这张 1688 订单号'] };
+        if (p.totalAmount > 0 && amounts.includes(p.totalAmount)) {
           score += 50;
           reasons.push(`金额一致（${(p.totalAmount / 100).toFixed(2)} 元）`);
-        } else {
-          const near = amounts.some((a) => a > 0 && Math.abs(a - p.totalAmount) / a <= 0.1);
-          if (near) {
-            score += 15;
-            reasons.push('金额接近');
-          }
         }
         const sup = p.supplier.name;
-        const supSim = Math.max(0, ...sellerNames.map((s) => (s.includes(sup) || sup.includes(s) ? 1 : dice(s, sup))));
+        const supSim = Math.max(0, ...sellerNames.map((x) => (x.includes(sup) || sup.includes(x) ? 1 : dice(x, sup))));
         if (supSim >= 0.5) {
           score += Math.round(25 * supSim);
           reasons.push('供应商名称相近');
         }
-        const names = p.items.map((i) => `${i.item.name}${i.item.spec ?? ''}`);
-        if (names.length) {
-          const sim = names.reduce((s, n) => s + containment(n, allTitles), 0) / names.length;
-          if (sim >= 0.4) {
-            score += Math.round(30 * sim);
-            reasons.push('货品名称相符');
+        // 货品：采购单里有没有哪个物品名出现在这笔订单的货品标题里（采购单可以有很多物品，命中其中几个即可）
+        const hits = p.items.filter((i) => containment(`${i.item.name}`, allTitles) >= 0.99).map((i) => i.item.name);
+        if (hits.length) {
+          score += Math.min(60, 45 + hits.length * 5);
+          reasons.push(`货品相符：${hits.slice(0, 3).join('、')}`);
+        } else {
+          const best = Math.max(0, ...p.items.map((i) => containment(`${i.item.name}`, allTitles)));
+          if (best >= 0.5) {
+            score += Math.round(30 * best);
+            reasons.push('货品名称部分相符');
           }
         }
-        if (o.createdAt) {
-          const gap = Math.abs(new Date(o.createdAt).getTime() - p.createdAt.getTime());
-          if (gap <= 3 * 86400_000) score += 5;
-        }
-        if (score >= 30) pairs.push({ o: oi, p: pi, score, reasons });
+        return { p, score, reasons };
       });
-    });
-
-    // 一对一：分数高的先配
-    const takenO = new Set<number>();
-    const takenP = new Set<number>();
-    const chosen = new Map<number, Pair>();
-    for (const pr of [...pairs].sort((a, b) => b.score - a.score)) {
-      if (takenO.has(pr.o) || takenP.has(pr.p)) continue;
-      takenO.add(pr.o);
-      takenP.add(pr.p);
-      chosen.set(pr.o, pr);
-    }
-
-    const rows: Import1688Row[] = orders.map((o, oi) => {
-      const mine = pairs.filter((x) => x.o === oi).sort((a, b) => b.score - a.score);
-      const pick = chosen.get(oi) ?? null;
-      const second = mine.find((x) => x !== pick);
-      const margin = pick ? pick.score - (second?.score ?? 0) : 0;
-      const confidence: Import1688Row['confidence'] = !pick ? 'none' : pick.score >= 200 || (pick.score >= 75 && margin >= 15) ? 'high' : pick.score >= 45 ? 'medium' : 'none';
+      const ranked = scored.filter((x) => x.score >= 30).sort((a, b) => b.score - a.score);
+      const pick = ranked[0] ?? null;
+      const margin = pick ? pick.score - (ranked[1]?.score ?? 0) : 0;
+      const confidence: Import1688Row['confidence'] = !pick ? 'none' : pick.score >= 200 || (pick.score >= 50 && margin >= 15) ? 'high' : pick.score >= 40 ? 'medium' : 'none';
       const notes: string[] = [];
       if (/关闭|取消/.test(o.status)) notes.push(`订单状态“${o.status}”，一般不用登记`);
-      if (!o.expressNos.length) notes.push('还没发货/没有运单号，只登记订单号');
-      else if (!o.expressCompany) notes.push(`快递公司“${o.expressCompanyRaw || '空'}”没认出来，只登记订单号，请到采购单里手动选快递公司`);
-      if (o.expressNos.length > 1) notes.push(`有 ${o.expressNos.length} 个运单号，系统先查第 1 个，其余记在备注里`);
+      if (!o.expressNos.length) notes.push('还没发货/没有运单号，只登记订单号，发货后再导入一次即可补上运单号');
+      else if (!o.expressCompany) notes.push(`快递公司“${o.expressCompanyRaw || '空'}”没认出来，只登记订单号，不查物流`);
+      if (o.expressNos.length > 1) notes.push(`有 ${o.expressNos.length} 个运单号，每个单号分别查物流`);
       return {
         order: o,
         confidence,
         score: pick?.score ?? 0,
         reasons: pick?.reasons ?? [],
-        match: confidence === 'none' ? null : brief(pos[pick!.p]),
-        alternatives: mine.slice(0, 4).map((x) => brief(pos[x.p])),
-        alreadyLinked: linkedPo.get(oi) !== undefined && pick?.p === linkedPo.get(oi),
+        match: pick && confidence !== 'none' ? brief(pick.p) : null,
+        alternatives: ranked.slice(0, 4).map((x) => brief(x.p)),
+        alreadyLinked: !!pick && pick.score >= 200,
         notes,
       };
     });
@@ -292,38 +274,45 @@ export class PurchaseOrder1688ImportService {
     return { rows, total: rows.length };
   }
 
+  /** 确认登记：每笔 1688 订单（每个运单号）记成采购单下的一条“平台订单”，再用快递100 查物流（后台依次查） */
   async commit(items: Import1688CommitItem[]) {
     if (!items?.length) throw new BadRequestException('没有要登记的订单');
+    const tenantId = this.ctx.tenantId!;
     const results: { purchaseOrderId: string; platformOrderNo: string; ok: boolean; error?: string }[] = [];
-    const seen = new Set<string>();
+    const toRefresh: string[] = [];
     for (const it of items) {
       const base = { purchaseOrderId: it.purchaseOrderId, platformOrderNo: it.platformOrderNo };
       try {
-        if (seen.has(it.purchaseOrderId)) throw new BadRequestException('同一张采购单被选了多次');
-        seen.add(it.purchaseOrderId);
-        const dup = await this.prisma.purchaseOrder.findFirst({
-          where: { tenantId: this.ctx.tenantId, platformOrderNo: it.platformOrderNo, id: { not: it.purchaseOrderId } },
-          select: { orderNo: true },
-        });
-        if (dup) throw new BadRequestException(`这张 1688 订单已经登记在采购单 ${dup.orderNo} 上`);
-        await this.logistics.updateInfo(it.purchaseOrderId, {
-          platform: '1688',
-          platformOrderNo: it.platformOrderNo,
-          expressNo: it.expressNo || undefined,
-          expressCompany: it.expressNo && it.expressCompany ? it.expressCompany : undefined,
-        });
-        if (it.extraExpressNos?.length) {
-          const po = await this.prisma.purchaseOrder.findFirst({ where: { id: it.purchaseOrderId, tenantId: this.ctx.tenantId }, select: { purchaseNote: true } });
-          const line = `1688 另有运单号：${it.extraExpressNos.join('、')}`;
-          if (!po?.purchaseNote?.includes(line)) {
-            await this.prisma.purchaseOrder.update({ where: { id: it.purchaseOrderId }, data: { purchaseNote: [po?.purchaseNote, line].filter(Boolean).join('\n') } });
-          }
+        const po = await this.prisma.purchaseOrder.findFirst({ where: { id: it.purchaseOrderId, tenantId }, select: { id: true, status: true, orderNo: true } });
+        if (!po) throw new BadRequestException('采购单不存在');
+        if (po.status === 'DRAFT' || po.status === 'CANCELLED') throw new BadRequestException('这张采购单当前状态不需要登记物流');
+        const other = await this.prisma.purchaseOrderShipment.findFirst({ where: { tenantId, platformOrderNo: it.platformOrderNo, purchaseOrderId: { not: po.id } }, include: { purchaseOrder: { select: { orderNo: true } } } });
+        if (other) throw new BadRequestException(`这张 1688 订单已经登记在采购单 ${other.purchaseOrder.orderNo} 上`);
+        const nos = (it.expressNos ?? []).map((n) => n.trim()).filter(Boolean);
+        const company = it.expressCompany || null;
+        const common = {
+          sellerName: it.sellerName?.slice(0, 120) || null,
+          goodsTitle: it.goodsTitle?.slice(0, 500) || null,
+          amount: fen(it.paid ?? 0),
+          orderStatus: it.orderStatus?.slice(0, 40) || null,
+        };
+        for (const no of nos.length ? nos : ['']) {
+          const key = { purchaseOrderId: po.id, platformOrderNo: it.platformOrderNo, expressNo: no };
+          const sh = await this.prisma.purchaseOrderShipment.upsert({
+            where: { purchaseOrderId_platformOrderNo_expressNo: key },
+            create: { tenantId, platform: '1688', ...key, ...common, expressCompany: no ? company : null, createdBy: this.ctx.accountId! },
+            update: { ...common, expressCompany: no ? company : null },
+          });
+          if (no && company && (sh.logisticsState === null || sh.logisticsState === -1 || sh.logisticsError)) toRefresh.push(sh.id);
         }
+        // 有了真实运单号，就把之前“还没发货”的占位记录去掉
+        if (nos.length) await this.prisma.purchaseOrderShipment.deleteMany({ where: { purchaseOrderId: po.id, platformOrderNo: it.platformOrderNo, expressNo: '' } });
         results.push({ ...base, ok: true });
       } catch (e) {
         results.push({ ...base, ok: false, error: e instanceof Error ? e.message : '登记失败' });
       }
     }
-    return { results, okCount: results.filter((r) => r.ok).length };
+    if (toRefresh.length) void this.core.refreshShipments(toRefresh);
+    return { results, okCount: results.filter((r) => r.ok).length, querying: toRefresh.length };
   }
 }

@@ -70,11 +70,6 @@ async function onFile(e: Event) {
 }
 
 const picked = computed(() => lines.value.filter((l) => l.checked && l.poId))
-const dupPo = computed(() => {
-  const c = new Map<string, number>()
-  for (const l of picked.value) c.set(l.poId!, (c.get(l.poId!) ?? 0) + 1)
-  return [...c.values()].some((n) => n > 1)
-})
 
 async function save() {
   saving.value = true
@@ -82,12 +77,12 @@ async function save() {
     const res = await purchaseOrderApi.import1688Commit(
       picked.value.map((l) => {
         const o = l.row.order
-        return { purchaseOrderId: l.poId!, platformOrderNo: o.orderNo, expressNo: o.expressNos[0] ?? null, expressCompany: o.expressCompany, extraExpressNos: o.expressNos.slice(1) }
+        return { purchaseOrderId: l.poId!, platformOrderNo: o.orderNo, sellerName: o.seller || o.sellerMember, goodsTitle: o.titles.join(' ｜ '), paid: o.paid, orderStatus: o.status, expressCompany: o.expressCompany, expressNos: o.expressNos }
       }),
     )
     const bad = res.results.filter((r) => !r.ok)
     if (bad.length) message.warning(`登记了 ${res.okCount} 张，${bad.length} 张失败：${bad[0].error}`, { duration: 8000 })
-    else message.success(`已登记 ${res.okCount} 张采购单的 1688 订单号和运单号，物流会自动查询`)
+    else message.success(`已登记 ${res.okCount} 笔 1688 订单${res.querying ? `，正在后台查询 ${res.querying} 个运单的物流（稍后在采购单详情里看）` : ''}`, { duration: 6000 })
     if (res.okCount) emit('done')
     if (!bad.length) show.value = false
     else lines.value = lines.value.filter((l) => bad.some((b) => b.purchaseOrderId === l.poId))
@@ -113,7 +108,7 @@ async function save() {
       <n-empty v-if="!parsing && !lines.length" description="还没有选择文件" />
       <div v-else>
         <div class="muted" style="margin-bottom: 8px">
-          共 {{ lines.length }} 张 1688 订单，已勾选 {{ picked.length }} 张。“已对上”默认勾选；“请核对”“没对上”请在右边下拉里搜索并选对应的采购单（选了会自动勾上），再点下面的登记。
+          共 {{ lines.length }} 张 1688 订单，已勾选 {{ picked.length }} 张。“已对上”默认勾选；“请核对”“没对上”请在右边下拉里搜索并选对应的采购单（选了会自动勾上），再点下面的登记。一张采购单可以对应很多笔 1688 订单。
         </div>
         <div v-for="l in lines" :key="l.row.order.orderNo" class="im-card" :class="{ off: !l.checked }">
           <div class="im-head">
@@ -143,13 +138,12 @@ async function save() {
           </div>
           <div v-for="n in l.row.notes" :key="n" class="warn">· {{ n }}</div>
         </div>
-        <div v-if="dupPo" class="warn" style="margin: 8px 0">有两张 1688 订单选了同一张采购单，请只保留一张勾选。</div>
       </div>
 
       <template #footer>
         <n-space justify="end">
           <n-button @click="show = false">取消</n-button>
-          <n-button type="primary" :loading="saving" :disabled="!picked.length || dupPo" @click="save">登记勾选的 {{ picked.length }} 张</n-button>
+          <n-button type="primary" :loading="saving" :disabled="!picked.length" @click="save">登记勾选的 {{ picked.length }} 张</n-button>
         </n-space>
       </template>
     </n-card>

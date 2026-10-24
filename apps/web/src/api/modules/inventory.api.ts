@@ -143,9 +143,30 @@ export interface Import1688Row {
 export interface Import1688CommitItem {
   purchaseOrderId: string
   platformOrderNo: string
-  expressNo?: string | null
+  sellerName?: string | null
+  goodsTitle?: string | null
+  paid?: number
+  orderStatus?: string | null
   expressCompany?: string | null
-  extraExpressNos?: string[]
+  expressNos?: string[]
+}
+/** 采购单下的一笔平台订单/一个运单号 */
+export interface PurchaseShipment {
+  id: string
+  platform: string
+  platformOrderNo: string
+  sellerName: string | null
+  goodsTitle: string | null
+  amount: number
+  orderStatus: string | null
+  expressCompany: string | null
+  expressCompanyName: string | null
+  expressNo: string
+  logisticsState: number | null
+  logisticsStateLabel: string | null
+  trace: { time: string; context: string; location?: string }[]
+  checkedAt: string | null
+  error: string | null
 }
 
 export const purchaseOrderApi = {
@@ -156,7 +177,7 @@ export const purchaseOrderApi = {
     return http.post<{ rows: Import1688Row[]; total: number }>('/inventory/purchase-orders/import-1688/preview', form, { timeout: 60_000 }).then((r) => r.data)
   },
   import1688Commit: (items: Import1688CommitItem[]) =>
-    http.post<{ results: { purchaseOrderId: string; platformOrderNo: string; ok: boolean; error?: string }[]; okCount: number }>('/inventory/purchase-orders/import-1688/commit', { items }, { timeout: 120_000 }).then((r) => r.data),
+    http.post<{ results: { purchaseOrderId: string; platformOrderNo: string; ok: boolean; error?: string }[]; okCount: number; querying: number }>('/inventory/purchase-orders/import-1688/commit', { items }, { timeout: 120_000 }).then((r) => r.data),
   list: (params?: { storeId?: string; warehouseId?: string; supplierId?: string; status?: string }) =>
     http.get<PurchaseOrder[]>('/inventory/purchase-orders', { params }).then((r) => r.data),
   get: (id: string) => http.get<PurchaseOrder>(`/inventory/purchase-orders/${id}`).then((r) => r.data),
@@ -167,6 +188,9 @@ export const purchaseOrderApi = {
     http.post<{ order: PurchaseOrder; receipt: { id: string; receiptNo: string } }>(`/inventory/purchase-orders/${id}/confirm-purchase`, body).then((r) => r.data),
   /** 物流：下拉选项、登记平台/单号、查看和刷新轨迹（快递100） */
   logisticsMeta: () => http.get<LogisticsMeta>('/inventory/purchase-orders/logistics-meta').then((r) => r.data),
+  shipments: (id: string) => http.get<PurchaseShipment[]>(`/inventory/purchase-orders/${id}/shipments`).then((r) => r.data),
+  refreshShipments: (id: string) => http.post<{ queued: number }>(`/inventory/purchase-orders/${id}/shipments/refresh`).then((r) => r.data),
+  refreshShipment: (id: string, sid: string) => http.post<PurchaseShipment>(`/inventory/purchase-orders/${id}/shipments/${sid}/refresh`).then((r) => r.data),
   logistics: (id: string) => http.get<PurchaseLogistics>(`/inventory/purchase-orders/${id}/logistics`).then((r) => r.data),
   saveLogistics: (id: string, body: Partial<Pick<PurchaseLogistics, 'platform' | 'platformOrderNo' | 'expressNo' | 'expressCompany' | 'expressPhoneTail'>>) =>
     http.patch<PurchaseLogistics>(`/inventory/purchase-orders/${id}/logistics`, body).then((r) => r.data),

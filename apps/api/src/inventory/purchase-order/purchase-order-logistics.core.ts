@@ -70,6 +70,12 @@ export class PurchaseOrderLogisticsCore implements OnModuleInit, OnModuleDestroy
       take: 200,
     });
     let n = 0;
+    const ships = await this.prisma.purchaseOrderShipment.findMany({
+      where: { expressNo: { not: '' }, expressCompany: { not: null }, createdAt: { gte: since }, OR: [{ logisticsState: null }, { logisticsState: { notIn: LOGISTICS_FINAL_STATES } }] },
+      select: { id: true },
+      take: 300,
+    });
+    n += await this.refreshShipments(ships.map((x) => x.id));
     for (const r of rows) {
       try {
         await this.refreshOrder(r.id, false);
@@ -80,6 +86,75 @@ export class PurchaseOrderLogisticsCore implements OnModuleInit, OnModuleDestroy
       if (process.env.NODE_ENV !== 'test') await new Promise((res) => setTimeout(res, 1000));
     }
     return n;
+  }
+
+  /** 查一个平台订单/包裹（采购单下的 shipment）的物流并写回 */
+  async refreshShipment(id: string, throwOnError: boolean) {
+    const sh = await this.prisma.purchaseOrderShipment.findUniqueOrThrow({ where: { id } });
+    if (!sh.expressNo || !sh.expressCompany) throw new BadRequestException('这笔订单还没有快递公司或运单号');
+    try {
+      const r = await this.client.query(sh.expressCompany, sh.expressNo, null);
+      return this.shipmentView(
+        await this.prisma.purchaseOrderShipment.update({
+          where: { id },
+          data: { logisticsState: r.state, logisticsTrace: r.events as unknown as Prisma.InputJsonValue, logisticsCheckedAt: new Date(), logisticsError: null },
+        }),
+      );
+    } catch (e) {
+      const msg = ((e as Error).message ?? '查询失败').slice(0, 250);
+      const upd = await this.prisma.purchaseOrderShipment.update({ where: { id }, data: { logisticsCheckedAt: new Date(), logisticsError: msg } });
+      if (throwOnError) throw e;
+      return this.shipmentView(upd);
+    }
+  }
+
+  /** 一批 shipment 依次查（间隔 1 秒），出错不中断；返回成功条数 */
+  async refreshShipments(ids: string[]): Promise<number> {
+    let n = 0;
+    for (const id of ids) {
+      try {
+        await this.refreshShipment(id, true);
+        n += 1;
+      } catch (e) {
+        this.logger.warn(`刷新平台订单物流失败 ${id}：${(e as Error).message}`);
+      }
+      if (process.env.NODE_ENV !== 'test') await new Promise((res) => setTimeout(res, 1000));
+    }
+    return n;
+  }
+
+  shipmentView(sh: {
+    id: string;
+    platform: string;
+    platformOrderNo: string;
+    sellerName: string | null;
+    goodsTitle: string | null;
+    amount: number;
+    orderStatus: string | null;
+    expressCompany: string | null;
+    expressNo: string;
+    logisticsState: number | null;
+    logisticsTrace: unknown;
+    logisticsCheckedAt: Date | null;
+    logisticsError: string | null;
+  }) {
+    return {
+      id: sh.id,
+      platform: sh.platform,
+      platformOrderNo: sh.platformOrderNo,
+      sellerName: sh.sellerName,
+      goodsTitle: sh.goodsTitle,
+      amount: sh.amount,
+      orderStatus: sh.orderStatus,
+      expressCompany: sh.expressCompany,
+      expressCompanyName: EXPRESS_COMPANIES.find((c) => c.code === sh.expressCompany)?.name ?? sh.expressCompany,
+      expressNo: sh.expressNo,
+      logisticsState: sh.logisticsState,
+      logisticsStateLabel: sh.logisticsState === null ? null : (LOGISTICS_STATE_LABEL[sh.logisticsState] ?? `状态${sh.logisticsState}`),
+      trace: Array.isArray(sh.logisticsTrace) ? sh.logisticsTrace : [],
+      checkedAt: sh.logisticsCheckedAt,
+      error: sh.logisticsError,
+    };
   }
 
   view(o: OrderLogisticsRow) {

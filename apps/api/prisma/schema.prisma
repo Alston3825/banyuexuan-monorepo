@@ -3213,10 +3213,41 @@ model PurchaseOrder {
   items            PurchaseOrderItem[]
   goodsReceipts    GoodsReceipt[]
   purchaseRequests PurchaseRequest[]
+  shipments        PurchaseOrderShipment[]
 
   @@unique([tenantId, orderNo])
   @@index([tenantId, status])
   @@map("purchase_orders")
+}
+
+/// 采购单下的“平台订单/包裹”：一张采购单常对应 1688 上拆开下的很多笔订单，每笔（每个运单号）单独记平台订单号、卖家、金额和物流轨迹。
+model PurchaseOrderShipment {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  purchaseOrderId String   @map("purchase_order_id")
+  platform        String   @default("1688") @db.VarChar(20)
+  platformOrderNo String   @map("platform_order_no") @db.VarChar(64)
+  sellerName      String?  @map("seller_name") @db.VarChar(120)
+  goodsTitle      String?  @map("goods_title") @db.VarChar(500)
+  /// 实付金额（分）
+  amount          Int      @default(0)
+  orderStatus     String?  @map("order_status") @db.VarChar(40)
+  expressCompany  String?  @map("express_company") @db.VarChar(40)
+  /// 运单号；还没发货时为空字符串（唯一键不能含 NULL）
+  expressNo       String   @default("") @map("express_no") @db.VarChar(100)
+  logisticsState  Int?     @map("logistics_state")
+  logisticsTrace  Json?    @map("logistics_trace")
+  logisticsCheckedAt DateTime? @map("logistics_checked_at")
+  logisticsError  String?  @map("logistics_error") @db.VarChar(255)
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@unique([purchaseOrderId, platformOrderNo, expressNo])
+  @@index([tenantId, platformOrderNo])
+  @@map("purchase_order_shipments")
 }
 
 model PurchaseOrderItem {
