@@ -6,6 +6,7 @@
 import { computed, ref } from 'vue'
 import { NButton, NCheckbox, NEmpty, NModal, NCard, NSelect, NSpace, NTag } from 'naive-ui'
 import { purchaseOrderApi, type Import1688Row } from '../../api/modules/inventory.api'
+import type { PurchaseOrder } from '../../api/types/inventory'
 import { message } from '../../utils/discrete-api'
 
 const emit = defineEmits<{ done: [] }>()
@@ -26,20 +27,26 @@ const yuan = (n: number) => n.toFixed(2)
 const cents = (n: number) => (n / 100).toFixed(2)
 const CONF = { high: { type: 'success', text: '已对上' }, medium: { type: 'warning', text: '请核对' }, none: { type: 'error', text: '没对上' } } as const
 
+/** 所有可以登记的采购单（没对上 / 对错了，都能在下拉里搜着手动选） */
+const allPos = ref<PurchaseOrder[]>([])
+const poLabel = (p: PurchaseOrder) => `${p.orderNo} · ${p.supplier.name} · ${cents(p.totalAmount)}元 · ${p.items.map((i) => i.item?.name ?? '').filter(Boolean).join('、')}`
 function optionsOf(l: Line) {
-  const seen = new Set<string>()
-  const opts: { label: string; value: string }[] = []
-  for (const p of [l.row.match, ...l.row.alternatives]) {
-    if (!p || seen.has(p.id)) continue
-    seen.add(p.id)
-    opts.push({ label: `${p.orderNo} · ${p.supplierName} · ${cents(p.totalAmount)}元 · ${p.itemsText}`.slice(0, 80), value: p.id })
-  }
-  return opts
+  const first = new Set([l.row.match?.id, ...l.row.alternatives.map((a) => a.id)])
+  const mine = allPos.value.filter((p) => !p.platformOrderNo || p.platformOrderNo === l.row.order.orderNo)
+  const sorted = [...mine.filter((p) => first.has(p.id)), ...mine.filter((p) => !first.has(p.id))]
+  return sorted.map((p) => ({ label: poLabel(p).slice(0, 90), value: p.id }))
 }
-const briefOf = (l: Line) => [l.row.match, ...l.row.alternatives].find((p) => p?.id === l.poId) ?? null
+const briefOf = (l: Line) => {
+  const p = allPos.value.find((x) => x.id === l.poId)
+  return p ? { orderNo: p.orderNo, supplierName: p.supplier.name, totalAmount: p.totalAmount, itemsText: p.items.map((i) => i.item?.name ?? '').filter(Boolean).join('、') } : null
+}
 
-function open() {
+async function open() {
   lines.value = []
+  void purchaseOrderApi
+    .list()
+    .then((r) => (allPos.value = r.filter((p) => !['DRAFT', 'CANCELLED', 'REJECTED'].includes(p.status))))
+    .catch(() => (allPos.value = []))
   fileName.value = ''
   show.value = true
 }
@@ -106,7 +113,7 @@ async function save() {
       <n-empty v-if="!parsing && !lines.length" description="还没有选择文件" />
       <div v-else>
         <div class="muted" style="margin-bottom: 8px">
-          共 {{ lines.length }} 张 1688 订单，已勾选 {{ picked.length }} 张。“已对上”默认勾选，“请核对”“没对上”需要你确认或在下拉里改选采购单。
+          共 {{ lines.length }} 张 1688 订单，已勾选 {{ picked.length }} 张。“已对上”默认勾选；“请核对”“没对上”请在右边下拉里搜索并选对应的采购单（选了会自动勾上），再点下面的登记。
         </div>
         <div v-for="l in lines" :key="l.row.order.orderNo" class="im-card" :class="{ off: !l.checked }">
           <div class="im-head">
@@ -127,7 +134,7 @@ async function save() {
               </div>
             </div>
             <div class="im-col">
-              <n-select v-model:value="l.poId" :options="optionsOf(l)" clearable filterable placeholder="选择对应的采购单（不登记就留空）" @update:value="(v: string | null) => (l.checked = !!v)" />
+              <n-select v-model:value="l.poId" :options="optionsOf(l)" clearable filterable placeholder="没自动对上？点这里搜索，选对应的采购单（不登记就留空）" @update:value="(v: string | null) => (l.checked = !!v)" />
               <div v-if="briefOf(l)" class="muted" style="margin-top: 4px">
                 {{ briefOf(l)!.orderNo }}：{{ briefOf(l)!.supplierName }}，{{ cents(briefOf(l)!.totalAmount) }} 元，{{ briefOf(l)!.itemsText }}
               </div>
