@@ -6,7 +6,7 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { toDbData } from '../care-assessment/assessment-codec';
 import { FormSpec } from '../care-assessment/assessment-specs';
 import { CareMedicationService } from '../care-medication/care-medication.service';
-import { DAILY_BABY_FIELDS, DAILY_MOTHER_FIELDS, FEEDING_COLUMNS } from './daily-specs';
+import { DAILY_BABY_FIELDS, DAILY_MOTHER_FIELDS, FEEDING_COLUMNS, NURSING_COLUMNS } from './daily-specs';
 
 const DAY_MS = 86_400_000;
 const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
@@ -14,6 +14,7 @@ const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 // 复用评估表的字段校验/转换器：只要有 groups 就能用
 const motherSpec = { groups: DAILY_MOTHER_FIELDS } as unknown as FormSpec;
 const babySpec = { groups: DAILY_BABY_FIELDS } as unknown as FormSpec;
+const nursingSpec = { groups: [{ title: '护理', fields: NURSING_COLUMNS }] } as unknown as FormSpec;
 const feedingSpec = { groups: [{ title: '喂养', fields: FEEDING_COLUMNS }] } as unknown as FormSpec;
 
 export interface FeedingInput {
@@ -26,7 +27,7 @@ export interface SaveDayDto {
   /** 当天记录已存在时带上版本号（乐观锁）；新建时不带 */
   version?: number;
   mother: Record<string, unknown>;
-  babies: { babyProfileId: string; values: Record<string, unknown>; feedings?: FeedingInput[] }[];
+  babies: { babyProfileId: string; values: Record<string, unknown>; feedings?: FeedingInput[]; nursings?: FeedingInput[] }[];
 }
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
@@ -53,7 +54,7 @@ export class CareDailyService {
   ) {}
 
   specs() {
-    return { mother: DAILY_MOTHER_FIELDS, baby: DAILY_BABY_FIELDS, feeding: FEEDING_COLUMNS };
+    return { mother: DAILY_MOTHER_FIELDS, baby: DAILY_BABY_FIELDS, feeding: FEEDING_COLUMNS, nursing: NURSING_COLUMNS };
   }
 
   private async mother(id: string) {
@@ -139,7 +140,7 @@ export class CareDailyService {
     const start = this.startDate(m);
     const record = await this.prisma.careDailyRecord.findUnique({
       where: { motherProfileId_recordDate: { motherProfileId, recordDate: d } },
-      include: { babies: { include: { feedings: { orderBy: [{ time: 'asc' }, { sortOrder: 'asc' }] } } }, document: { select: { id: true } } },
+      include: { babies: { include: { feedings: { orderBy: [{ time: 'asc' }, { sortOrder: 'asc' }] }, nursings: { orderBy: [{ time: 'asc' }, { sortOrder: 'asc' }] } } }, document: { select: { id: true } } },
     });
     const stayDay = Math.round((d.getTime() - start.getTime()) / DAY_MS) + 1;
     const activeMeds = await this.medication.activeItems(m.babies.map((b) => b.id), date);
@@ -156,8 +157,9 @@ export class CareDailyService {
         return {
           baby: { id: b.id, sequenceNo: b.sequenceNo, name: b.name, gender: b.gender, birthDate: b.birthDate },
           defaultAgeDays: ageDays !== null && ageDays >= 0 ? ageDays : null,
-          record: br ? { ...br, feedings: undefined } : null,
+          record: br ? { ...br, feedings: undefined, nursings: undefined } : null,
           feedings: br?.feedings ?? [],
+          nursings: br?.nursings ?? [],
           summary: this.babySummary(br?.feedings ?? []),
           /** 这一天仍有效的用药委托（日常记录“用药”栏据此选药/核对） */
           activeMedications: activeMeds[b.id] ?? [],
@@ -191,7 +193,14 @@ export class CareDailyService {
         const t = String(data.time);
         return { ...data, time: t.length === 4 ? `0${t}` : t, sortOrder: i };
       });
-      return { babyProfileId: b.babyProfileId, data: toDbData(babySpec, b.values ?? {}), feedings };
+      // 没带 nursings（旧页面/识别流程）= 不动已有的护理记录；带了（哪怕是空数组）= 整体替换
+      const nursings = b.nursings === undefined ? null : b.nursings.map((n, i) => {
+        const data = toDbData(nursingSpec, n);
+        if (!data.time || !TIME_RE.test(String(data.time))) throw new BadRequestException(`第 ${i + 1} 行护理记录的时间格式不对，应为 HH:mm（如 08:30）`);
+        const t = String(data.time);
+        return { ...data, time: t.length === 4 ? `0${t}` : t, sortOrder: i };
+      });
+      return { babyProfileId: b.babyProfileId, data: toDbData(babySpec, b.values ?? {}), feedings, nursings };
     });
     if (dto.documentId) {
       const doc = await this.prisma.careDocument.findFirst({ where: { id: dto.documentId, tenantId: this.ctx.tenantId, motherProfileId: dto.motherProfileId } });
@@ -227,6 +236,12 @@ export class CareDailyService {
         await tx.careFeedingEntry.deleteMany({ where: { babyDailyId: br.id } });
         if (b.feedings.length > 0) {
           await tx.careFeedingEntry.createMany({ data: b.feedings.map((f) => ({ ...(f as object), tenantId, babyDailyId: br.id }) as Prisma.CareFeedingEntryCreateManyInput) });
+        }
+        if (b.nursings) {
+          await tx.careNursingEntry.deleteMany({ where: { babyDailyId: br.id } });
+          if (b.nursings.length > 0) {
+            await tx.careNursingEntry.createMany({ data: b.nursings.map((n) => ({ ...(n as object), tenantId, babyDailyId: br.id }) as Prisma.CareNursingEntryCreateManyInput) });
+          }
         }
       }
       return record;

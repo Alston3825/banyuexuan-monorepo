@@ -2094,6 +2094,7 @@ model CareDailyBabyRecord {
   babyProfile BabyProfile        @relation(fields: [babyProfileId], references: [id])
   document    CareDocument?      @relation("DailyBabyRecordDocument", fields: [documentId], references: [id])
   feedings    CareFeedingEntry[]
+  nursings    CareNursingEntry[]
 
   @@unique([dailyRecordId, babyProfileId])
   @@index([babyProfileId])
@@ -2110,7 +2111,8 @@ model CareFeedingEntry {
   directFeedMin Int?     @map("direct_feed_min") // 亲喂(分钟)
   breastMilkMl  Int?     @map("breast_milk_ml") // 母乳(ml)
   formulaMl     Int?     @map("formula_ml") // 奶粉(ml)
-  medication    String?  @map("medication") // 用药
+  medication    String?  @map("medication") // 药名（药物记录）
+  medicationDose String? @map("medication_dose") // 剂量（药物记录）
   waterMl       Int?     @map("water_ml") // 喂水(ml)
   urine         String?  @map("urine") // 小便
   stool         String?  @map("stool") // 大便
@@ -2125,6 +2127,26 @@ model CareFeedingEntry {
 
   @@index([babyDailyId])
   @@map("care_feeding_entries")
+}
+
+/// 新生儿 24 小时护理记录的一行（晨护/脐带护理/皮肤护理/退黄贴更换，打勾=已做）
+model CareNursingEntry {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  babyDailyId   String   @map("baby_daily_id")
+  sortOrder     Int      @default(0) @map("sort_order")
+  time          String?  @map("time")
+  morningCare   String?  @map("morning_care")
+  cordCare      String?  @map("cord_care")
+  skinCare      String?  @map("skin_care")
+  jaundicePatch String?  @map("jaundice_patch")
+  nurseName     String?  @map("nurse_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  babyDaily CareDailyBabyRecord @relation(fields: [babyDailyId], references: [id], onDelete: Cascade)
+
+  @@index([babyDailyId])
+  @@map("care_nursing_entries")
 }
 
 enum CareMedicationStatus {

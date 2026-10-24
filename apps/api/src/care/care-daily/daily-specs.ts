@@ -127,7 +127,8 @@ export const FEEDING_COLUMNS: FieldSpec[] = [
   int('directFeedMin', '亲喂(分钟)', { min: 0, max: 90, aiHint: '“亲喂”列：只有这一行的亲喂格里真的有手写时长才填分钟数；只打了勾没写时长填 0；这一格是空的（比如这行喝的是奶粉）一定填 null，不要填 0' }),
   int('breastMilkMl', '母乳(ml)', { min: 0, max: 300 }),
   int('formulaMl', '奶粉(ml)', { min: 0, max: 300, aiHint: '“奶粉”列的毫升数，如 80ml 填 80；前面带“补”“(补)”等字样也照样填数字，字样写进备注；这一列有字就一定要读出来，不要漏' }),
-  text('medication', '用药'),
+  text('medication', '药名', { aiHint: '“用药/药物”列手写的药名；没写留空' }),
+  text('medicationDose', '剂量', { aiHint: '药物的剂量，如 2滴、0.5ml；没写留空' }),
   int('waterMl', '喂水(ml)', { min: 0, max: 200 }),
   single('urine', '小便', [o('YES', '有')], { aiHint: '“小便”列打了勾填 YES，没有则 null' }),
   single('stool', '大便', [o('YES', '有')], { aiHint: '“大便（颜色/量/性）”列有手写内容就填 YES' }),
@@ -135,7 +136,16 @@ export const FEEDING_COLUMNS: FieldSpec[] = [
   single('stoolAmount', '大便量', STOOL_AMOUNT),
   single('stoolTexture', '大便性状', STOOL_TEXTURE),
   text('nurseName', '责护签字'),
-  text('remark', '备注'),
+];
+
+/** 新生儿 24 小时护理记录的一行：时间 + 晨护/脐带护理/皮肤护理/退黄贴更换（打勾=已做）+ 责护签字 */
+export const NURSING_COLUMNS: FieldSpec[] = [
+  text('time', '时间', { hint: 'HH:mm' }),
+  single('morningCare', '晨护', [o('YES', '已做')]),
+  single('cordCare', '脐带护理', [o('YES', '已做')]),
+  single('skinCare', '皮肤护理', [o('YES', '已做')]),
+  single('jaundicePatch', '退黄贴更换', [o('YES', '已更换')]),
+  text('nurseName', '责护签字'),
 ];
 
 /** AI 识别时整张纸的字段：妈妈 + 宝宝 + 喂养表（table 在 ai 请求里单独描述） */

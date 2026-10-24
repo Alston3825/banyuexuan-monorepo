@@ -15,7 +15,7 @@ const props = defineProps<{
   columns: FieldSpec[]
   warnings?: ExtractWarning[]
   defaultNurse?: string
-  /** 这一天仍有效的用药委托：用药栏可一键选药，填了委托书之外的药会提示 */
+  /** 这一天仍有效的用药委托：药物记录可一键选药，填了委托书之外的药会提示 */
   activeMedications?: ActiveMedication[]
   disabled?: boolean
 }>()
@@ -55,8 +55,7 @@ const meds = computed(() => props.activeMedications ?? [])
 const medLabel = (m: ActiveMedication) => `${m.drugName}${m.dose ? ' ' + m.dose : ''}`
 function pickMed(i: number, m: ActiveMedication) {
   const cur = String(props.modelValue[i].medication ?? '').trim()
-  const add = medLabel(m)
-  if (!cur.includes(m.drugName)) setRow(i, { medication: cur ? `${cur}、${add}` : add })
+  if (!cur.includes(m.drugName)) setRow(i, { medication: cur ? `${cur}、${m.drugName}` : m.drugName, ...(m.dose && !String(props.modelValue[i].medicationDose ?? '').trim() ? { medicationDose: m.dose } : {}) })
 }
 /** 用药栏填了内容，但没有任何有效委托书包含这个药 → 提醒（按委托给药才有据可查） */
 function noAuth(i: number): boolean {
@@ -102,8 +101,12 @@ const summary = computed(() => ({
 
       <div class="ft-line">
         <label class="ft-grow" :class="{ 'ft-bad': warnOf(i, 'medication') }">
-          <span>用药</span>
+          <span>药物记录·药名</span>
           <n-input :value="(r.medication as string) ?? ''" size="small" :disabled="disabled" @update:value="(v) => setRow(i, { medication: v })" />
+        </label>
+        <label class="ft-grow" :class="{ 'ft-bad': warnOf(i, 'medicationDose') }">
+          <span>剂量</span>
+          <n-input :value="(r.medicationDose as string) ?? ''" size="small" :disabled="disabled" @update:value="(v) => setRow(i, { medicationDose: v })" />
         </label>
       </div>
       <div v-if="meds.length > 0 && !disabled" class="ft-line ft-meds">
@@ -138,10 +141,6 @@ const summary = computed(() => ({
         <label class="ft-grow" :class="{ 'ft-bad': warnOf(i, 'nurseName') }">
           <span>责护签字</span>
           <n-input :value="(r.nurseName as string) ?? ''" size="small" :disabled="disabled" @update:value="(v) => setRow(i, { nurseName: v })" />
-        </label>
-        <label class="ft-grow" :class="{ 'ft-bad': warnOf(i, 'remark') }">
-          <span>备注</span>
-          <n-input :value="(r.remark as string) ?? ''" size="small" :disabled="disabled" @update:value="(v) => setRow(i, { remark: v })" />
         </label>
       </div>
 

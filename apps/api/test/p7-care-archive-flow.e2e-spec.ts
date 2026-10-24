@@ -366,14 +366,18 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
           babyProfileId: babyDailyId,
           values: { weightG: 3850, tempMorning: 36.2, tempEvening: 36.5, umbilical: ['NOT_FALLEN'], jaundiceForehead: 7.0, babyPlan: '抚触、晒黄疸' },
           feedings: [
-            { time: '14:07', formulaMl: 60, urine: 'YES' },
+            { time: '14:07', formulaMl: 60, urine: 'YES', medication: '维生素D', medicationDose: '1滴' },
             { time: '2:00', formulaMl: 60, urine: 'YES', stool: 'YES', stoolColor: 'YELLOW', stoolAmount: 'DOT' },
             { time: '10:27', formulaMl: 80, urine: 'YES', stool: 'YES' },
           ],
+          nursings: [{ time: '9:00', morningCare: 'YES', cordCare: 'YES', nurseName: '乔燕' }, { time: '08:30', skinCare: 'YES', jaundicePatch: 'YES' }],
         },
       ],
     };
     const saved = (await put(body).expect(200)).body;
+    // 药物记录（药名+剂量）、新生儿24小时护理记录（按时间排序，一位数小时自动补零）
+    expect(saved.babies[0].feedings.find((f: Json) => f.time === '14:07')).toMatchObject({ medication: '维生素D', medicationDose: '1滴' });
+    expect(saved.babies[0].nursings.map((n: Json) => [n.time, n.morningCare, n.skinCare, n.jaundicePatch])).toEqual([['08:30', null, 'YES', 'YES'], ['09:00', 'YES', null, null]]);
     expect(saved.record).toMatchObject({ motherPulse: 93, motherBpSystolic: 127, lochiaStatus: 'NOT_CLEAN', version: 0 });
     expect(saved.babies[0].record).toMatchObject({ weightG: 3850, babyPlan: '抚触、晒黄疸' });
     expect(saved.babies[0].feedings.map((f: Json) => f.time)).toEqual(['02:00', '10:27', '14:07']);
@@ -387,6 +391,7 @@ describe('P7 护理档案：资料留档 + 单次评估表 (e2e)', () => {
     const updated = (await put({ ...body, version: 0, mother: { motherTemperature: 36.6 }, babies: [{ babyProfileId: babyDailyId, values: {}, feedings: [{ time: '08:00', formulaMl: 70 }] }] }).expect(200)).body;
     expect(updated.record).toMatchObject({ motherTemperature: 36.6, motherPulse: 93, version: 1 }); // 没传的字段不动
     expect(updated.babies[0].feedings).toHaveLength(1);
+    expect(updated.babies[0].nursings).toHaveLength(2); // 没带 nursings 的保存不动已有的护理记录
     expect(updated.babies[0].summary.formulaTotalMl).toBe(70);
 
     const after = (await get(`/daily/days?motherProfileId=${mother.id}`).expect(200)).body;

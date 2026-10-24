@@ -129,6 +129,7 @@ export interface DailySpecs {
   mother: GroupSpec[]
   baby: GroupSpec[]
   feeding: FieldSpec[]
+  nursing: FieldSpec[]
 }
 
 export interface DailyDayRow {
@@ -172,6 +173,7 @@ export interface DailyDay {
     defaultAgeDays: number | null
     record: ({ id: string; version: number } & Record<string, unknown>) | null
     feedings: FeedingEntry[]
+    nursings: FeedingEntry[]
     summary: DailySummary
     /** 这一天仍有效的用药委托（日常记录“用药”栏选药/核对用） */
     activeMedications: ActiveMedication[]
@@ -184,7 +186,7 @@ export interface SaveDayBody {
   documentId?: string | null
   version?: number
   mother: Record<string, unknown>
-  babies: { babyProfileId: string; values: Record<string, unknown>; feedings: FeedingEntry[] }[]
+  babies: { babyProfileId: string; values: Record<string, unknown>; feedings: FeedingEntry[]; nursings?: FeedingEntry[] }[]
 }
 
 // ---------------- 用药委托书 ----------------

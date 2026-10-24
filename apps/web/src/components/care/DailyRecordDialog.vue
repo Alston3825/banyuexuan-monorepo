@@ -27,7 +27,7 @@ const loading = ref(false)
 const saving = ref(false)
 
 const motherValues = ref<Record<string, unknown>>({})
-const babyStates = ref<Record<string, { values: Record<string, unknown>; feedings: FeedingEntry[] }>>({})
+const babyStates = ref<Record<string, { values: Record<string, unknown>; feedings: FeedingEntry[]; nursings?: FeedingEntry[] }>>({})
 const warnings = ref<ExtractWarning[]>([])
 const aiBabyId = ref<string | null>(null)
 
@@ -143,7 +143,7 @@ function fill(d: DailyDay) {
       if (b.defaultAgeDays !== null) v.ageDays = b.defaultAgeDays // 出生天数按出生日期预填
       v.dayNurseName = nurse.value
     }
-    bs[b.baby.id] = { values: v, feedings: b.feedings.map((f) => ({ ...f })) }
+    bs[b.baby.id] = { values: v, feedings: b.feedings.map((f) => ({ ...f })), nursings: (b.nursings ?? []).map((f) => ({ ...f })) }
   }
   babyStates.value = bs
 }
@@ -195,6 +195,7 @@ function applyExtraction(d: CareDocument) {
   const id = d.babyProfileId ?? photoBabyId.value
   if (id && babyStates.value[id]) {
     babyStates.value[id] = {
+      ...babyStates.value[id],
       values: { ...babyStates.value[id].values, ...b },
       feedings: Array.isArray(data.feedings) ? (data.feedings as FeedingEntry[]) : babyStates.value[id].feedings,
     }
@@ -228,7 +229,7 @@ function applyBabySheet(d: CareDocument) {
   const rows = Array.isArray(data.feedings) ? (data.feedings as FeedingEntry[]) : []
   const old = babyStates.value[id].feedings
   const put = (feedings: FeedingEntry[], append: boolean) => {
-    babyStates.value[id] = { values: { ...babyStates.value[id].values, ...b }, feedings }
+    babyStates.value[id] = { ...babyStates.value[id], values: { ...babyStates.value[id].values, ...b }, feedings }
     // 追加时新行的提醒下标要整体后移，这里简单处理：追加就不再标黄
     warnings.value = append ? [] : d.extractWarnings ?? []
     aiBabyId.value = id
@@ -306,7 +307,7 @@ async function save() {
       documentId: doc.value?.id,
       version: day.value.record?.version,
       mother: motherValues.value,
-      babies: day.value.babies.map((b) => ({ babyProfileId: b.baby.id, values: babyStates.value[b.baby.id].values, feedings: babyStates.value[b.baby.id].feedings })),
+      babies: day.value.babies.map((b) => ({ babyProfileId: b.baby.id, values: babyStates.value[b.baby.id].values, feedings: babyStates.value[b.baby.id].feedings, nursings: babyStates.value[b.baby.id].nursings ?? [] })),
     })
     message.success('当天的日常护理记录已保存')
     clearDraft()

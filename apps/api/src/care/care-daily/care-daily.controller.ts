@@ -10,7 +10,7 @@ class SaveDayBody {
   @ApiProperty({ required: false }) @IsOptional() @IsString() documentId?: string | null;
   @ApiProperty({ required: false, description: '当天记录已存在时必填（乐观锁）' }) @IsOptional() @IsInt() version?: number;
   @ApiProperty({ description: '妈妈栏字段值' }) @IsObject() mother: Record<string, unknown>;
-  @ApiProperty({ description: '每个宝宝的栏：babyProfileId + values + feedings[]' }) @IsArray() babies: { babyProfileId: string; values: Record<string, unknown>; feedings?: Record<string, unknown>[] }[];
+  @ApiProperty({ description: '每个宝宝的栏：babyProfileId + values + feedings[]' }) @IsArray() babies: { babyProfileId: string; values: Record<string, unknown>; feedings?: Record<string, unknown>[]; nursings?: Record<string, unknown>[] }[];
 }
 
 @ApiTags('care/daily')

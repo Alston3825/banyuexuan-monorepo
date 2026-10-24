@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 宝宝 24 小时喂养记录单（电脑端）：和纸质单一样的一张表，一行一次喂养/排泄，
- * 列 = 时间 | 亲喂 | 母乳 | 奶粉 | 用药 | 喂水 | 小便 | 大便 | 责护签字 | 备注；最下面“总结”行自动合计。
+ * 列 = 时间 | 亲喂 | 母乳 | 奶粉 | 药物记录（药名/剂量） | 喂水 | 小便 | 大便 | 责护签字；最下面“总结”行自动合计。
  * 手机上用卡片行的 FeedingTable（见 DailyPaperSheet），两个组件的数据格式和提醒规则完全一致。
  */
 import { computed } from 'vue'
@@ -44,7 +44,14 @@ function toggle(i: number, key: 'urine' | 'stool') {
 }
 
 const meds = computed(() => props.activeMedications ?? [])
-const medLabel = (m: ActiveMedication) => `${m.drugName}${m.dose ? ' ' + m.dose : ''}`
+const medLabel = (m: ActiveMedication) => m.drugName
+/** 填药名时，如果正好是有效委托里的药，剂量空着就自动带上委托书上的剂量 */
+function onMedName(i: number, v: string) {
+  const m = meds.value.find((x) => x.drugName === v.trim())
+  const patch: FeedingEntry = { medication: v }
+  if (m?.dose && !String(props.modelValue[i].medicationDose ?? '').trim()) patch.medicationDose = m.dose
+  setRow(i, patch)
+}
 const noAuth = (i: number) => {
   const v = String(props.modelValue[i].medication ?? '').trim()
   return !!v && !meds.value.some((m) => v.includes(m.drugName))
@@ -59,17 +66,20 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
     <table class="fg-t">
       <thead>
         <tr>
-          <th class="w-time">时间</th>
-          <th class="w-n">亲喂<small>分</small></th>
-          <th class="w-n">母乳<small>ml</small></th>
-          <th class="w-n">奶粉<small>ml</small></th>
-          <th class="w-med">用药</th>
-          <th class="w-n">喂水<small>ml</small></th>
-          <th class="w-c">小便</th>
-          <th class="w-stool">大便 颜色/量/性</th>
-          <th class="w-nurse">责护签字</th>
-          <th class="w-remark">备注</th>
-          <th class="w-x">操作</th>
+          <th class="w-time" rowspan="2">时间</th>
+          <th class="w-n" rowspan="2">亲喂<small>分</small></th>
+          <th class="w-n" rowspan="2">母乳<small>ml</small></th>
+          <th class="w-n" rowspan="2">奶粉<small>ml</small></th>
+          <th colspan="2">药物记录</th>
+          <th class="w-n" rowspan="2">喂水<small>ml</small></th>
+          <th class="w-c" rowspan="2">小便</th>
+          <th class="w-stool" rowspan="2">大便 颜色/量/性</th>
+          <th class="w-nurse" rowspan="2">责护签字</th>
+          <th class="w-x" rowspan="2">操作</th>
+        </tr>
+        <tr>
+          <th class="w-med">药名</th>
+          <th class="w-dose">剂量</th>
         </tr>
       </thead>
       <tbody>
@@ -77,8 +87,9 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <td :class="{ bad: warnOf(i, 'time') }"><input type="time" :value="(r.time as string) ?? ''" @input="(e) => setRow(i, { time: (e.target as HTMLInputElement).value })" /></td>
           <td v-for="k in ['directFeedMin', 'breastMilkMl', 'formulaMl']" :key="k" :class="{ bad: warnOf(i, k) }"><input class="n" inputmode="numeric" :value="r[k] ?? ''" @change="(e) => num(i, k, e)" /></td>
           <td :class="{ bad: warnOf(i, 'medication') || noAuth(i) }" :title="noAuth(i) ? '这个药没有对应的、仍有效的用药委托书，请确认家长已签委托书' : ''">
-            <input list="fg-meds" :value="(r.medication as string) ?? ''" @input="(e) => setRow(i, { medication: (e.target as HTMLInputElement).value })" />
+            <input list="fg-meds" :value="(r.medication as string) ?? ''" @input="(e) => onMedName(i, (e.target as HTMLInputElement).value)" />
           </td>
+          <td :class="{ bad: warnOf(i, 'medicationDose') }"><input :value="(r.medicationDose as string) ?? ''" @input="(e) => setRow(i, { medicationDose: (e.target as HTMLInputElement).value })" /></td>
           <td :class="{ bad: warnOf(i, 'waterMl') }"><input class="n" inputmode="numeric" :value="r.waterMl ?? ''" @change="(e) => num(i, 'waterMl', e)" /></td>
           <td class="c"><button type="button" class="tick" :class="{ on: r.urine === 'YES' }" @click="toggle(i, 'urine')">✓</button></td>
           <td :class="{ bad: warnOf(i, 'stoolColor') || warnOf(i, 'stoolAmount') || warnOf(i, 'stoolTexture') || warnOf(i, 'stool') }">
@@ -91,7 +102,6 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
             </template></div>
           </td>
           <td :class="{ bad: warnOf(i, 'nurseName') }"><input :value="(r.nurseName as string) ?? ''" @input="(e) => setRow(i, { nurseName: (e.target as HTMLInputElement).value })" /></td>
-          <td :class="{ bad: warnOf(i, 'remark') }"><input :value="(r.remark as string) ?? ''" @input="(e) => setRow(i, { remark: (e.target as HTMLInputElement).value })" /></td>
           <td class="c"><button type="button" class="del" title="删除这一行" @click="removeRow(i)">删除</button></td>
         </tr>
         <tr v-if="modelValue.length === 0">
@@ -102,11 +112,11 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <td></td>
           <td>{{ sum('breastMilkMl') || '' }}</td>
           <td>{{ sum('formulaMl') || '' }}</td>
-          <td></td>
+          <td colspan="2"></td>
           <td>{{ sum('waterMl') || '' }}</td>
           <td class="c">{{ count('urine') || '' }}</td>
           <td>大便 {{ count('stool') }} 次</td>
-          <td colspan="3"></td>
+          <td colspan="2"></td>
         </tr>
       </tbody>
     </table>
@@ -142,11 +152,11 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 }
 .w-time { width: 84px; }
 .w-n { width: 52px; }
-.w-med { width: 150px; }
+.w-med { width: 110px; }
+.w-dose { width: 80px; }
 .w-c { width: 48px; }
 .w-stool { width: 250px; }
 .w-nurse { width: 76px; }
-.w-remark { width: 110px; }
 .w-x { width: 64px; }
 .stool-cell {
   display: flex;

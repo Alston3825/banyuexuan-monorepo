@@ -10,11 +10,12 @@ import type { DailyDay, DailySpecs, ExtractWarning, FeedingEntry, FieldSpec } fr
 import { useNarrow } from '../../composables/useNarrow'
 import FeedingGrid from './FeedingGrid.vue'
 import FeedingTable from './FeedingTable.vue'
+import NursingRecords from './NursingRecords.vue'
 import PaperField from './PaperField.vue'
 import DailyShiftCard from './DailyShiftCard.vue'
 import SheetSection from './SheetSection.vue'
 
-type BabyState = { values: Record<string, unknown>; feedings: FeedingEntry[] }
+type BabyState = { values: Record<string, unknown>; feedings: FeedingEntry[]; nursings?: FeedingEntry[] }
 
 const props = defineProps<{
   specs: DailySpecs
@@ -99,6 +100,10 @@ function feedSummary(id: string) {
   const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0)
   return `${rows.length} 次 · 奶粉 ${sum('formulaMl')}ml · 尿 ${rows.filter((r) => r.urine === 'YES').length} · 便 ${rows.filter((r) => r.stool === 'YES').length}`
 }
+function nursingSummary(id: string) {
+  const rows = props.babyStates[id].nursings ?? []
+  return rows.length ? `${rows.length} 次护理` : '还没记录'
+}
 const stateOf = (n: number): 'empty' | 'done' => (n > 0 ? 'done' : 'empty')
 const motherFilled = computed(() => countFilled(props.motherValues, MOTHER_KEYS))
 const motherSummary = computed(() => (motherFilled.value ? `已填 ${motherFilled.value}/${MOTHER_KEYS.length}` : '还没填'))
@@ -158,7 +163,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
         </SheetSection>
       </div>
 
-      <SheetSection title="24 小时喂养记录" :summary="feedSummary(b.baby.id)" :state="stateOf(babyStates[b.baby.id].feedings.length)" :open="isOpen(`${b.baby.id}:feed`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:feed`)">
+      <SheetSection title="新生儿24小时喂养记录" :summary="feedSummary(b.baby.id)" :state="stateOf(babyStates[b.baby.id].feedings.length)" :open="isOpen(`${b.baby.id}:feed`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:feed`)">
         <FeedingTable
           v-if="narrow"
           :model-value="babyStates[b.baby.id].feedings"
@@ -178,6 +183,10 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
           @update:model-value="(v) => setBaby(b.baby.id, { feedings: v })"
         />
         <div class="ps-plan"><PaperField :field="bf.babyPlan" :model-value="babyStates[b.baby.id].values" :warn="warnFor(b.baby.id, 'babyPlan')" :rows="2" @update:model-value="(v) => setBaby(b.baby.id, { values: v })" /></div>
+      </SheetSection>
+
+      <SheetSection title="新生儿24小时护理记录" :summary="nursingSummary(b.baby.id)" :state="stateOf((babyStates[b.baby.id].nursings ?? []).length)" :open="isOpen(`${b.baby.id}:nursing`)" :collapsible="narrow" @toggle="toggle(`${b.baby.id}:nursing`)">
+        <NursingRecords :model-value="babyStates[b.baby.id].nursings ?? []" :default-nurse="nurse" :narrow="narrow" @update:model-value="(v) => setBaby(b.baby.id, { nursings: v })" />
       </SheetSection>
 
       <!-- 手机上班次总结跟在宝宝后面 -->
