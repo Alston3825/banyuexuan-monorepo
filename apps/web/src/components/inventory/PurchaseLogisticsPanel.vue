@@ -67,6 +67,16 @@ async function save() {
     saving.value = false
   }
 }
+/** 填完单号直接点“查询物流”：有没保存的修改就先保存（保存时会顺手查一次），否则直接刷新 */
+async function queryNow() {
+  if (!form.value.expressCompany || !form.value.expressNo.trim()) return void message.warning('请先选择快递公司并填写快递单号')
+  if (dirty.value) {
+    if (!props.canEdit) return void message.warning('没有权限修改物流信息')
+    await save()
+    return
+  }
+  await refresh(false)
+}
 async function refresh(silent = false) {
   if (!info.value?.expressNo || !info.value.expressCompany) return void message.warning('请先填写并保存快递公司和快递单号')
   refreshing.value = true
@@ -101,8 +111,8 @@ const fmtTime = (s: string | null) => (s ? s.replace('T', ' ').slice(0, 16) : ''
       <label v-if="form.expressCompany === 'shunfeng'"><span>手机尾号（顺丰必填）</span><n-input v-model:value="form.expressPhoneTail" :disabled="!canEdit" maxlength="4" placeholder="收/寄件手机后 4 位" /></label>
     </div>
     <n-space style="margin-top: 8px" :wrap="true" align="center">
-      <n-button v-if="canEdit" type="primary" :loading="saving" :disabled="!dirty" @click="save">保存</n-button>
-      <n-button :loading="refreshing" :disabled="!info?.expressNo || dirty" @click="refresh(false)">刷新物流</n-button>
+      <n-button v-if="canEdit" :loading="saving" :disabled="!dirty" @click="save">只保存</n-button>
+      <n-button :loading="refreshing || saving" :disabled="!form.expressCompany || !form.expressNo.trim()" @click="queryNow">查询物流</n-button>
       <span v-if="info?.checkedAt" class="pl-sub">最近查询：{{ fmtTime(info.checkedAt) }}</span>
     </n-space>
 
