@@ -656,7 +656,7 @@ onMounted(fetchAll)
     <div v-if="isMobile" class="cp-mmenu">
       <div class="cp-mcur" @click="menuOpen = !menuOpen">
         <span>{{ activeLabel }}</span>
-        <span class="cp-hint">{{ menuOpen ? '收起 ▴' : '切换子页面 ▾' }}</span>
+        <span class="cp-hint">{{ menuOpen ? '收起 ▴' : '母婴档案详情 ▾' }}</span>
       </div>
       <div v-if="menuOpen" class="cp-mlist">
         <div v-for="t in TAB_LABELS" :key="t.name" class="cp-mitem" :class="{ 'cp-mon': t.name === activeTab }" @click="pickTab(t.name)">{{ t.label }}</div>
@@ -1045,9 +1045,9 @@ onMounted(fetchAll)
   color: #1f3a5f;
 }
 .cp-hint {
-  color: #999;
-  font-size: 12px;
-  font-weight: 400;
+  color: #18a058;
+  font-size: 14px;
+  font-weight: 700;
 }
 .cp-mlist {
   border-top: 1px solid #f0f0f0;
