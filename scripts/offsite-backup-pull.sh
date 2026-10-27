@@ -17,16 +17,16 @@ log() { echo "$(date '+%F %T') $*"; }
 mkdir -p "$DEST"; mkdir -p "$SECRETS"; chmod 700 "$SECRETS"
 if [[ ! -f "$PASSFILE" ]]; then
   umask 077; openssl rand -base64 32 > "$PASSFILE"
-  log "已生成加密口令文件 $PASSFILE（请把它另存进密码管理器，丢了备份就无法还原）"
+  log "已生成加密口令文件 ${PASSFILE}（请把它另存进密码管理器，丢了备份就无法还原）"
 fi
 
 latest() { "${SSH[@]}" "ls -1t ~/banyuexuan/backups/$1 2>/dev/null | head -n1"; }
 pull_encrypted() { # $1 服务器上的文件名
   local name="$1" out="$DEST/$1.enc"
-  [[ -s "$out" ]] && { log "已有 $name，跳过"; return; }
+  [[ -s "$out" ]] && { log "已有 ${name}，跳过"; return; }
   "${SSH[@]}" "sudo cat ~/banyuexuan/backups/$name" | openssl enc -aes-256-cbc -pbkdf2 -salt -pass "file:$PASSFILE" -out "$out.part"
   [[ -s "$out.part" ]] || { rm -f "$out.part"; log "拉取 $name 失败（空文件）"; return 1; }
-  mv "$out.part" "$out"; log "已备份并加密：$out（$(du -h "$out" | cut -f1)）"
+  mv "$out.part" "$out"; log "已备份并加密：${out}（$(du -h "$out" | cut -f1)）"
 }
 
 DB="$(latest '*.sql.gz')"; FILES="$(latest 'files-*.tar.gz')"
