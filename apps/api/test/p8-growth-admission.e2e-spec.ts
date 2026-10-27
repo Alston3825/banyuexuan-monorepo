@@ -1,0 +1,71 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
+
+type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/** 新生儿入所评估 → 宝宝档案（出生日期/出生体重自动填）+ 生长曲线（出生点、按入所日期画入所体重/身长/头围） */
+describe('P8 入所评估与生长曲线 (e2e)', () => {
+  let app: INestApplication<App>;
+  let server: App;
+  let prisma: PrismaService;
+  let token: string;
+  const tag = Date.now().toString().slice(-7);
+  const authed = () => ({ Authorization: `Bearer ${token}` });
+
+  const newBaby = async (n: number, patch: Json = {}) => {
+    const c = (await request(server).post('/api/v1/crm/customers').set(authed()).send({ name: `入所曲线${tag}${n}`, phone: `135${tag}${n}`.slice(0, 11), source: 'ONLINE_AD' }).expect(201)).body as Json;
+    const m = (await request(server).post('/api/v1/care/mother-profiles').set(authed()).send({ customerId: c.id, deliveryMethod: 'VAGINAL', babies: [{ name: '宝', gender: 'MALE', ...patch }] }).expect(201)).body as Json;
+    return ((await request(server).get(`/api/v1/care/mother-profiles/${m.id}`).set(authed()).expect(200)).body as Json).babies[0].id as string;
+  };
+  const admit = (babyId: string, values: Json) => request(server).post('/api/v1/care/assessments/BABY_ADMISSION').set(authed()).send({ profileId: babyId, values });
+  const report = async (babyId: string) => (await request(server).get(`/api/v1/care/growth/baby/${babyId}`).set(authed()).expect(200)).body as Json;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    await app.init();
+    server = app.getHttpServer();
+    prisma = app.get(PrismaService);
+    token = ((await request(server).post('/api/v1/auth/login').send({ username: 'admin', password: 'Passw0rd!23' }).expect(201)).body as Json).accessToken;
+  });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('1. 入所评估填了出生日期/出生体重 → 宝宝档案里空着的自动填上；曲线有“出生”点，入所体重/身长/头围按入所日期画点', async () => {
+    const baby = await newBaby(1);
+    await admit(baby, { birthDate: '2026-10-01', birthWeightG: 3400, admissionDate: '2026-10-05', admissionWeightG: 3300, admissionLengthCm: 50.5, headCircumferenceCm: 34 }).expect(201);
+    const p = await prisma.babyProfile.findUniqueOrThrow({ where: { id: baby } });
+    expect(p.birthDate?.toISOString().slice(0, 10)).toBe('2026-10-01');
+    expect(p.birthWeightGrams).toBe(3400);
+    const r = await report(baby);
+    expect(r.ready).toBe(true);
+    expect(r.hints).toEqual([]);
+    const w = r.points.weight.map((x: Json) => [x.date, x.value, x.source]);
+    expect(w).toEqual([['2026-10-01', 3400, 'BIRTH'], ['2026-10-05', 3300, 'ADMISSION']]);
+    expect(r.points.length[0]).toMatchObject({ date: '2026-10-05', value: 50.5, source: 'ADMISSION' });
+    expect(r.points.head[0]).toMatchObject({ date: '2026-10-05', value: 34, source: 'ADMISSION' });
+  });
+
+  it('2. 宝宝档案里已经有的出生信息不会被入所评估覆盖（人工改过的算数）', async () => {
+    const baby = await newBaby(2, { birthDate: '2026-09-28T00:00:00.000Z', birthWeightGrams: 3000 });
+    await admit(baby, { birthDate: '2026-10-01', birthWeightG: 3400 }).expect(201);
+    const p = await prisma.babyProfile.findUniqueOrThrow({ where: { id: baby } });
+    expect(p.birthDate?.toISOString().slice(0, 10)).toBe('2026-09-28');
+    expect(p.birthWeightGrams).toBe(3000);
+  });
+
+  it('3. 填了入所体重却没填入所日期：提醒补入所日期，不乱画点', async () => {
+    const baby = await newBaby(3);
+    await admit(baby, { birthDate: '2026-10-01', admissionWeightG: 3300 }).expect(201);
+    const r = await report(baby);
+    expect(r.hints.join('')).toContain('入所日期');
+    expect(r.points.weight).toEqual([]);
+  });
+});

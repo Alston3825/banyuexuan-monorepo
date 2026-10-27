@@ -22,7 +22,7 @@ export interface GrowthPoint {
   /** 月龄（早产儿为矫正月龄）；算不出来（出生日期缺失等）时为 null */
   ageMonths: number | null;
   value: number;
-  source: 'GROWTH' | 'DAILY' | 'BIRTH';
+  source: 'GROWTH' | 'DAILY' | 'BIRTH' | 'ADMISSION';
   recordId?: string;
   rating: string | null;
   pctText: string | null;
@@ -51,7 +51,18 @@ export class CareGrowthService {
     const b = await this.prisma.babyProfile.findFirst({ where: { id: babyId, tenantId }, include: { motherProfile: { select: { gestationalWeeks: true } } } });
     if (!b) throw new NotFoundException('宝宝档案不存在');
     const sex: GrowthSex | null = b.gender === 'MALE' || b.gender === 'FEMALE' ? b.gender : null;
-    const birth = b.birthDate ? new Date(`${ymd(new Date(b.birthDate.getTime() + 8 * 3600_000))}T00:00:00.000Z`) : null;
+    // 新生儿入所评估表（出生日期/出生体重/入所日期+入所体重身长头围）：宝宝档案里没填的出生信息从这里补
+    const adm = await this.prisma.careBabyAdmission.findFirst({
+      where: { tenantId, babyProfileId: babyId },
+      select: { birthDate: true, birthWeightG: true, admissionDate: true, admissionWeightG: true, admissionLengthCm: true, headCircumferenceCm: true },
+    });
+    const birthRaw = b.birthDate ?? adm?.birthDate ?? null;
+    const birthWeightG = b.birthWeightGrams ?? adm?.birthWeightG ?? null;
+    const birth = birthRaw ? new Date(`${ymd(new Date(birthRaw.getTime() + 8 * 3600_000))}T00:00:00.000Z`) : null;
+    const hints: string[] = [];
+    if (adm && (adm.admissionWeightG != null || adm.admissionLengthCm != null || adm.headCircumferenceCm != null) && !adm.admissionDate) {
+      hints.push('新生儿入所评估里填了入所体重/身长/头围，但没有填“入所日期”，这些数据没法画到曲线上（请到入所评估里补上入所日期）');
+    }
     const ga = b.motherProfile.gestationalWeeks;
     const notReady: string[] = [];
     if (!sex) notReady.push('宝宝性别');
@@ -65,7 +76,14 @@ export class CareGrowthService {
 
     // 每个指标、每个日期只保留一个值：手工测量 > 日常护理记录里的体重/身长/头围 > 出生体重
     const raw: Record<GrowthMetric, Map<string, { value: number; source: GrowthPoint['source']; recordId?: string }>> = { weight: new Map(), length: new Map(), head: new Map() };
-    if (b.birthWeightGrams && birth) raw.weight.set(ymd(birth), { value: Math.round(b.birthWeightGrams) / 1000, source: 'BIRTH' });
+    if (birthWeightG && birth) raw.weight.set(ymd(birth), { value: Math.round(birthWeightG) / 1000, source: 'BIRTH' });
+    // 入所评估：入所体重/身长/头围按“入所日期”那天画点（比出生优先，日常记录和手工测量再覆盖它）
+    if (adm?.admissionDate) {
+      const k = ymd(adm.admissionDate);
+      if (adm.admissionWeightG != null) raw.weight.set(k, { value: adm.admissionWeightG / 1000, source: 'ADMISSION' });
+      if (adm.admissionLengthCm != null) raw.length.set(k, { value: adm.admissionLengthCm, source: 'ADMISSION' });
+      if (adm.headCircumferenceCm != null) raw.head.set(k, { value: adm.headCircumferenceCm, source: 'ADMISSION' });
+    }
     for (const d of daily) {
       const k = ymd(d.dailyRecord.recordDate);
       if (d.weightG != null) raw.weight.set(k, { value: d.weightG / 1000, source: 'DAILY' });
@@ -123,6 +141,7 @@ export class CareGrowthService {
       baby: { id: b.id, name: b.name, sequenceNo: b.sequenceNo, sex, birthDate: birth ? ymd(birth) : null, preterm: !!ga && ga < 37, gestationalWeeks: ga ?? null },
       ready: notReady.length === 0,
       notReady,
+      hints,
       points,
       curves,
       latest,

@@ -151,7 +151,8 @@ const babyAdmission: FormSpec = {
       title: '基本信息',
       fields: [
         text('gestationalWeeks', '孕周', { hint: '如 40+4' }),
-        date('admissionDate', '入所日期'),
+        date('birthDate', '出生日期', { aiHint: '宝宝的出生日期（不是入所日期）；纸上若只写了“出生天数/日龄”没有日期，留空' }),
+        date('admissionDate', '入所日期', { hint: '入所体重/身长/头围就是这一天量的，生长曲线按这个日期画点，请务必填' }),
         single('mentalState', '精神状况', [o('GOOD', '好'), o('FAIR', '一般'), o('POOR', '差')]),
         single('birthMethod', '出生方式', DELIVERY),
         int('birthWeightG', '出生体重', { unit: 'g', min: 1000, max: 6000, aiHint: '换算成克，如 3750g 填 3750；写 3.75kg 也要换成 3750' }),

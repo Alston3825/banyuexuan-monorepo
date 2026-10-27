@@ -136,7 +136,7 @@ async function download() {
   }
 }
 const ratingType = (r: string) => (r === '中' ? 'success' : r === '中上' || r === '中下' ? 'warning' : 'error')
-const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常护理' : '出生')
+const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常护理' : s === 'ADMISSION' ? '入所评估' : '出生')
 </script>
 
 <template>
@@ -156,8 +156,9 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
 
     <n-empty v-if="babies.length === 0" description="这位妈妈还没有宝宝档案，先在“概览”里添加宝宝" />
     <template v-else-if="report">
+      <n-alert v-for="h in report.hints ?? []" :key="h" type="warning" :show-icon="false" style="margin-bottom: 10px">{{ h }}</n-alert>
       <n-alert v-if="!report.ready" type="warning" :show-icon="false" style="margin-bottom: 10px">
-        要和国家标准对比，需要先在宝宝档案里补上：<b>{{ report.notReady.join('、') }}</b>（概览 → 宝宝档案 → 编辑）。
+        要和国家标准对比，需要先补上：<b>{{ report.notReady.join('、') }}</b>（出生日期可在“新生儿入所评估”里填写后自动带入，也可以在 概览 → 宝宝档案 → 编辑 里直接填）。
       </n-alert>
 
       <template v-else>

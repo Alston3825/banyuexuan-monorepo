@@ -1714,6 +1714,7 @@ model CareBabyAdmission {
   documentId           String?   @map("document_id") // 对应的纸质原件照片（可为空：手工录入时没拍照）
   // —— 以下是纸质表上的字段（由 care-assessment/assessment-specs.ts 生成）——
   gestationalWeeks     String?   @map("gestational_weeks") // 孕周
+  birthDate            DateTime? @map("birth_date") @db.Date // 出生日期
   admissionDate        DateTime? @map("admission_date") @db.Date // 入所日期
   mentalState          String?   @map("mental_state") // 精神状况
   birthMethod          String?   @map("birth_method") // 出生方式

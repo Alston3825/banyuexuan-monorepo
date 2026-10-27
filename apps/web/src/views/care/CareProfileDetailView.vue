@@ -272,6 +272,13 @@ function openAddBaby() {
   babyVisible.value = true
 }
 
+/** 出生日期：日期选择器用时间戳，档案里存 ISO 字符串 */
+const babyBirthTs = computed<number | null>({
+  get: () => (babyModel.value.birthDate ? new Date(babyModel.value.birthDate).getTime() : null),
+  set: (v) => (babyModel.value.birthDate = v ? new Date(v).toISOString() : undefined),
+})
+const fmtBirth = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-CN') : '-')
+
 function openEditBaby(baby: BabyProfile) {
   editingBaby.value = baby
   babyModel.value = {
@@ -318,6 +325,7 @@ const babyColumns: DataTableColumns<BabyProfile> = [
   { key: 'sequenceNo', title: '序号', width: 60 },
   { key: 'name', title: '姓名', render: (row) => row.name ?? '-' },
   { key: 'gender', title: '性别', render: (row) => BABY_GENDER_LABEL_MAP[row.gender] },
+  { key: 'birthDate', title: '出生日期', render: (row) => fmtBirth(row.birthDate) },
   { key: 'birthWeightGrams', title: '出生体重(g)', render: (row) => row.birthWeightGrams ?? '-' },
   { key: 'apgarScore', title: 'Apgar评分', render: (row) => row.apgarScore ?? '-' },
   {
@@ -701,7 +709,7 @@ onMounted(fetchAll)
             <b>{{ b.sequenceNo }} 号宝宝 · {{ b.name ?? '未取名' }}</b>
             <span class="cp-baby-sub">{{ BABY_GENDER_LABEL_MAP[b.gender] }}</span>
           </div>
-          <div class="cp-baby-line">出生体重 {{ b.birthWeightGrams ?? '-' }} g · Apgar 评分 {{ b.apgarScore ?? '-' }}</div>
+          <div class="cp-baby-line">出生日期 {{ fmtBirth(b.birthDate) }} · 出生体重 {{ b.birthWeightGrams ?? '-' }} g · Apgar 评分 {{ b.apgarScore ?? '-' }}</div>
           <n-space v-if="(babyRiskTags[b.id] ?? []).length" :size="4" style="margin-top: 6px">
             <n-tag v-for="t in babyRiskTags[b.id]" :key="t.id" size="small" :color="{ color: t.tag.color ?? undefined }">{{ t.tag.name }}</n-tag>
           </n-space>
@@ -866,6 +874,7 @@ onMounted(fetchAll)
               ]"
             />
           </n-form-item>
+          <n-form-item label="出生日期"><n-date-picker v-model:value="babyBirthTs" type="date" style="width: 100%" clearable placeholder="新生儿入所评估填了会自动带入" /></n-form-item>
           <n-form-item label="出生体重(g)"><n-input-number v-model:value="babyModel.birthWeightGrams" style="width: 100%" /></n-form-item>
           <n-form-item label="Apgar评分"><n-input v-model:value="babyModel.apgarScore" placeholder="如 9-10" /></n-form-item>
           <n-form-item label="风险标签">

@@ -6,7 +6,7 @@ export interface GrowthPoint {
   /** 月龄（早产儿为矫正月龄）；算不出来时为 null */
   ageMonths: number | null
   value: number
-  source: 'GROWTH' | 'DAILY' | 'BIRTH'
+  source: 'GROWTH' | 'DAILY' | 'BIRTH' | 'ADMISSION'
   recordId?: string
   rating: string | null
   pctText: string | null
@@ -35,6 +35,8 @@ export interface GrowthReport {
   baby: { id: string; name: string | null; sequenceNo: number; sex: 'MALE' | 'FEMALE' | null; birthDate: string | null; preterm: boolean; gestationalWeeks: number | null }
   ready: boolean
   notReady: string[]
+  /** 数据上的提醒（如填了入所体重却没填入所日期） */
+  hints?: string[]
   points: Record<GrowthMetric, GrowthPoint[]>
   curves: Record<GrowthMetric, { ages: number[]; rows: number[][] } | null>
   latest: GrowthLatest[]

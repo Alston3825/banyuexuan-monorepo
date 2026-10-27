@@ -95,6 +95,7 @@ export class CareAssessmentService {
       include: withDoc,
     });
     if (dto.documentId) await this.confirmDocument(dto.documentId);
+    await this.syncBabyProfile(spec, dto.profileId, created);
     await this.audit('CREATE', spec, created.id, null, created);
     return created;
   }
@@ -116,8 +117,20 @@ export class CareAssessmentService {
       }),
     );
     if (dto.documentId) await this.confirmDocument(dto.documentId);
+    await this.syncBabyProfile(spec, before[fk], updated);
     await this.audit('UPDATE', spec, id, before, updated, Object.keys(data));
     return updated;
+  }
+
+  /** 新生儿入所评估里的出生日期/出生体重，宝宝档案里还是空的就自动填进去（已经有的不覆盖，免得冲掉人工改过的）。 */
+  private async syncBabyProfile(spec: FormSpec, babyProfileId: string, row: Record<string, unknown>): Promise<void> {
+    if (spec.type !== 'BABY_ADMISSION') return;
+    const baby = await this.prisma.babyProfile.findFirst({ where: { id: babyProfileId, tenantId: this.ctx.tenantId }, select: { birthDate: true, birthWeightGrams: true } });
+    if (!baby) return;
+    const data: { birthDate?: Date; birthWeightGrams?: number } = {};
+    if (!baby.birthDate && row.birthDate instanceof Date) data.birthDate = row.birthDate;
+    if (!baby.birthWeightGrams && typeof row.birthWeightG === 'number') data.birthWeightGrams = row.birthWeightG;
+    if (Object.keys(data).length) await this.prisma.babyProfile.update({ where: { id: babyProfileId }, data });
   }
 
   /** 评估表入库后，对应的纸质资料标记为"已确认"（不再是待复核草稿）。 */
