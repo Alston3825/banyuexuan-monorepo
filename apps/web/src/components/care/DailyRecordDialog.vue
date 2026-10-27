@@ -51,10 +51,17 @@ const babyLabel = (id: string) => babyOptions.value.find((o) => o.value === id)?
 // ---- 草稿自动保存：核对/填写到一半页面被刷新、闪退、误关，重新打开能恢复，不用重拍重填 ----
 const draftKey = () => `daily-draft:${props.motherProfileId}:${props.date}`
 let draftReady = false
+/** 刚载入/刚保存时的内容快照：和它一样 = 没有改动，不存草稿（否则每次打开、每次保存后都会提示“有没保存的内容”） */
+let baseline = ''
+const snapshot = () => JSON.stringify({ m: motherValues.value, b: babyStates.value })
 let draftTimer: ReturnType<typeof setTimeout> | null = null
 function writeDraft() {
   if (!draftReady || !day.value) return
   try {
+    if (snapshot() === baseline) {
+      localStorage.removeItem(draftKey())
+      return
+    }
     localStorage.setItem(draftKey(), JSON.stringify({ at: Date.now(), version: day.value.record?.version ?? null, mother: motherValues.value, babies: babyStates.value, documentId: doc.value?.id ?? null, aiBabyId: aiBabyId.value }))
   } catch {
     /* 存储满了/被禁用就算了，不影响正常填写 */
@@ -88,6 +95,12 @@ function offerDraft() {
     d = JSON.parse(raw)
   } catch {
     return void (draftReady = true)
+  }
+  // 草稿内容和现在库里的一样（没有真正改动过）：不用提示
+  if (JSON.stringify({ m: d.mother, b: d.babies }) === baseline) {
+    clearDraft()
+    draftReady = true
+    return
   }
   // 草稿之后别人又保存过（版本号变了）就不再提示，避免用旧内容盖掉新的
   if (d.version !== (day.value?.record?.version ?? null) || Date.now() - d.at > 3 * 86_400_000) {
@@ -146,6 +159,7 @@ function fill(d: DailyDay) {
     bs[b.baby.id] = { values: v, feedings: b.feedings.map((f) => ({ ...f })), nursings: (b.nursings ?? []).map((f) => ({ ...f })) }
   }
   babyStates.value = bs
+  baseline = snapshot()
 }
 
 async function load() {
