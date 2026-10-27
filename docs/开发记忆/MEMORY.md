@@ -1,0 +1,22 @@
+# Memory Index
+
+- [伴月轩项目进度](banyuexuan_project_status.md) — P0-P4全部完成(含IoT)、P5第一片(经营看板)完成、环境/账号/分支未push提醒
+- [伴月轩服务器SSH登录方式](banyuexuan_server_access.md) — 当前私钥路径fanqieai.pem、登录用户ubuntu、2026-09-20重置后已验证
+- [竞品分析报告位置](banyuexuan_competitor_analysis.md) — 一月妈咪421张截图逆向分析报告存放位置
+- [协作方法论与教训](banyuexuan_working_style.md) — 模块打包测试节奏、commit时机、浏览器自动化测试的坑、每次改完附测试地址+账密
+- [减少确认弹框偏好](banyuexuan_autonomy_preference.md) — 常规实现细节自行决定，只在重要事项上确认
+- [真实房态数据已导入本机库](banyuexuan_real_data_import.md) — 2026-09-19起dev库含真实客户/入住记录，禁止重置，含回滚方法
+- [合同管理改造方向](banyuexuan_contract_redesign.md) — 纸质合同拍照+AI提取+待排房联动，2026-09-20已定决策，等真实合同样张和火山引擎Key
+- [房态日期都是预估（行业惯例）](banyuexuan_room_dates_are_estimates.md) — 合同无入住日期，销售按预产期+3~5天预估，实际入住当天才定，房态持续变动
+- [护理看板功能](banyuexuan_care_board.md) — 母婴护理模块新页面，2026-09-22已实现完成、通过全量e2e、未提交未同步服务器
+- [护理档案设计共识](banyuexuan_care_archive_design.md) — 三大块（计划/服务记录/监测记录）、3级护理、护理长制定+护理主任审核、7天评审+随时更新；等用户发纸质表格后再改
+- [导航整理原则](banyuexuan_nav_principle.md) — 日常功能在前、后台设置类合并成一个入口（母婴护理已做，其他模块照此思路）
+- [待完善清单规则](banyuexuan_todo_list_rule.md) — 占位/空置/"后面再做"必须随时记入 docs/待完善清单.md
+- [新添客户页改版](banyuexuan_customer_form_redesign.md) — 2026-10-05按竞品截图重做整页表单+渠道主数据+推荐人/电话销售员，决策与取舍，未提交未同步
+- [2026-10-06 服务器部署记录](banyuexuan_deploy_20261006.md) — 首次大批量上线结果、发版流程、nginx/vue-tsc -b 踩坑、AI密钥待定
+- [护理档案签字方案](banyuexuan_care_signature_design.md) — 2026-10-07 纸质留档不做电子签、护理师账号+签名图多人签字、客户链接确认每日服务报告+打分+防代点设计
+- [员工手机号/工号规则与批量开通账号](banyuexuan_employee_identity_rules.md) — 手机号+工号唯一、工号改权限、离职归档释放工号、拖入员工信息表开通账号（2026-10-07已实现，未提交未上服务器）
+- [审批中心/待办/流程设置](banyuexuan_workflow_center.md) — 审批进度+待办铃铛+流程设置已实现(2026-10-07，未提交未上服务器)，审批人解析规则、申购单卡死根因
+- [2026-10-07 第二次上线](banyuexuan_deploy_20261007.md) — 账号导入/审批中心/采购全流程等已上线(main 3469110)，验证方式、新角色待分配、服务器无员工账号
+- [2026-10-08 上线](banyuexuan_deploy_20261008.md) — 默认权限清单/预订冲突/权限保存网络失败修复已上线；线上部门负责人权限被用户手调，别覆盖；pgrep自匹配坑
+- [界面开发规范](banyuexuan_ui_standards.md) — 数据多必须加搜索、弹窗不点遮罩关闭等，已写入仓库 CLAUDE.md

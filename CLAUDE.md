@@ -2,6 +2,8 @@
 
 > 给每次进入本项目的 Claude 会话看的：以下是用户明确提出过的做法，写新功能/改页面时必须照做。
 
+> **接手/换 AI 先读**：`docs/交接手册.md`（项目全貌、本机运行、上线流程、备份与灾难恢复）、`docs/进度快照.md`（每天自动更新的最新进度）、`docs/待完善清单.md`（待办）。历史决策笔记在 `docs/开发记忆/`。
+
 ## 沟通
 - 用户不懂编程，一律用**中文**回复；每次改动后附上**测试地址和账号**（本机 http://localhost:5180，账号 `admin`，密码 `change-me`）。
 - 只有用户明确说“上线”才部署（先推 GitHub 主分支 → 服务器 `git pull` → `sudo bash scripts/deploy.sh`，部署前先 `sudo bash scripts/backup-mysql.sh` 备份）。
