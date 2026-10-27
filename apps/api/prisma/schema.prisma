@@ -2143,6 +2143,10 @@ model CareNursingEntry {
   jaundicePatch String?  @map("jaundice_patch") // 已取消该项，旧数据保留
   hipCare       String?  @map("hip_care")
   faceCare      String?  @map("face_care")
+  swimming      String?  @map("swimming")
+  bathing       String?  @map("bathing")
+  massage       String?  @map("massage")
+  earlyEdu      String?  @map("early_edu")
   otherCare     String?  @map("other_care")
   nurseName     String?  @map("nurse_name")
   createdAt     DateTime @default(now()) @map("created_at")

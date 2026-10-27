@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 新生儿 24 小时护理记录：一行一次护理，列 = 时间 | 晨护 | 脐带护理 | 皮肤护理 | 臀部护理 | 面部护理 | 其他（手写）| 责护签字 | 操作（打勾=已做），
+ * 新生儿 24 小时护理记录：一行一次护理，列 = 时间 | 晨护 | 脐带护理 | 皮肤护理 | 臀部护理 | 面部护理 | 游泳 | 洗澡 | 抚触 | 早教 | 其他（手写）| 责护签字 | 操作（打勾=已做），
  * 排列方式和“24 小时喂养记录”一致。电脑端是表格，手机上每行一张卡片。
  */
 import type { FeedingEntry } from '../../api/types/care-archive'
@@ -14,6 +14,10 @@ const TICKS = [
   { key: 'skinCare', label: '皮肤护理' },
   { key: 'hipCare', label: '臀部护理' },
   { key: 'faceCare', label: '面部护理' },
+  { key: 'swimming', label: '游泳' },
+  { key: 'bathing', label: '洗澡' },
+  { key: 'massage', label: '抚触' },
+  { key: 'earlyEdu', label: '早教' },
 ] as const
 
 const setRow = (i: number, patch: FeedingEntry) => emit('update:modelValue', props.modelValue.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -48,7 +52,7 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
           <td class="c"><button type="button" class="del" @click="removeRow(i)">删除</button></td>
         </tr>
         <tr v-if="modelValue.length === 0">
-          <td colspan="9" class="empty">还没有记录，点下面“＋ 添加一行”。</td>
+          <td colspan="13" class="empty">还没有记录，点下面“＋ 添加一行”。</td>
         </tr>
         <tr class="sum">
           <td>总结</td>
@@ -81,7 +85,7 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 .nr-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
 .nr-t th, .nr-t td { border: 1px solid #9a9a9a; padding: 1px 3px; text-align: center; vertical-align: middle; }
 .nr-t th { background: #f4f4f4; font-weight: 600; padding: 4px 2px; }
-.w-time { width: 100px; }
+.w-time { width: 92px; }
 .w-other { width: 22%; }
 .w-nurse { width: 90px; }
 .w-x { width: 64px; }

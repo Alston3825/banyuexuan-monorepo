@@ -140,7 +140,7 @@ export const FEEDING_COLUMNS: FieldSpec[] = [
   text('nurseName', '责护签字'),
 ];
 
-/** 新生儿 24 小时护理记录的一行：时间 + 晨护/脐带护理/皮肤护理/臀部护理/面部护理（打勾=已做）+ 其他（手写）+ 责护签字 */
+/** 新生儿 24 小时护理记录的一行：时间 + 晨护/脐带护理/皮肤护理/臀部护理/面部护理/游泳/洗澡/抚触/早教（打勾=已做）+ 其他（手写）+ 责护签字 */
 export const NURSING_COLUMNS: FieldSpec[] = [
   text('time', '时间', { hint: 'HH:mm' }),
   single('morningCare', '晨护', [o('YES', '已做')]),
@@ -148,6 +148,10 @@ export const NURSING_COLUMNS: FieldSpec[] = [
   single('skinCare', '皮肤护理', [o('YES', '已做')]),
   single('hipCare', '臀部护理', [o('YES', '已做')]),
   single('faceCare', '面部护理', [o('YES', '已做')]),
+  single('swimming', '游泳', [o('YES', '已做')]),
+  single('bathing', '洗澡', [o('YES', '已做')]),
+  single('massage', '抚触', [o('YES', '已做')]),
+  single('earlyEdu', '早教', [o('YES', '已做')]),
   text('otherCare', '其他'),
   text('nurseName', '责护签字'),
 ];
