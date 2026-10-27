@@ -68,4 +68,38 @@ describe('P8 入所评估与生长曲线 (e2e)', () => {
     expect(r.hints.join('')).toContain('入所日期');
     expect(r.points.weight).toEqual([]);
   });
+
+  it('4. 生长数据表：按日期合并出生/入所评估/日常护理/手工修改；改一行 = 曲线跟着变；清空 = 恢复系统数据；只有护理长/店长/超管能改', async () => {
+    const baby = await newBaby(4);
+    await admit(baby, { birthDate: '2026-10-01', birthWeightG: 3400, admissionDate: '2026-10-05', admissionWeightG: 3300, admissionLengthCm: 50.5, headCircumferenceCm: 34 }).expect(201);
+    const t0 = (await report(baby)).table as Json[];
+    expect(t0.map((r) => [r.date, r.weightG, r.lengthCm, r.headCm, r.sources.weight])).toEqual([
+      ['2026-10-01', 3400, null, null, 'BIRTH'],
+      ['2026-10-05', 3300, 50.5, 34, 'ADMISSION'],
+    ]);
+    expect(t0[1].ageDays).toBe(4);
+    expect(t0[1].recordId).toBeNull();
+
+    // 超管改入所体重（手工修改覆盖，曲线跟着变）；同一天只留一条手工记录
+    const save = (body: Json, t = token) => request(server).post('/api/v1/care/growth/records').set({ Authorization: `Bearer ${t}` }).send({ babyProfileId: baby, ...body });
+    await save({ measuredAt: '2026-10-05', weightG: 3350 }).expect(201);
+    await save({ measuredAt: '2026-10-05', headCm: 34.5 }).expect(201); // 只改头围，体重的手工修改保留
+    const t1 = (await report(baby)).table as Json[];
+    expect(t1[1]).toMatchObject({ weightG: 3350, lengthCm: 50.5, headCm: 34.5 });
+    expect(t1[1].sources).toEqual({ weight: 'GROWTH', length: 'ADMISSION', head: 'GROWTH' });
+    expect(await prisma.babyGrowthRecord.count({ where: { babyProfileId: baby } })).toBe(1);
+    const r1 = await report(baby);
+    expect(r1.points.weight.find((p: Json) => p.date === '2026-10-05')).toMatchObject({ value: 3350, source: 'GROWTH' });
+
+    // 把手工修改都清掉 → 恢复成入所评估里的原值，手工记录删除
+    await save({ measuredAt: '2026-10-05', weightG: null, headCm: null }).expect(201);
+    const t2 = (await report(baby)).table as Json[];
+    expect(t2[1]).toMatchObject({ weightG: 3300, headCm: 34, recordId: null });
+    expect(await prisma.babyGrowthRecord.count({ where: { babyProfileId: baby } })).toBe(0);
+
+    // 权限：普通员工不能改；店长可以
+    const login = async (u: string) => ((await request(server).post('/api/v1/auth/login').send({ username: u, password: 'Passw0rd!23' }).expect(201)).body as Json).accessToken as string;
+    await save({ measuredAt: '2026-10-06', weightG: 3400 }, await login('store_staff')).expect(403);
+    await save({ measuredAt: '2026-10-06', weightG: 3400 }, await login('store_manager')).expect(201);
+  });
 });

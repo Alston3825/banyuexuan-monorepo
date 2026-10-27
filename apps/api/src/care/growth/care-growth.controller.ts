@@ -8,7 +8,7 @@ import { CareGrowthService } from './care-growth.service';
 class GrowthRecordDto {
   @ApiProperty() @IsString() @IsNotEmpty() babyProfileId: string;
   @ApiProperty({ description: '测量日期 YYYY-MM-DD' }) @IsString() @IsNotEmpty() measuredAt: string;
-  @ApiProperty({ required: false }) @IsOptional() @IsNumber() weightG?: number | null;
+  @ApiProperty({ required: false, description: '不传=不改这一项；传 null=清掉手工修改值（恢复为系统数据）' }) @IsOptional() @IsNumber() weightG?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() lengthCm?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsNumber() headCm?: number | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() note?: string | null;
@@ -26,15 +26,16 @@ export class CareGrowthController {
     return this.service.report(babyId, standard);
   }
 
+  /** 修改/新增某一天的体重、身长、头围（只给超级管理员、店长、护理长） */
   @Post('records')
-  @RequirePermission('care.profile.update')
+  @RequirePermission('care.growth.edit')
   addRecord(@Body() dto: GrowthRecordDto) {
     return this.service.addRecord(dto);
   }
 
   @Delete('records/:id')
   @HttpCode(204)
-  @RequirePermission('care.profile.update')
+  @RequirePermission('care.growth.edit')
   removeRecord(@Param('id') id: string) {
     return this.service.removeRecord(id);
   }

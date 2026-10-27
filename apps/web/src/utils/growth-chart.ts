@@ -38,6 +38,10 @@ function clipCurve(curve: { ages: number[]; rows: number[][] }, months: number):
   return { ages, rows }
 }
 
+const TIP_NAME: Record<GrowthMetric, string> = { weight: '体重', length: '身长', head: '头围' }
+const TIP_UNIT: Record<GrowthMetric, string> = { weight: ' g', length: ' cm', head: ' cm' }
+const TIP_SRC: Record<string, string> = { GROWTH: '手工录入/修改', DAILY: '日常护理记录', ADMISSION: '入所评估', BIRTH: '出生' }
+
 function panel(report: GrowthReport, m: GrowthMetric, top: number, months: number): { svg: string; height: number } | null {
   const full = report.curves[m]
   if (!full || full.ages.length < 2) return null
@@ -94,6 +98,8 @@ function panel(report: GrowthReport, m: GrowthMetric, top: number, months: numbe
       const cx = x(Math.min(p.ageMonths!, maxAge))
       const cy = y(p.value)
       g += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4.5" fill="${COLOR.baby}" stroke="#fff" stroke-width="1.5"/>`
+      // 鼠标移上去/手机点一下显示“日期 + 数值 + 来源”（页面里监听 data-tip；下载成图片时这些属性不起作用）
+      g += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="13" fill="transparent" data-tip="${esc(`${p.date}｜${TIP_NAME[m]} ${f1(p.value)}${TIP_UNIT[m]}｜${TIP_SRC[p.source] ?? ''}`)}" style="cursor:pointer"/>`
       if (k === pts.length - 1 || pts.length <= 4) g += `<text x="${cx.toFixed(1)}" y="${(cy - 9).toFixed(1)}" font-size="12" font-weight="700" fill="${COLOR.baby}" text-anchor="middle">${f1(p.value)}</text>`
     })
   }

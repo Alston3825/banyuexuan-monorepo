@@ -187,6 +187,7 @@ async function main() {
     { code: 'care.plan-template', name: '护理-护理方案管理', type: 'PAGE', parentCode: 'care' },
     { code: 'care.board', name: '护理-护理看板', type: 'PAGE', parentCode: 'care' },
     { code: 'care.profile', name: '护理-母婴档案', type: 'PAGE', parentCode: 'care' },
+    { code: 'care.growth', name: '护理-生长曲线', type: 'PAGE', parentCode: 'care' },
     { code: 'care.plan', name: '护理-护理计划', type: 'PAGE', parentCode: 'care' },
     { code: 'care.record', name: '护理-护理记录', type: 'PAGE', parentCode: 'care' },
     { code: 'care.abnormality', name: '护理-护理异常', type: 'PAGE', parentCode: 'care' },
@@ -373,6 +374,8 @@ async function main() {
   for (const action of ['view', 'create', 'update', 'force-delete', 'approve']) {
     permSpecs.push({ code: `care.profile.${action}`, name: `护理-母婴档案-${action}`, type: 'BUTTON', parentCode: 'care.profile' });
   }
+  // 生长数据表的修改（体重/身长/头围）：只给超级管理员、店长、护理长
+  permSpecs.push({ code: 'care.growth.edit', name: '护理-生长曲线-修改数据', type: 'BUTTON', parentCode: 'care.growth' });
   for (const action of ['view', 'create', 'terminate']) {
     permSpecs.push({ code: `care.plan.${action}`, name: `护理-护理计划-${action}`, type: 'BUTTON', parentCode: 'care.plan' });
   }

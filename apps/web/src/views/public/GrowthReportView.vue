@@ -12,6 +12,13 @@ const error = ref('')
 const loading = ref(true)
 const standard = ref<GrowthStandard>('CN')
 const months = ref(3)
+const tip = ref<{ x: number; y: number; text: string } | null>(null)
+function onChartMove(e: MouseEvent) {
+  const el = (e.target as Element | null)?.closest?.('[data-tip]')
+  if (!el) return void (tip.value = null)
+  const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  tip.value = { x: e.clientX - box.left, y: e.clientY - box.top, text: el.getAttribute('data-tip') ?? '' }
+}
 const svg = computed(() => (report.value?.ready ? buildGrowthSvg(report.value, { months: months.value }) : ''))
 const hasPoints = computed(() => !!report.value && (['weight', 'length', 'head'] as const).some((m) => report.value!.points[m].length > 0))
 
@@ -60,7 +67,10 @@ async function save() {
               <n-radio-button :value="3" label="3个月" />
             </n-radio-group>
           </div>
-          <div class="gr-svg" v-html="svg" />
+          <div class="gr-svg" style="position: relative" @mousemove="onChartMove" @mouseleave="tip = null" @click="onChartMove">
+            <div v-html="svg" />
+            <div v-if="tip" class="gr-tip" :style="{ left: tip.x + 12 + 'px', top: tip.y - 36 + 'px' }">{{ tip.text }}</div>
+          </div>
           <n-button type="primary" block size="large" style="margin-top: 12px" @click="save">保存成图片</n-button>
         </template>
       </template>
@@ -69,6 +79,18 @@ async function save() {
 </template>
 
 <style scoped>
+.gr-tip {
+  position: absolute;
+  z-index: 5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .gr-page {
   max-width: 800px;
   margin: 0 auto;

@@ -10,9 +10,14 @@ import { careGrowthApi } from '../../api/modules/care-growth.api'
 import type { GrowthReport, GrowthStandard } from '../../api/types/care-growth'
 import { buildGrowthSvg, downloadSvgAsPng } from '../../utils/growth-chart'
 import { dialog, message } from '../../utils/discrete-api'
+import { useAuthStore } from '../../stores/auth'
+import type { GrowthTableRow } from '../../api/types/care-growth'
 
 const props = defineProps<{ babies: { id: string; sequenceNo: number; name: string | null }[]; customerName?: string }>()
 
+const auth = useAuthStore()
+/** 只有超级管理员、店长、护理长能改数据（后端同样校验） */
+const canEdit = computed(() => auth.hasAccess('care.growth.edit'))
 const babyId = ref<string | null>(props.babies[0]?.id ?? null)
 const standard = ref<GrowthStandard>('CN')
 const months = ref(3)
@@ -72,7 +77,7 @@ async function save() {
   if (f.weightG === null && f.lengthCm === null && f.headCm === null) return void message.warning('体重、身长、头围至少填一项')
   saving.value = true
   try {
-    await careGrowthApi.addRecord({ babyProfileId: babyId.value, measuredAt: ymdOf(f.date), weightG: f.weightG, lengthCm: f.lengthCm, headCm: f.headCm, note: f.note || null })
+    await careGrowthApi.addRecord({ babyProfileId: babyId.value, measuredAt: ymdOf(f.date), weightG: f.weightG ?? undefined, lengthCm: f.lengthCm ?? undefined, headCm: f.headCm ?? undefined, note: f.note || undefined })
     message.success('已记录')
     form.value = null
     await load()
@@ -80,14 +85,49 @@ async function save() {
     saving.value = false
   }
 }
-function remove(id: string, date: string) {
+// ---- 曲线上鼠标移到点上（手机点一下）显示日期和数值，方便核对 ----
+const tip = ref<{ x: number; y: number; text: string } | null>(null)
+function onChartMove(e: MouseEvent) {
+  const el = (e.target as Element | null)?.closest?.('[data-tip]')
+  if (!el) return void (tip.value = null)
+  const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  tip.value = { x: e.clientX - box.left, y: e.clientY - box.top, text: el.getAttribute('data-tip') ?? '' }
+}
+
+// ---- 生长数据表（可改，只有有权限的人看到操作按钮） ----
+const SRC_LABEL: Record<string, string> = { GROWTH: '手工', DAILY: '日常护理', ADMISSION: '入所评估', BIRTH: '出生' }
+const tableRows = computed(() => [...(report.value?.table ?? [])].reverse())
+const editRow = ref<{ date: string; weightG: number | null; lengthCm: number | null; headCm: number | null; orig: GrowthTableRow } | null>(null)
+const savingRow = ref(false)
+const startEdit = (r: GrowthTableRow) => (editRow.value = { date: r.date, weightG: r.weightG, lengthCm: r.lengthCm, headCm: r.headCm, orig: r })
+async function saveRow() {
+  const e = editRow.value
+  if (!e || !babyId.value) return
+  // 只提交改过的项：没改的不会被“固化”成手工数据；清空 = 恢复系统里原来的数据
+  const body: { weightG?: number | null; lengthCm?: number | null; headCm?: number | null } = {}
+  if (e.weightG !== e.orig.weightG) body.weightG = e.weightG
+  if (e.lengthCm !== e.orig.lengthCm) body.lengthCm = e.lengthCm
+  if (e.headCm !== e.orig.headCm) body.headCm = e.headCm
+  if (Object.keys(body).length === 0) return void (editRow.value = null)
+  savingRow.value = true
+  try {
+    await careGrowthApi.addRecord({ babyProfileId: babyId.value, measuredAt: e.date, ...body })
+    message.success('已修改，曲线已更新')
+    editRow.value = null
+    await load()
+  } finally {
+    savingRow.value = false
+  }
+}
+function removeRow(r: GrowthTableRow) {
+  if (!r.recordId) return
   dialog.warning({
-    title: `删除 ${date} 的测量记录？`,
-    content: '删除后曲线图里这一天的点也会消失（日常护理记录里的体重不受影响）。',
-    positiveText: '删除',
+    title: `去掉 ${r.date} 的手工修改？`,
+    content: '这一天会恢复成系统里原来的数据（日常护理记录/入所评估/出生）；如果原来没有数据，这一天的点会消失。',
+    positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await careGrowthApi.removeRecord(id)
+      await careGrowthApi.removeRecord(r.recordId!)
       await load()
     },
   })
@@ -149,7 +189,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
       <n-radio-group v-model:value="months" size="small">
         <n-radio-button v-for="o in monthOptions" :key="o.value" :value="o.value" :label="o.label" />
       </n-radio-group>
-      <n-button type="primary" @click="open">＋ 记录一次测量（体重/身长/头围）</n-button>
+      <n-button v-if="canEdit" type="primary" @click="open">＋ 记录一次测量（体重/身长/头围）</n-button>
       <n-button :disabled="!svg" @click="download">⬇ 下载图片</n-button>
       <n-button :disabled="!svg" :loading="sharing" @click="createShare">🔗 生成客户链接</n-button>
     </n-space>
@@ -176,18 +216,34 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
         </div>
 
         <n-empty v-if="!hasPoints" description="还没有测量数据：点上面“记录一次测量”，或在日常护理记录里记宝宝体重" style="margin: 20px 0" />
-        <div v-else class="gc-chart" v-html="svg" />
+        <div v-else class="gc-chart" @mousemove="onChartMove" @mouseleave="tip = null" @click="onChartMove">
+          <div v-html="svg" />
+          <div v-if="tip" class="gc-tip" :style="{ left: tip.x + 12 + 'px', top: tip.y - 36 + 'px' }">{{ tip.text }}</div>
+        </div>
 
-        <n-card v-if="report.records.length > 0" size="small" title="手工测量记录" style="margin-top: 12px">
-          <div v-for="r in report.records" :key="r.id" class="gc-rec">
-            <div>
-              <b>{{ r.date }}</b>
-              <span v-if="r.weightG != null"> · 体重 {{ r.weightG }}g</span>
-              <span v-if="r.lengthCm != null"> · 身长 {{ r.lengthCm }}cm</span>
-              <span v-if="r.headCm != null"> · 头围 {{ r.headCm }}cm</span>
-              <span class="gc-sub"> {{ r.measuredByName ?? '' }}{{ r.note ? ' · ' + r.note : '' }}</span>
-            </div>
-            <n-button size="tiny" type="error" quaternary @click="remove(r.id, r.date)">删除</n-button>
+        <n-card v-if="tableRows.length > 0" size="small" title="生长数据表（曲线上的点就来自这里）" style="margin-top: 12px">
+          <div class="gc-sub" style="margin-bottom: 6px">
+            按日期汇总了出生、新生儿入所评估、日常护理记录里的体重/身长/头围，以及手工修改。{{ canEdit ? '数据有误可以点“修改”，改过的会标“手工”，曲线随之更新。清空某一项 = 恢复系统里的原数据。' : '只有超级管理员、店长、护理长可以修改。' }}
+          </div>
+          <div class="gt-head"><span>日期</span><span>体重 g</span><span>身长 cm</span><span>头围 cm</span><span v-if="canEdit" class="gt-op">操作</span></div>
+          <div v-for="r in tableRows" :key="r.date" class="gt-row" :class="{ 'gt-editing': editRow?.date === r.date }">
+            <div class="gt-date"><b>{{ r.date }}</b><small v-if="r.ageDays !== null">第 {{ r.ageDays }} 天</small></div>
+            <template v-if="editRow?.date === r.date">
+              <n-input-number v-model:value="editRow.weightG" :min="500" :max="20000" :precision="0" :show-button="false" size="small" placeholder="体重" />
+              <n-input-number v-model:value="editRow.lengthCm" :min="25" :max="120" :precision="1" :show-button="false" size="small" placeholder="身长" />
+              <n-input-number v-model:value="editRow.headCm" :min="20" :max="60" :precision="1" :show-button="false" size="small" placeholder="头围" />
+              <div class="gt-op"><n-button size="tiny" type="primary" :loading="savingRow" @click="saveRow">保存</n-button><n-button size="tiny" @click="editRow = null">取消</n-button></div>
+            </template>
+            <template v-else>
+              <div v-for="k in (['weight', 'length', 'head'] as const)" :key="k" class="gt-cell">
+                <span>{{ k === 'weight' ? (r.weightG ?? '-') : k === 'length' ? (r.lengthCm ?? '-') : (r.headCm ?? '-') }}</span>
+                <small v-if="r.sources[k]" :class="{ 'gt-manual': r.sources[k] === 'GROWTH' }">{{ SRC_LABEL[r.sources[k]!] }}</small>
+              </div>
+              <div v-if="canEdit" class="gt-op">
+                <n-button size="tiny" @click="startEdit(r)">修改</n-button>
+                <n-button v-if="r.recordId" size="tiny" type="error" quaternary @click="removeRow(r)">去掉手工</n-button>
+              </div>
+            </template>
           </div>
         </n-card>
         <div v-if="hasPoints" class="gc-sub" style="margin-top: 6px">
@@ -227,6 +283,66 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
 </template>
 
 <style scoped>
+.gc-chart {
+  position: relative;
+}
+.gc-tip {
+  position: absolute;
+  z-index: 5;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.gt-head,
+.gt-row {
+  display: grid;
+  grid-template-columns: 112px repeat(3, minmax(0, 1fr)) auto;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #eee;
+  font-size: 14px;
+}
+.gt-head {
+  color: #888;
+  font-size: 12px;
+  border-bottom: 1px solid #e6e6e6;
+}
+.gt-date small,
+.gt-cell small {
+  display: block;
+  color: #aaa;
+  font-size: 11px;
+}
+.gt-cell small.gt-manual {
+  color: #2a64b0;
+  font-weight: 600;
+}
+.gt-op {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  min-width: 96px;
+}
+.gt-editing {
+  background: #f6fbf8;
+}
+@media (max-width: 767px) {
+  .gt-head,
+  .gt-row {
+    grid-template-columns: 88px repeat(3, minmax(0, 1fr));
+  }
+  .gt-op {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
 .gc-latest {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));

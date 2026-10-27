@@ -97,6 +97,29 @@ export class CareGrowthService {
       if (g.headCm != null) raw.head.set(k, { value: g.headCm, source: 'GROWTH', recordId: g.id });
     }
 
+    // 生长数据表：把三个指标按日期合并成一行（曲线就是用这些数据画的）；某天有手工修改记录的，该行可以直接改/删
+    const tableDates = new Set<string>([...raw.weight.keys(), ...raw.length.keys(), ...raw.head.keys()]);
+    const growthByDate = new Map(growth.map((g) => [ymd(g.measuredAt), g]));
+    const table = [...tableDates]
+      .sort()
+      .map((date) => {
+        const w = raw.weight.get(date);
+        const l = raw.length.get(date);
+        const h = raw.head.get(date);
+        const g = growthByDate.get(date);
+        return {
+          date,
+          ageDays: birth ? Math.round((new Date(`${date}T00:00:00.000Z`).getTime() - birth.getTime()) / DAY_MS) : null,
+          weightG: w ? Math.round(w.value * 1000) : null,
+          lengthCm: l?.value ?? null,
+          headCm: h?.value ?? null,
+          sources: { weight: w?.source ?? null, length: l?.source ?? null, head: h?.source ?? null },
+          recordId: g?.id ?? null,
+          note: g?.note ?? null,
+          editedByName: g?.measuredByName ?? null,
+        };
+      });
+
     const points = { weight: [] as GrowthPoint[], length: [] as GrowthPoint[], head: [] as GrowthPoint[] };
     for (const m of METRICS) {
       for (const [date, v] of [...raw[m].entries()].sort((x, y) => x[0].localeCompare(y[0]))) {
@@ -142,6 +165,7 @@ export class CareGrowthService {
       ready: notReady.length === 0,
       notReady,
       hints,
+      table,
       points,
       curves,
       latest,
@@ -162,46 +186,56 @@ export class CareGrowthService {
     return this.buildReport(babyId, this.ctx.tenantId!, standard);
   }
 
+  /** 修改/新增某一天的数据：只改传了的项（null=清掉这一项的手工修改，恢复为系统里原来的数据）；同一天只有一条手工记录 */
   async addRecord(dto: { babyProfileId: string; measuredAt: string; weightG?: number | null; lengthCm?: number | null; headCm?: number | null; note?: string | null }) {
     const b = await this.baby(dto.babyProfileId);
     const day = String(dto.measuredAt ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(new Date(day).getTime())) throw new BadRequestException('测量日期格式不正确');
     if (day > ymd(today())) throw new BadRequestException('不能记录未来的日期');
     if (b.birthDate && day < ymd(new Date(b.birthDate.getTime() + 8 * 3600_000))) throw new BadRequestException('测量日期不能早于宝宝出生日期');
-    const vals = { weight: dto.weightG == null ? null : Math.round(dto.weightG),  length: dto.lengthCm ?? null, head: dto.headCm ?? null };
-    if (vals.weight === null && vals.length === null && vals.head === null) throw new BadRequestException('体重、身长、头围至少填一项');
+    const patch: { weightG?: number | null; lengthCm?: number | null; headCm?: number | null } = {};
+    if (dto.weightG !== undefined) patch.weightG = dto.weightG === null ? null : Math.round(dto.weightG);
+    if (dto.lengthCm !== undefined) patch.lengthCm = dto.lengthCm;
+    if (dto.headCm !== undefined) patch.headCm = dto.headCm;
+    const check: Record<GrowthMetric, number | null | undefined> = { weight: patch.weightG, length: patch.lengthCm, head: patch.headCm };
     for (const m of METRICS) {
-      const v = vals[m];
-      if (v !== null && (v < RANGE[m][0] || v > RANGE[m][1])) throw new BadRequestException(`${METRIC_LABEL[m].name}应在 ${RANGE[m][0]}~${RANGE[m][1]} ${METRIC_LABEL[m].unit} 之间，请核对`);
+      const v = check[m];
+      if (v != null && (v < RANGE[m][0] || v > RANGE[m][1])) throw new BadRequestException(`${METRIC_LABEL[m].name}应在 ${RANGE[m][0]}~${RANGE[m][1]} ${METRIC_LABEL[m].unit} 之间，请核对`);
     }
+    const measuredAt = new Date(`${day}T00:00:00.000Z`);
+    const existing = await this.prisma.babyGrowthRecord.findFirst({ where: { tenantId: this.ctx.tenantId, babyProfileId: b.id, measuredAt } });
+    const merged = {
+      weightG: patch.weightG !== undefined ? patch.weightG : (existing?.weightG ?? null),
+      lengthCm: patch.lengthCm !== undefined ? patch.lengthCm : (existing?.lengthCm ?? null),
+      headCm: patch.headCm !== undefined ? patch.headCm : (existing?.headCm ?? null),
+    };
+    const allEmpty = merged.weightG === null && merged.lengthCm === null && merged.headCm === null;
+    if (allEmpty && !existing) throw new BadRequestException('体重、身长、头围至少填一项');
     const me = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId! }, select: { realName: true } });
-    const created = await this.prisma.babyGrowthRecord.create({
-      data: {
-        tenantId: this.ctx.tenantId!,
-        storeId: b.storeId,
-        motherProfileId: b.motherProfileId,
-        babyProfileId: b.id,
-        measuredAt: new Date(`${day}T00:00:00.000Z`),
-        weightG: vals.weight,
-        lengthCm: vals.length,
-        headCm: vals.head,
-        measuredByName: me?.realName ?? null,
-        note: dto.note?.trim() || null,
-        createdBy: this.ctx.accountId!,
-      },
-    });
+    let result;
+    if (existing && allEmpty) {
+      await this.prisma.babyGrowthRecord.delete({ where: { id: existing.id } }); // 手工修改都清掉了：恢复为系统里原来的数据
+      result = existing;
+    } else if (existing) {
+      result = await this.prisma.babyGrowthRecord.update({ where: { id: existing.id }, data: { ...merged, note: dto.note !== undefined ? dto.note?.trim() || null : existing.note, measuredByName: me?.realName ?? existing.measuredByName } });
+    } else {
+      result = await this.prisma.babyGrowthRecord.create({
+        data: { tenantId: this.ctx.tenantId!, storeId: b.storeId, motherProfileId: b.motherProfileId, babyProfileId: b.id, measuredAt, ...merged, measuredByName: me?.realName ?? null, note: dto.note?.trim() || null, createdBy: this.ctx.accountId! },
+      });
+    }
     await this.auditLogService.record({
-      action: 'CREATE',
+      action: existing ? (allEmpty ? 'DELETE' : 'UPDATE') : 'CREATE',
       entityType: 'BabyGrowthRecord',
-      entityId: created.id,
-      afterData: { day, ...vals },
-      remark: `记录宝宝生长测量 ${day}`,
+      entityId: result.id,
+      beforeData: existing ? { day, weightG: existing.weightG, lengthCm: existing.lengthCm, headCm: existing.headCm } : undefined,
+      afterData: { day, ...merged },
+      remark: `修改宝宝生长数据 ${day}`,
       tenantId: this.ctx.tenantId,
       storeId: b.storeId,
       accountId: this.ctx.accountId,
       requestId: this.ctx.requestId,
     });
-    return created;
+    return result;
   }
 
   async removeRecord(id: string) {

@@ -122,6 +122,7 @@ export const DEFAULT_ROLES: RoleDefault[] = [
     description: '护理部日常管理：护理档案/计划/记录/异常/离店关怀、护理部排班、填写护理部申购单；不含审核护理计划',
     perms: [
       ...CARE_DAILY, ...PURCHASE_REQUEST_FILL, ...SELF_SERVICE,
+      'care.growth.edit',
       'hr.shift-definition.view', 'hr.schedule-entry.view', 'hr.schedule-entry.create', 'hr.schedule-entry.update', 'hr.schedule-entry.delete',
       'ai.care-abnormality-agent.*',
     ],
@@ -276,6 +277,7 @@ function storeManagerCodes(allCodes: string[]): string[] {
           code.startsWith('payment.record') ||
           code.startsWith('care.board') ||
           code.startsWith('care.profile') ||
+          code.startsWith('care.growth') ||
           code === 'care.plan' ||
           code.startsWith('care.plan.') ||
           code.startsWith('care.record') ||
@@ -324,7 +326,7 @@ function storeStaffCodes(allCodes: string[]): string[] {
   // 基础资料统一在 platform 这一个MODULE code下面，见 nav-menu.ts 里对这三个导航分组
   // 共用同一个后端module的说明；审计日志audit；经营分析analytics；设备网关iot）。
   // 另外"删除房间"(room.room.delete)是不可逆操作，只给店长/管理员，普通员工不开放。
-  const storeStaffExcluded = new Set(['room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive', 'crm.customer.archive', 'crm.customer.merge', 'hr.payroll-record.view-all']); // 审核护理计划只给店长/护理主任
+  const storeStaffExcluded = new Set(['care.growth.edit', 'room.room.delete', 'care.profile.approve', 'hr.employee-profile.archive', 'crm.customer.archive', 'crm.customer.merge', 'hr.payroll-record.view-all']); // 审核护理计划只给店长/护理主任
   return storeManagerCodes_.filter(
     (code) =>
       !storeStaffExcluded.has(code) &&
