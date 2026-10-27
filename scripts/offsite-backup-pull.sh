@@ -20,11 +20,12 @@ if [[ ! -f "$PASSFILE" ]]; then
   log "已生成加密口令文件 ${PASSFILE}（请把它另存进密码管理器，丢了备份就无法还原）"
 fi
 
-latest() { "${SSH[@]}" "ls -1t ~/banyuexuan/backups/$1 2>/dev/null | head -n1"; }
+# 备份目录是 root 的定时任务写的，ubuntu 直接 ls 可能没权限，所以都用 sudo
+latest() { "${SSH[@]}" "sudo sh -c 'ls -1t /home/ubuntu/banyuexuan/backups/$1 2>/dev/null | head -n1' | xargs -r basename"; }
 pull_encrypted() { # $1 服务器上的文件名
   local name="$1" out="$DEST/$1.enc"
   [[ -s "$out" ]] && { log "已有 ${name}，跳过"; return; }
-  "${SSH[@]}" "sudo cat ~/banyuexuan/backups/$name" | openssl enc -aes-256-cbc -pbkdf2 -salt -pass "file:$PASSFILE" -out "$out.part"
+  "${SSH[@]}" "sudo cat /home/ubuntu/banyuexuan/backups/$name" | openssl enc -aes-256-cbc -pbkdf2 -salt -pass "file:$PASSFILE" -out "$out.part"
   [[ -s "$out.part" ]] || { rm -f "$out.part"; log "拉取 $name 失败（空文件）"; return 1; }
   mv "$out.part" "$out"; log "已备份并加密：${out}（$(du -h "$out" | cut -f1)）"
 }
@@ -33,7 +34,7 @@ DB="$(latest '*.sql.gz')"; FILES="$(latest 'files-*.tar.gz')"
 [[ -n "$DB" ]] && pull_encrypted "$DB" || log "服务器上没有数据库备份"
 [[ -n "$FILES" ]] && pull_encrypted "$FILES" || log "服务器上没有文件备份"
 
-"${SSH[@]}" "sudo cat ~/banyuexuan/.env.prod" > "$SECRETS/env.prod.latest.part"
+"${SSH[@]}" "sudo cat /home/ubuntu/banyuexuan/.env.prod" > "$SECRETS/env.prod.latest.part"
 if [[ -s "$SECRETS/env.prod.latest.part" ]]; then mv "$SECRETS/env.prod.latest.part" "$SECRETS/env.prod.latest"; chmod 600 "$SECRETS/env.prod.latest"; log "已更新密钥配置备份：$SECRETS/env.prod.latest"; else rm -f "$SECRETS/env.prod.latest.part"; log "拉取 .env.prod 失败"; fi
 
 find "$DEST" -name '*.enc' -mtime +$KEEP_DAYS -delete
