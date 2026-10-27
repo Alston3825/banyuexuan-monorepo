@@ -2129,7 +2129,7 @@ model CareFeedingEntry {
   @@map("care_feeding_entries")
 }
 
-/// 新生儿 24 小时护理记录的一行（晨护/脐带护理/皮肤护理/退黄贴更换，打勾=已做）
+/// 新生儿 24 小时护理记录的一行（晨护/脐带护理/皮肤护理/臀部护理/面部护理打勾=已做，其他项手写）
 model CareNursingEntry {
   id            String   @id @default(cuid())
   tenantId      String   @map("tenant_id")
@@ -2139,7 +2139,10 @@ model CareNursingEntry {
   morningCare   String?  @map("morning_care")
   cordCare      String?  @map("cord_care")
   skinCare      String?  @map("skin_care")
-  jaundicePatch String?  @map("jaundice_patch")
+  jaundicePatch String?  @map("jaundice_patch") // 已取消该项，旧数据保留
+  hipCare       String?  @map("hip_care")
+  faceCare      String?  @map("face_care")
+  otherCare     String?  @map("other_care")
   nurseName     String?  @map("nurse_name")
   createdAt     DateTime @default(now()) @map("created_at")
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 新生儿 24 小时护理记录：一行一次护理，列 = 时间 | 晨护 | 脐带护理 | 皮肤护理 | 退黄贴更换 | 责护签字 | 操作（打勾=已做），
+ * 新生儿 24 小时护理记录：一行一次护理，列 = 时间 | 晨护 | 脐带护理 | 皮肤护理 | 臀部护理 | 面部护理 | 其他（手写）| 责护签字 | 操作（打勾=已做），
  * 排列方式和“24 小时喂养记录”一致。电脑端是表格，手机上每行一张卡片。
  */
 import type { FeedingEntry } from '../../api/types/care-archive'
@@ -12,7 +12,8 @@ const TICKS = [
   { key: 'morningCare', label: '晨护' },
   { key: 'cordCare', label: '脐带护理' },
   { key: 'skinCare', label: '皮肤护理' },
-  { key: 'jaundicePatch', label: '退黄贴更换' },
+  { key: 'hipCare', label: '臀部护理' },
+  { key: 'faceCare', label: '面部护理' },
 ] as const
 
 const setRow = (i: number, patch: FeedingEntry) => emit('update:modelValue', props.modelValue.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -33,6 +34,7 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
         <tr>
           <th class="w-time">时间</th>
           <th v-for="t in TICKS" :key="t.key">{{ t.label }}</th>
+          <th class="w-other">其他</th>
           <th class="w-nurse">责护签字</th>
           <th class="w-x">操作</th>
         </tr>
@@ -41,16 +43,17 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
         <tr v-for="(r, i) in modelValue" :key="i">
           <td><input type="time" :value="(r.time as string) ?? ''" @input="(e) => setRow(i, { time: (e.target as HTMLInputElement).value })" /></td>
           <td v-for="t in TICKS" :key="t.key" class="c"><button type="button" class="tick" :class="{ on: r[t.key] === 'YES' }" @click="toggle(i, t.key)">✓</button></td>
+          <td><input :value="(r.otherCare as string) ?? ''" @input="(e) => setRow(i, { otherCare: (e.target as HTMLInputElement).value })" /></td>
           <td><input :value="(r.nurseName as string) ?? ''" @input="(e) => setRow(i, { nurseName: (e.target as HTMLInputElement).value })" /></td>
           <td class="c"><button type="button" class="del" @click="removeRow(i)">删除</button></td>
         </tr>
         <tr v-if="modelValue.length === 0">
-          <td colspan="7" class="empty">还没有记录，点下面“＋ 添加一行”。</td>
+          <td colspan="9" class="empty">还没有记录，点下面“＋ 添加一行”。</td>
         </tr>
         <tr class="sum">
           <td>总结</td>
           <td v-for="t in TICKS" :key="t.key" class="c">{{ count(t.key) || '' }}</td>
-          <td colspan="2"></td>
+          <td colspan="3"></td>
         </tr>
       </tbody>
     </table>
@@ -65,7 +68,8 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
         <div class="nr-ticks">
           <button v-for="t in TICKS" :key="t.key" type="button" class="nr-chip" :class="{ on: r[t.key] === 'YES' }" @click="toggle(i, t.key)">{{ t.label }}</button>
         </div>
-        <label class="nr-nurse">责护签字<input :value="(r.nurseName as string) ?? ''" @input="(e) => setRow(i, { nurseName: (e.target as HTMLInputElement).value })" /></label>
+        <label class="nr-nurse">其他<input :value="(r.otherCare as string) ?? ''" placeholder="没有对应勾选项的护理，手写" @input="(e) => setRow(i, { otherCare: (e.target as HTMLInputElement).value })" /></label>
+        <label class="nr-nurse" style="margin-top: 6px">责护签字<input :value="(r.nurseName as string) ?? ''" @input="(e) => setRow(i, { nurseName: (e.target as HTMLInputElement).value })" /></label>
       </div>
       <div v-if="modelValue.length === 0" class="empty">还没有记录，点下面的按钮添加。</div>
     </template>
@@ -78,7 +82,8 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 .nr-t th, .nr-t td { border: 1px solid #9a9a9a; padding: 1px 3px; text-align: center; vertical-align: middle; }
 .nr-t th { background: #f4f4f4; font-weight: 600; padding: 4px 2px; }
 .w-time { width: 100px; }
-.w-nurse { width: 110px; }
+.w-other { width: 22%; }
+.w-nurse { width: 90px; }
 .w-x { width: 64px; }
 .nr-t input { width: 100%; height: 26px; padding: 0 3px; border: 0; background: transparent; font-size: 13px; outline: none; text-align: center; }
 .nr-t input[type='time'] { font-weight: 600; }
