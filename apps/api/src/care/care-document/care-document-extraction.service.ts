@@ -7,6 +7,7 @@ import { MED_AI_DESCRIPTION, MED_HEADER_FIELDS, MED_ITEM_COLUMNS } from '../care
 import { DAILY_AI_DESCRIPTION, DAILY_BABY_AI_DESCRIPTION, DAILY_BABY_FIELDS, dailyFlatFields, FEEDING_COLUMNS } from '../care-daily/daily-specs';
 import { serviceSheetAiSpec } from '../care-plan-version/service-sheet-specs';
 import { CareStorageService } from './care-storage.service';
+import { applyNurseRoster, withRosterHint } from './nurse-name-match';
 
 const MAX_CONCURRENT = 2;
 
@@ -89,6 +90,15 @@ export class CareDocumentExtractionService implements OnModuleInit {
     result.warnings = result.warnings.filter((w) => !drop.has(w.field));
   }
 
+  /** 账号管理里“护理部”的在职员工姓名（本门店 + 总部账号） */
+  private async nurseRoster(tenantId: string, storeId: string | null): Promise<string[]> {
+    const rows = await this.prisma.account.findMany({
+      where: { tenantId, status: 'ACTIVE', department: { name: { contains: '护理' } }, ...(storeId ? { OR: [{ storeId }, { storeId: null }] } : {}) },
+      select: { realName: true },
+    });
+    return [...new Set(rows.map((r) => r.realName.trim()).filter(Boolean))];
+  }
+
   enqueue(documentId: string): void {
     void this.runQueued(documentId);
   }
@@ -119,7 +129,10 @@ export class CareDocumentExtractionService implements OnModuleInit {
     await this.prisma.careDocument.update({ where: { id: documentId }, data: { extractStatus: 'RUNNING' } });
 
     const files = await Promise.all(doc.files.map(async (f) => ({ name: f.fileName, data: await this.storage.readBuffer(f.storagePath) })));
-    const result = await this.aiGateway.extractCareForm(spec, files);
+    // 护理师签字：先拿护理部员工名单告诉 AI，识别完再逐个核对（手写潦草时把认错的字纠正过来）
+    const roster = await this.nurseRoster(doc.tenantId, doc.storeId);
+    const result = await this.aiGateway.extractCareForm({ ...spec, fields: withRosterHint(spec.fields as { key: string; aiHint?: string; columns?: unknown[] }[], roster) }, files);
+    result.warnings.push(...applyNurseRoster(result.data, roster));
     await this.dropOtherSexFields(doc.babyProfileId, spec.fields as { key: string; label: string }[], result);
     await this.prisma.careDocument.update({
       where: { id: documentId },
