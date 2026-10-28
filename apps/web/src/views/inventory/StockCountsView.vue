@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, type DataTableColumns } from 'naive-ui'
 import { stockCountApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { StockCount, StockCountItemInput, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
 import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import LineListEditor from '../../components/inventory/LineListEditor.vue'
 import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
@@ -193,13 +194,13 @@ onMounted(fetchAll)
           <n-form-item label="仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="盘点明细">
-            <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
+            <line-list-editor v-model="model.items" :on-create="createItemRow" add-text="添加一个盘点物品" #="{ value }">
               <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
                 <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" style="width: min(360px, 94vw)" />
                 <n-input-number v-model:value="value.countedQuantity" :min="0" placeholder="实际盘点数量" style="width: min(160px, 94vw)" />
                 <span v-if="value.itemId && stockLoaded" style="white-space: nowrap; color: #18a058; font-size: 13px">系统库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}</span>
               </n-space>
-            </n-dynamic-input>
+            </line-list-editor>
           </n-form-item>
         </n-form>
         <template #footer>

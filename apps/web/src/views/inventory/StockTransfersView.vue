@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, NAlert, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NAlert, type DataTableColumns } from 'naive-ui'
 import { stockTransferApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import type { StockTransfer, StockTransferItemInput, Warehouse, InventoryItem } from '../../api/types/inventory'
 import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import LineListEditor from '../../components/inventory/LineListEditor.vue'
 import { useWarehouseStockMap } from '../../composables/useWarehouseStockMap'
 import { docMatches } from '../../utils/item-search'
 import { renderStatusBadge, INVENTORY_DOC_STATUS_MAP } from '../../utils/status-map'
@@ -195,7 +196,7 @@ onMounted(fetchAll)
               <n-alert v-for="o in overItems" :key="o.id" type="error" :show-icon="false" style="margin-bottom: 6px">
                 ⚠「{{ itemName(o.id) }}」调拨数量 {{ o.used }} 大于调出仓库现有库存 {{ o.stock }}，无法提交，请减少数量。
               </n-alert>
-              <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
+              <line-list-editor v-model="model.items" :on-create="createItemRow" add-text="添加一个调拨物品" #="{ value }">
                 <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
                   <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" style="width: min(280px, 94vw)" />
                   <n-input-number v-model:value="value.quantity" :min="1" :precision="0" :status="rowOver(value) ? 'error' : undefined" placeholder="数量" style="width: min(120px, 94vw)" />
@@ -206,7 +207,7 @@ onMounted(fetchAll)
                     <template v-else>暂时查不到库存</template>
                   </span>
                 </n-space>
-              </n-dynamic-input>
+              </line-list-editor>
             </div>
           </n-form-item>
         </n-form>

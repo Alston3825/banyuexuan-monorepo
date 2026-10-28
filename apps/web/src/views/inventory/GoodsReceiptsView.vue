@@ -7,7 +7,7 @@
  */
 import { computed, h, onBeforeUnmount, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDynamicInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
 import { goodsReceiptApi, purchaseOrderApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
@@ -15,6 +15,7 @@ import { useAuthStore } from '../../stores/auth'
 import type { GoodsReceipt, GoodsReceiptItem, GoodsReceiptItemInput, PurchaseOrder, Warehouse, InventoryItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
 import ItemSelect from '../../components/inventory/ItemSelect.vue'
+import LineListEditor from '../../components/inventory/LineListEditor.vue'
 import { docMatches, itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, GOODS_RECEIPT_STATUS_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
@@ -365,7 +366,7 @@ onMounted(fetchAll)
           <n-form-item label="入库仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" :disabled="!!model.purchaseOrderId" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" /></n-form-item>
           <n-form-item label="入库明细">
-            <n-dynamic-input v-model:value="model.items" :on-create="createItemRow" #="{ value }">
+            <line-list-editor v-model="model.items" :on-create="createItemRow" add-text="添加一个入库物品" #="{ value }">
               <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
                 <item-select v-model="value.itemId" :items="items" style="width: min(320px, 94vw)" />
                 <n-input-number v-model:value="value.quantity" :min="1" :precision="0" placeholder="数量" style="width: min(150px, 94vw)">
@@ -377,7 +378,7 @@ onMounted(fetchAll)
                   <template #suffix>元</template>
                 </n-input-number>
               </n-space>
-            </n-dynamic-input>
+            </line-list-editor>
           </n-form-item>
         </n-form>
         <template #footer>
