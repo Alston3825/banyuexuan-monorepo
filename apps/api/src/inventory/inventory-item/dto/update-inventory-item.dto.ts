@@ -4,6 +4,7 @@ import { IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'cla
 export class UpdateInventoryItemDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() name?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() category?: string;
+  @ApiProperty({ required: false, description: '计量单位（只改显示的名称，库存数量不换算）' }) @IsOptional() @IsString() @MaxLength(20) unit?: string;
   @ApiProperty({ required: false, description: '空字符串 = 清空' }) @IsOptional() @IsString() @MaxLength(200) spec?: string;
   @ApiProperty({ required: false, description: '空字符串 = 清空' }) @IsOptional() @IsString() @MaxLength(100) brand?: string;
   @ApiProperty({ required: false, nullable: true, description: '传 null = 清空' }) @IsOptional() @IsNumber() @Min(0) referencePrice?: number | null;

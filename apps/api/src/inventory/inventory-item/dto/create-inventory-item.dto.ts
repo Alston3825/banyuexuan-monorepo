@@ -3,7 +3,7 @@ import { WarehousePurpose } from '@prisma/client';
 import { IsEnum, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class CreateInventoryItemDto {
-  @ApiProperty() @IsString() code: string;
+  @ApiProperty({ required: false, description: '不填则自动生成（WP0001 这样的格式）' }) @IsOptional() @IsString() code?: string;
   @ApiProperty() @IsString() name: string;
   @ApiProperty({ description: '计量单位，如 件/kg/箱' }) @IsString() unit: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() category?: string;

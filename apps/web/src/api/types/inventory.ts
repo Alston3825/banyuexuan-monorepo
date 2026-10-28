@@ -66,7 +66,8 @@ export interface InventoryItem extends ScopedEntityBase {
   status: CommonStatus
 }
 export interface CreateInventoryItemDto {
-  code: string
+  /** 不填则自动生成 */
+  code?: string
   name: string
   unit: string
   category?: string
@@ -79,6 +80,8 @@ export interface CreateInventoryItemDto {
 }
 export interface UpdateInventoryItemDto {
   name?: string
+  /** 计量单位（只改显示的名称，库存数量不换算） */
+  unit?: string
   category?: string
   /** 空字符串 = 清空 */
   spec?: string

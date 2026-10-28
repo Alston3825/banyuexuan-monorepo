@@ -48,6 +48,8 @@ describe('P8 导入 1688 订单 (e2e)', () => {
     // A：一张采购单包含很多物品，对应 1688 上拆开下的好几笔订单（供应商只写“1688”）
     await mk('A', '1688', [['保鲜膜', 30, 1700], ['洗洁精', 2, 5700], ['办公椅子', 1, 99900]]);
     await mk('C', '不相干商贸', [['火箭模型', 1, 100]]);
+    // 同一个测试库里别的测试文件留下的采购单会和这里的货品名撞车（对应结果出现并列），把它们挪到 90 天前，不参与对应
+    await prisma.purchaseOrder.updateMany({ where: { id: { notIn: [poIds.A, poIds.C] } }, data: { createdAt: new Date(Date.now() - 200 * 86_400_000) } });
   });
   afterAll(async () => {
     jest.restoreAllMocks();

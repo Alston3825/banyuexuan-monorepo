@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
 import { itemMatchesKeyword } from '../common/item-match';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -38,8 +38,19 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     return all.filter((i) => itemMatchesKeyword(i, keyword)).slice(0, 30);
   }
 
-  create(data: {
-    code: string;
+  /** 下一个自动编码：WP0001、WP0002……（取现有最大号 +1） */
+  private async nextCode(): Promise<string> {
+    const rows = await this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId, code: { startsWith: 'WP' } }, select: { code: true } });
+    let max = 0;
+    for (const { code } of rows) {
+      const m = /^WP(\d+)$/.exec(code);
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    return `WP${String(max + 1).padStart(4, '0')}`;
+  }
+
+  async create(data: {
+    code?: string;
     name: string;
     unit: string;
     category?: string;
@@ -50,7 +61,15 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     safetyStockThreshold?: number;
     shelfLifeDays?: number;
   }) {
-    return super.create({ ...data, spec: data.spec?.trim() || undefined, brand: data.brand?.trim() || undefined, tenantId: this.ctx.tenantId });
+    const base = { ...data, spec: data.spec?.trim() || undefined, brand: data.brand?.trim() || undefined, tenantId: this.ctx.tenantId };
+    if (data.code?.trim()) return super.create({ ...base, code: data.code.trim() });
+    // 没填编码：自动编；两个人同时新建撞了号就换下一个号再试一次
+    try {
+      return await super.create({ ...base, code: await this.nextCode() });
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+      return super.create({ ...base, code: await this.nextCode() });
+    }
   }
 
   /** 规格/品牌传空字符串 = 清空（存成 null） */
@@ -58,6 +77,10 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     const cleaned = { ...data };
     for (const k of ['spec', 'brand', 'category'] as const) {
       if (typeof cleaned[k] === 'string') cleaned[k] = (cleaned[k] as string).trim() || null;
+    }
+    if (typeof cleaned.unit === 'string') {
+      cleaned.unit = cleaned.unit.trim();
+      if (!cleaned.unit) throw new BadRequestException('计量单位不能为空');
     }
     return super.update(id, cleaned, expectedVersion);
   }

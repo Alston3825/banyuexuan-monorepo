@@ -6,7 +6,7 @@
  */
 import { computed, h, onMounted, ref } from 'vue'
 import {
-  NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NTag, NAlert, NRadioGroup, NRadio, NEmpty,
+  NAutoComplete, NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NTag, NAlert, NRadioGroup, NRadio, NEmpty,
   type DataTableColumns, type FormInst,
 } from 'naive-ui'
 import { inventoryItemApi } from '../../api/modules/inventory.api'
@@ -22,6 +22,9 @@ const keyword = ref('')
 // 名称 / 规格 / 品牌 / 编码 / 分类 都能搜，也支持拼音（全拼或首字母，如 bxm = 保鲜膜）
 const shown = computed(() => rows.value.filter((r) => itemMatches(r, keyword.value)))
 
+/** 已有的分类（给“分类”输入框做下拉候选，没有的直接输入就是新分类） */
+const categoryOptions = computed(() => [...new Set(rows.value.map((r) => r.category?.trim()).filter((c): c is string => !!c))].sort().map((c) => ({ label: c, value: c })))
+
 const formVisible = ref(false)
 const editingRow = ref<InventoryItem | null>(null)
 const submitting = ref(false)
@@ -35,7 +38,7 @@ const model = ref({
   brand: '',
   referencePrice: null as number | null,
   category: '',
-  purpose: 'OPERATING' as InventoryItem['purpose'],
+  purpose: 'LOGISTICS' as InventoryItem['purpose'],
   safetyStockThreshold: null as number | null,
   shelfLifeDays: null as number | null,
   status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
@@ -52,7 +55,7 @@ async function fetchList() {
 
 function openCreateModal() {
   editingRow.value = null
-  model.value = { code: '', name: '', unit: '', spec: '', brand: '', referencePrice: null, category: '', purpose: 'OPERATING', safetyStockThreshold: null, shelfLifeDays: null, status: 'ACTIVE' }
+  model.value = { code: '', name: '', unit: '', spec: '', brand: '', referencePrice: null, category: '', purpose: 'LOGISTICS', safetyStockThreshold: null, shelfLifeDays: null, status: 'ACTIVE' }
   formVisible.value = true
 }
 
@@ -81,6 +84,7 @@ async function handleSubmit() {
     if (editingRow.value) {
       await inventoryItemApi.update(editingRow.value.id, {
         name: model.value.name,
+        unit: model.value.unit.trim(),
         category: model.value.category || undefined,
         spec: model.value.spec.trim(),
         brand: model.value.brand.trim(),
@@ -93,7 +97,6 @@ async function handleSubmit() {
       message.success('物品已更新')
     } else {
       await inventoryItemApi.create({
-        code: model.value.code,
         name: model.value.name,
         unit: model.value.unit,
         spec: model.value.spec.trim() || undefined,
@@ -265,19 +268,24 @@ onMounted(fetchList)
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
       <n-card :title="editingRow ? '编辑物品' : '新建物品'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="110">
-          <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
-            <n-input v-model:value="model.code" placeholder="如 egg" />
+          <n-form-item label="编码">
+            <span v-if="editingRow" style="color: #666">{{ model.code }}（自动生成，不能修改）</span>
+            <span v-else style="color: #999">保存后自动生成（WP0001 这样的格式），不用填写</span>
           </n-form-item>
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />
           </n-form-item>
           <n-form-item label="规格/型号/尺寸"><n-input v-model:value="model.spec" placeholder="如 100*120、27卷/箱" /></n-form-item>
           <n-form-item label="品牌"><n-input v-model:value="model.brand" /></n-form-item>
-          <n-form-item v-if="!editingRow" label="计量单位" path="unit" :rule="{ required: true, message: '请输入计量单位' }">
-            <n-input v-model:value="model.unit" placeholder="如 kg/件/箱" />
+          <n-form-item label="计量单位" path="unit" :rule="{ required: true, message: '请输入计量单位' }">
+            <n-input v-model:value="model.unit" placeholder="如 kg/件/箱/瓶" />
+            <template v-if="editingRow" #feedback>只改单位的名称，库存里已有的数量不会换算（比如“箱”改成“件”，数量不变）。</template>
           </n-form-item>
           <n-form-item label="参考单价"><n-input-number v-model:value="model.referencePrice" :min="0" :precision="4" :show-button="false" style="width: 100%" placeholder="按计量单位计，仅供申购参考" /></n-form-item>
-          <n-form-item label="分类"><n-input v-model:value="model.category" /></n-form-item>
+          <n-form-item label="分类">
+            <n-auto-complete v-model:value="model.category" :options="categoryOptions" clearable placeholder="选已有分类，或直接输入新分类（如 保洁耗材）" />
+            <template #feedback>没有单独的“分类设置”页：在这里输入就会产生新分类，下次新建物品时可以直接选。</template>
+          </n-form-item>
           <n-form-item v-if="!editingRow" label="用途">
             <n-select
               v-model:value="model.purpose"
