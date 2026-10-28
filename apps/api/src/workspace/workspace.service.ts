@@ -84,14 +84,17 @@ export class WorkspaceService {
       });
     }
 
-    // 3) 员工证件/合同/转正到期（30 天内或已过期；需要有员工档案查看权限）
+    // 3a) 健康证到期前一个月起提醒：员工本人、本部门负责人、本门店店长（见 healthCertTodos）
+    items.push(...(await this.healthCertTodos()));
+
+    // 3) 员工合同/转正到期（30 天内或已过期；需要有员工档案查看权限）
     if (await this.ctx.hasPermission('hr.employee-profile.view')) {
       const limit = new Date(Date.now() + 30 * DAY);
       const profiles = await this.prisma.employeeProfile.findMany({
         where: {
           tenantId,
           archivedAt: null,
-          OR: [{ healthCertExpiresAt: { lte: limit } }, { contractExpiresAt: { lte: limit } }, { probationEndsAt: { lte: limit, gte: startOfToday() } }],
+          OR: [{ contractExpiresAt: { lte: limit } }, { probationEndsAt: { lte: limit, gte: startOfToday() } }],
         },
         include: { account: { select: { realName: true } } },
         take: 100,
@@ -114,7 +117,6 @@ export class WorkspaceService {
         });
       };
       for (const p of profiles) {
-        push(p, '健康证', p.healthCertExpiresAt);
         push(p, '劳动合同', p.contractExpiresAt);
         push(p, '转正', p.probationEndsAt, false);
       }
@@ -168,6 +170,59 @@ export class WorkspaceService {
       },
       items,
     };
+  }
+
+  /**
+   * 健康证到期提醒：到期前 30 天起（已过期的继续提醒，直到档案里的到期日更新）。
+   * 收到的人：员工本人；员工所在部门的“部门负责人”（角色 DEPT_HEAD，且和员工同部门）；员工所在门店的“店长”（角色 STORE_MANAGER，权限范围覆盖该门店）。
+   */
+  private async healthCertTodos(): Promise<TodoItem[]> {
+    const tenantId = this.ctx.tenantId!;
+    const me = this.ctx.accountId!;
+    const limit = new Date(Date.now() + 30 * DAY);
+    const profiles = await this.prisma.employeeProfile.findMany({
+      where: { tenantId, archivedAt: null, healthCertExpiresAt: { not: null, lte: limit }, account: { status: 'ACTIVE' } },
+      include: { account: { select: { id: true, realName: true, departmentId: true, storeId: true } } },
+      take: 300,
+    });
+    if (profiles.length === 0) return [];
+
+    const meAcc = await this.prisma.account.findUnique({ where: { id: me }, select: { departmentId: true } });
+    const assigns = await this.prisma.accountRoleAssignment.findMany({
+      where: { accountId: me, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], role: { code: { in: ['DEPT_HEAD', 'STORE_MANAGER'] } } },
+      select: { scopeType: true, scopeId: true, role: { select: { code: true } } },
+    });
+    const isDeptHead = assigns.some((a) => a.role.code === 'DEPT_HEAD');
+    const managerScopes = assigns.filter((a) => a.role.code === 'STORE_MANAGER');
+    const storeIds = [...new Set(profiles.map((p) => p.account.storeId).filter((x): x is string => !!x))];
+    const regionOf = new Map((await this.prisma.store.findMany({ where: { id: { in: storeIds } }, select: { id: true, regionId: true } })).map((s) => [s.id, s.regionId]));
+    const managesStore = (storeId: string | null) =>
+      !!storeId && managerScopes.some((a) => a.scopeType === 'TENANT' || (a.scopeType === 'STORE' && a.scopeId === storeId) || (a.scopeType === 'REGION' && a.scopeId === regionOf.get(storeId)));
+
+    // 按北京时间的“日历日”算还差几天（到期日只有日期没有时分，不能按小时差向上取整）
+    const calDay = (t: number) => Math.floor((t + 8 * 3600_000) / DAY);
+    const out: TodoItem[] = [];
+    for (const p of profiles) {
+      const at = p.healthCertExpiresAt!;
+      const isSelf = p.account.id === me;
+      const isHead = isDeptHead && !!meAcc?.departmentId && meAcc.departmentId === p.account.departmentId;
+      if (!isSelf && !isHead && !managesStore(p.account.storeId)) continue;
+      const days = calDay(at.getTime()) - calDay(Date.now());
+      const overdue = days < 0;
+      const when = overdue ? `已过期 ${-days} 天` : days === 0 ? '今天到期' : `${days} 天后到期`;
+      out.push({
+        key: `expiry:${p.id}:健康证`,
+        kind: 'EXPIRY',
+        title: isSelf ? `你的健康证${when}` : `${p.account.realName} 的健康证${when}`,
+        desc: `到期日 ${at.toISOString().slice(0, 10)}，${isSelf ? '请尽快办理续办，并把新的到期日告诉部门负责人更新档案' : '请提醒他/她尽快办理续办，办好后更新员工档案里的到期日'}`,
+        link: isSelf ? '/workspace/todos' : '/hr/employee-profiles',
+        dueAt: at,
+        overdue,
+        level: overdue || days <= 7 ? 'danger' : 'warning',
+        sortAt: at.getTime(),
+      });
+    }
+    return out;
   }
 
   /** 采购流程各环节“轮到我”的待办（按权限点判断我是哪个岗位）。超过时限（见 PROCUREMENT_SLA_HOURS）算已超时。 */
