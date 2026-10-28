@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { GoodsReceipt, Prisma } from '@prisma/client';
+import { InventoryItemImportService, keyOf } from '../inventory-item/inventory-item-import.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -45,6 +46,7 @@ export class GoodsReceiptService {
     private readonly workflowEngineService: WorkflowEngineService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly itemImport: InventoryItemImportService,
   ) {}
 
   async findMany(query: QueryGoodsReceiptDto = {}): Promise<GoodsReceipt[]> {
@@ -73,7 +75,32 @@ export class GoodsReceiptService {
   }
 
   async create(dto: CreateGoodsReceiptDto): Promise<GoodsReceipt> {
-    const itemIds = [...new Set(dto.items.map((i) => i.itemId))];
+    for (const [idx, i] of dto.items.entries()) {
+      if (!i.itemId && !i.newItem) throw new BadRequestException(`第 ${idx + 1} 行请选择物品，或填写新物品的名称和单位`);
+    }
+    // 用已有物品但改成新名称（人工核对后选“用新名称”）
+    for (const i of dto.items.filter((x) => x.itemId && x.renameItemTo?.trim())) {
+      const target = await this.prisma.inventoryItem.findFirst({ where: { id: i.itemId, tenantId: this.ctx.tenantId } });
+      if (!target) throw new BadRequestException('存在不存在的物品 ID');
+      if (target.name !== i.renameItemTo!.trim()) {
+        await this.prisma.inventoryItem.update({ where: { id: target.id }, data: { name: i.renameItemTo!.trim() } });
+        await this.auditLogService.record({ action: 'UPDATE', entityType: 'InventoryItem', entityId: target.id, beforeData: { name: target.name }, afterData: { name: i.renameItemTo!.trim() }, remark: '入库时核对相似名称，改用新名称', ...this.auditCtx(dto.storeId) });
+      }
+    }
+    // 新物品（物品库里还没有）：自动加入物品库（编码自动编）；同名同规格已有的直接对上
+    const newOnes = dto.items.filter((i) => !i.itemId);
+    if (newOnes.length > 0) {
+      const made = await this.itemImport.ensureItems(
+        newOnes.map((i, n) => ({ rowNo: n + 1, name: i.newItem!.name, spec: i.newItem!.spec ?? null, brand: i.newItem!.brand ?? null, unit: i.newItem!.unit, referencePrice: i.unitCost > 0 ? i.unitCost / 100 : null })),
+        { createMissing: true, purpose: 'LOGISTICS' },
+      );
+      for (const i of newOnes) {
+        const id = made.get(keyOf(i.newItem!.name.trim(), i.newItem!.spec?.trim() || null));
+        if (!id) throw new BadRequestException(`新物品「${i.newItem!.name}」没能加入物品库，请检查名称和单位`);
+        i.itemId = id;
+      }
+    }
+    const itemIds = [...new Set(dto.items.map((i) => i.itemId as string))];
     const items = await this.prisma.inventoryItem.findMany({ where: { id: { in: itemIds } } });
     if (items.length !== itemIds.length) throw new BadRequestException('存在不存在的物品 ID');
 
@@ -96,7 +123,7 @@ export class GoodsReceiptService {
         },
       });
       await tx.goodsReceiptItem.createMany({
-        data: dto.items.map((i) => ({ goodsReceiptId: receipt.id, itemId: i.itemId, quantity: i.quantity, unitCost: i.unitCost })),
+        data: dto.items.map((i) => ({ goodsReceiptId: receipt.id, itemId: i.itemId as string, quantity: i.quantity, unitCost: i.unitCost })),
       });
       return receipt;
     });

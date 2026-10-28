@@ -35,6 +35,7 @@ import type {
   UpdateWarehouseDto,
   Warehouse,
   WarehouseStock,
+  SimilarItem,
 } from '../types/inventory'
 
 export const supplierApi = {
@@ -56,6 +57,9 @@ export const inventoryItemApi = {
     http
       .get<{ id: string; code: string; name: string; spec: string | null; brand: string | null; unit: string; referencePrice: string | number | null }[]>('/inventory/items/search', { params: { keyword: keyword || undefined } })
       .then((r) => r.data),
+  /** 新物品入库前查重：名称相近的已有物品 */
+  similar: (name: string, spec?: string) =>
+    http.get<SimilarItem[]>('/inventory/items/similar', { params: { name, spec: spec || undefined } }).then((r) => r.data),
   create: (body: CreateInventoryItemDto) => http.post<InventoryItem>('/inventory/items', body).then((r) => r.data),
   update: (id: string, body: UpdateInventoryItemDto) => http.patch<InventoryItem>(`/inventory/items/${id}`, body).then((r) => r.data),
   /** Excel 导入第一步：上传表格，返回识别结果供核对（不入库） */

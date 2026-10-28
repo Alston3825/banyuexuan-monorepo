@@ -7,12 +7,12 @@
  */
 import { computed, h, onBeforeUnmount, onMounted, ref, type VNode } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
+import { NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInputNumber, NSelect, NInput, NRadio, NRadioGroup, NDescriptions, NDescriptionsItem, NEmpty, type DataTableColumns } from 'naive-ui'
 import { goodsReceiptApi, purchaseOrderApi, warehouseApi, inventoryItemApi } from '../../api/modules/inventory.api'
 import { workflowInstanceApi } from '../../api/modules/workflow-instance.api'
 import { storeApi } from '../../api/modules/store.api'
 import { useAuthStore } from '../../stores/auth'
-import type { GoodsReceipt, GoodsReceiptItem, GoodsReceiptItemInput, PurchaseOrder, Warehouse, InventoryItem } from '../../api/types/inventory'
+import type { GoodsReceipt, GoodsReceiptItem, GoodsReceiptItemInput, PurchaseOrder, Warehouse, InventoryItem, SimilarItem } from '../../api/types/inventory'
 import type { Store } from '../../api/types/store'
 import ItemSelect from '../../components/inventory/ItemSelect.vue'
 import LineListEditor from '../../components/inventory/LineListEditor.vue'
@@ -107,27 +107,104 @@ function onPurchaseOrderChange(poId: string | null) {
   }
 }
 function createItemRow() {
-  return { key: itemRowKey++, itemId: '', quantity: 1, unitCost: 0 }
+  return { key: itemRowKey++, itemId: '', quantity: 1, unitCost: 0 } as GoodsReceiptItemInput & { key: number }
+}
+/** 这一行改成“新物品”（物品库里没有）/ 改回选已有物品 */
+function toNewItem(row: GoodsReceiptItemInput) {
+  row.itemId = ''
+  row.newItem = { name: '', spec: '', unit: '' }
+}
+function toExistingItem(row: GoodsReceiptItemInput) {
+  row.newItem = undefined
+}
+
+// ---- 提交：新物品先和物品库查重，名称相近的弹窗让人核对（用已有 / 用已有改新名 / 作为新物品新增）----
+interface SimilarCheck {
+  rowKey: number
+  name: string
+  spec: string
+  unit: string
+  candidates: SimilarItem[]
+  /** use:<物品id> | rename:<物品id> | new */
+  choice: string
+}
+const similarVisible = ref(false)
+const similarChecks = ref<SimilarCheck[]>([])
+const exactMap = ref<Record<number, string>>({})
+
+function validateRows(): string | null {
+  if (!model.value.storeId || !model.value.warehouseId || model.value.items.length === 0) return '请完整填写门店/仓库，并至少添加一行入库明细'
+  for (const [i, r] of model.value.items.entries()) {
+    if (r.newItem) {
+      if (!r.newItem.name.trim() || !r.newItem.unit.trim()) return `第 ${i + 1} 项是新物品，请填写名称和单位`
+    } else if (!r.itemId) return `第 ${i + 1} 项请选择物品（物品库里没有的，点“新增物品”）`
+  }
+  return null
 }
 
 async function handleSubmit() {
-  if (!model.value.storeId || !model.value.warehouseId || model.value.items.length === 0) return void message.error('请完整填写门店/仓库，并至少添加一行入库明细')
+  const err = validateRows()
+  if (err) return void message.error(err)
   submitting.value = true
   try {
-    await goodsReceiptApi.create({
-      storeId: model.value.storeId,
-      warehouseId: model.value.warehouseId,
-      purchaseOrderId: model.value.purchaseOrderId ?? undefined,
-      remark: model.value.remark || undefined,
-      items: model.value.items.map(({ key: _key, ...i }) => ({ ...i, unitCost: Math.round((i.unitCost ?? 0) * 100) })), // 界面填“元”，接口按“分”
-    })
-    message.success('入库单已创建')
-    draft.clear()
-    formVisible.value = false
-    await fetchAll()
+    const checks: SimilarCheck[] = []
+    const exact: Record<number, string> = {}
+    for (const r of model.value.items) {
+      if (!r.newItem) continue
+      const found = await inventoryItemApi.similar(r.newItem.name.trim(), r.newItem.spec?.trim())
+      const hit = found.find((x) => x.exact)
+      if (hit) {
+        exact[r.key] = hit.id // 名称规格都一样：直接用已有的
+        continue
+      }
+      if (found.length > 0) checks.push({ rowKey: r.key, name: r.newItem.name.trim(), spec: r.newItem.spec?.trim() ?? '', unit: r.newItem.unit.trim(), candidates: found.slice(0, 3), choice: `use:${found[0].id}` })
+    }
+    exactMap.value = exact
+    if (checks.length > 0) {
+      similarChecks.value = checks
+      similarVisible.value = true
+      return
+    }
+    await doCreate()
   } finally {
     submitting.value = false
   }
+}
+
+async function confirmSimilar() {
+  similarVisible.value = false
+  submitting.value = true
+  try {
+    await doCreate()
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function doCreate() {
+  const decide = new Map(similarChecks.value.map((c) => [c.rowKey, c.choice]))
+  const payloadItems: GoodsReceiptItemInput[] = model.value.items.map((r) => {
+    const unitCost = Math.round((r.unitCost ?? 0) * 100) // 界面填“元”，接口按“分”
+    if (!r.newItem) return { itemId: r.itemId, quantity: r.quantity, unitCost }
+    if (exactMap.value[r.key]) return { itemId: exactMap.value[r.key], quantity: r.quantity, unitCost }
+    const choice = decide.get(r.key) ?? 'new'
+    if (choice.startsWith('use:')) return { itemId: choice.slice(4), quantity: r.quantity, unitCost }
+    if (choice.startsWith('rename:')) return { itemId: choice.slice(7), renameItemTo: r.newItem.name.trim(), quantity: r.quantity, unitCost }
+    return { newItem: { name: r.newItem.name.trim(), spec: r.newItem.spec?.trim() || undefined, unit: r.newItem.unit.trim() }, quantity: r.quantity, unitCost }
+  })
+  await goodsReceiptApi.create({
+    storeId: model.value.storeId!,
+    warehouseId: model.value.warehouseId!,
+    purchaseOrderId: model.value.purchaseOrderId ?? undefined,
+    remark: model.value.remark || undefined,
+    items: payloadItems,
+  })
+  const added = payloadItems.filter((x) => x.newItem).length
+  message.success(added ? `入库单已创建，${added} 个新物品已自动加入物品管理` : '入库单已创建')
+  draft.clear()
+  formVisible.value = false
+  similarChecks.value = []
+  await fetchAll()
 }
 
 function handleSubmitReceipt(row: GoodsReceipt) {
@@ -368,10 +445,19 @@ onMounted(fetchAll)
           <n-form-item label="入库明细">
             <line-list-editor v-model="model.items" :on-create="createItemRow" add-text="添加一个入库物品" #="{ value }">
               <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
-                <item-select v-model="value.itemId" :items="items" style="width: min(320px, 94vw)" />
+                <template v-if="value.newItem">
+                  <n-input v-model:value="value.newItem.name" placeholder="新物品名称" style="width: min(200px, 94vw)" />
+                  <n-input v-model:value="value.newItem.spec" placeholder="规格（选填）" style="width: min(140px, 94vw)" />
+                  <n-input v-model:value="value.newItem.unit" placeholder="单位，如 箱" style="width: min(110px, 94vw)" />
+                  <n-button text type="primary" @click="toExistingItem(value)">改选已有物品</n-button>
+                </template>
+                <template v-else>
+                  <item-select v-model="value.itemId" :items="items" style="width: min(320px, 94vw)" />
+                  <n-button text type="primary" @click="toNewItem(value)">物品库里没有？新增物品</n-button>
+                </template>
                 <n-input-number v-model:value="value.quantity" :min="1" :precision="0" placeholder="数量" style="width: min(150px, 94vw)">
                   <template #prefix>数量</template>
-                  <template #suffix>{{ items.find((i) => i.id === value.itemId)?.unit ?? '' }}</template>
+                  <template #suffix>{{ value.newItem ? value.newItem.unit : (items.find((i) => i.id === value.itemId)?.unit ?? '') }}</template>
                 </n-input-number>
                 <n-input-number v-model:value="value.unitCost" :min="0" :show-button="false" placeholder="0" style="width: min(190px, 94vw)">
                   <template #prefix>单位成本</template>
@@ -389,10 +475,43 @@ onMounted(fetchAll)
         </template>
       </n-card>
     </n-modal>
+
+    <!-- 新物品和已有物品名称相近：人工核对 -->
+    <n-modal :mask-closable="false" :show="similarVisible" @update:show="(v) => (similarVisible = v)">
+      <n-card title="发现名称相近的物品，请核对" style="width: min(640px, 96vw); max-height: 90vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+        <p class="gr-hint" style="margin-top: 0">下面这些新物品，物品管理里已经有名字很像的。请逐个选择：是同一种东西就用已有的（避免重复），确实是新东西再单独新增。</p>
+        <div v-for="c in similarChecks" :key="c.rowKey" class="sim-card">
+          <div class="sim-title">新物品：<b>{{ c.name }}</b><span v-if="c.spec"> · {{ c.spec }}</span> · {{ c.unit }}</div>
+          <n-radio-group v-model:value="c.choice" vertical>
+            <template v-for="cand in c.candidates" :key="cand.id">
+              <n-radio :value="'use:' + cand.id">合并：用已有物品「{{ cand.name }}{{ cand.spec ? ' ' + cand.spec : '' }}」（{{ cand.code }}，单位 {{ cand.unit }}），名称保持原来的</n-radio>
+              <n-radio v-if="cand.name !== c.name" :value="'rename:' + cand.id">合并并改名：用已有物品「{{ cand.name }}」，同时把名称改成新名称「{{ c.name }}」</n-radio>
+            </template>
+            <n-radio value="new">不是同一种：作为新物品「{{ c.name }}」单独新增</n-radio>
+          </n-radio-group>
+        </div>
+        <template #footer>
+          <n-space justify="end">
+            <n-button @click="similarVisible = false">返回修改</n-button>
+            <n-button type="primary" :loading="submitting" @click="confirmSimilar">按以上选择创建入库单</n-button>
+          </n-space>
+        </template>
+      </n-card>
+    </n-modal>
   </div>
 </template>
 
 <style scoped>
+.sim-card {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  background: #fcfcfc;
+}
+.sim-title {
+  margin-bottom: 6px;
+}
 .gr-card {
   padding: 10px 12px;
   margin-bottom: 8px;

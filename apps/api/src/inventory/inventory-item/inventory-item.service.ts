@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
 import { itemMatchesKeyword } from '../common/item-match';
+import { nameSimilarity, normName } from '../common/item-similarity';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
@@ -36,6 +37,26 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     });
     // 名称/规格/品牌/编码 + 拼音（全拼/首字母）在内存里匹配，最多返回 30 条
     return all.filter((i) => itemMatchesKeyword(i, keyword)).slice(0, 30);
+  }
+
+  /**
+   * 新物品入库前查重：和物品库里已有的物品比名称，返回相似的（最多 5 个）。
+   * exact = 名称和规格都一样（可以直接用已有的，不用问人）；其余相似的要人工确认是合并还是新增。
+   */
+  async similar(name?: string, spec?: string) {
+    const n = (name ?? '').trim();
+    if (!n) return [];
+    const all = await this.prisma.inventoryItem.findMany({
+      where: { tenantId: this.ctx.tenantId },
+      select: { id: true, code: true, name: true, spec: true, brand: true, unit: true, status: true },
+      take: 5000,
+    });
+    return all
+      .map((i) => ({ ...i, score: nameSimilarity(n, i.name) }))
+      .filter((i) => i.score >= 0.6)
+      .map((i) => ({ ...i, exact: normName(i.name) === normName(n) && normName(i.spec) === normName(spec) }))
+      .sort((a, b) => Number(b.exact) - Number(a.exact) || b.score - a.score)
+      .slice(0, 5);
   }
 
   /** 下一个自动编码：WP0001、WP0002……（取现有最大号 +1） */

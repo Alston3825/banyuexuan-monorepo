@@ -46,6 +46,12 @@ export class InventoryItemController {
     return this.inventoryItemService.search(keyword);
   }
 
+  /** 新物品入库前查重：名称相近的已有物品（登录即可查，只返回基础资料） */
+  @Get('similar')
+  similar(@Query('name') name?: string, @Query('spec') spec?: string) {
+    return this.inventoryItemService.similar(name, spec);
+  }
+
   @Get()
   @RequirePermission('inventory.item.view')
   findAll() {

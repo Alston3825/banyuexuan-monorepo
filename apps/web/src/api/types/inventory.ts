@@ -182,9 +182,25 @@ export interface CreatePurchaseOrderDto {
 
 // ---------------- 入库单 ----------------
 export interface GoodsReceiptItemInput {
-  itemId: string
+  /** 已有物品；新物品不填，改填 newItem */
+  itemId?: string
+  /** 物品库里还没有的新物品（保存时自动加入物品库） */
+  newItem?: { name: string; spec?: string; unit: string }
+  /** 用已有物品，同时把它的名称改成这个 */
+  renameItemTo?: string
   quantity: number
   unitCost: number
+}
+export interface SimilarItem {
+  id: string
+  code: string
+  name: string
+  spec: string | null
+  brand: string | null
+  unit: string
+  score: number
+  /** 名称和规格都一样：可以直接用已有的 */
+  exact: boolean
 }
 export interface GoodsReceiptItem {
   id: string
