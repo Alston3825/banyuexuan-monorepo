@@ -45,6 +45,7 @@ const model = reactive({
   idCardNo: '',
   birthday: null as number | null,
   dietTaboo: '',
+  allergens: '',
   provinceCode: null as string | null,
   cityCode: null as string | null,
   districtCode: null as string | null,
@@ -296,6 +297,7 @@ function buildPayload() {
     idCardNo: emptyToNull(model.idCardNo),
     birthday: model.birthday ? ymd(model.birthday) : null,
     dietTaboo: emptyToNull(model.dietTaboo),
+    allergens: emptyToNull(model.allergens),
     region: regionText(),
     address: emptyToNull(model.address),
     zone: emptyToNull(model.zone),
@@ -372,6 +374,7 @@ async function loadForEdit(id: string) {
   model.idCardNo = c.idCardNo ?? ''
   model.birthday = c.birthday ? fromYmd(c.birthday) : null
   model.dietTaboo = c.dietTaboo ?? ''
+  model.allergens = c.allergens ?? ''
   parseRegion(c.region)
   model.address = c.address ?? ''
   model.zone = c.zone ?? ''
@@ -512,8 +515,12 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
           <n-date-picker v-model:value="model.birthday" type="date" clearable style="width: 250px" />
         </n-form-item>
 
+        <n-form-item label="过敏源：">
+          <n-input v-model:value="model.allergens" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" maxlength="180" show-count placeholder="如：青霉素、海鲜、花粉；没有可不填" style="max-width: 420px" />
+        </n-form-item>
+
         <n-form-item label="饮食禁忌：">
-          <n-input v-model:value="model.dietTaboo" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="200" show-count placeholder="如：忌辛辣、对海鲜过敏、不吃羊肉" style="max-width: 420px" />
+          <n-input v-model:value="model.dietTaboo" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="180" show-count placeholder="如：忌辛辣、对海鲜过敏、不吃羊肉" style="max-width: 420px" />
         </n-form-item>
 
         <n-form-item label="地区：">

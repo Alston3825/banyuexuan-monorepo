@@ -236,6 +236,7 @@ onMounted(async () => {
         <n-descriptions-item label="建卡/产检医院">{{ customer.hospital ?? '-' }}</n-descriptions-item>
         <n-descriptions-item label="预产期">{{ customer.expectedDueDate ? new Date(customer.expectedDueDate).toLocaleDateString() : '-' }}</n-descriptions-item>
         <n-descriptions-item label="妈妈生日">{{ customer.birthday ? customer.birthday.slice(0, 10) : '-' }}</n-descriptions-item>
+        <n-descriptions-item label="过敏源">{{ customer.allergens || '-' }}</n-descriptions-item>
         <n-descriptions-item label="饮食禁忌">{{ customer.dietTaboo || '-' }}</n-descriptions-item>
         <n-descriptions-item label="妈妈身份证">{{ customer.idCardNo ?? '-' }}</n-descriptions-item>
         <n-descriptions-item label="国际证件号">{{ customer.passportNo ?? '-' }}</n-descriptions-item>

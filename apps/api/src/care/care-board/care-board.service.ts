@@ -111,8 +111,7 @@ export class CareBoardService {
           gestationalWeeks: profile.gestationalWeeks,
           careNote: profile.careNote,
           nurse: profile.primaryNurse ? { id: profile.primaryNurse.id, name: profile.primaryNurse.realName } : null,
-          hasAllergyTag: allergyMotherProfileIds.has(profile.id) || !!allergyByProfile.get(profile.id)?.flag,
-          allergyNote: allergyByProfile.get(profile.id)?.note ?? null,
+          ...this.allergyOf(profile.allergens, allergyMotherProfileIds.has(profile.id), allergyByProfile.get(profile.id)),
           dailyFilledToday: dailyFilled.has(profile.id),
           plan: planByMother.has(profile.id)
             ? {
@@ -126,5 +125,17 @@ export class CareBoardService {
         },
       };
     });
+  }
+
+  /**
+   * 看板上的“过敏”：以产妇档案里登记的过敏源为准（写“无”等于明确没有）；档案里没填时，才参考“高敏”风险标签和入所评估单，避免老档案丢提示。
+   */
+  private allergyOf(allergens: string | null, hasTag: boolean, fromAssessment?: { flag: boolean; note: string | null }) {
+    const text = allergens?.trim() || null;
+    if (text) {
+      const means = !/^(无|没有|否|无过敏|未见|\/|-|—)$/.test(text);
+      return { hasAllergyTag: means || hasTag, allergyNote: means ? text : null };
+    }
+    return { hasAllergyTag: hasTag || !!fromAssessment?.flag, allergyNote: fromAssessment?.note ?? null };
   }
 }

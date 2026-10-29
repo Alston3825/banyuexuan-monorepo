@@ -11,6 +11,7 @@ export class CreateBabyProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() birthDate?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsInt() birthWeightGrams?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() apgarScore?: string;
+  @ApiProperty({ required: false, description: '宝宝过敏源' }) @IsOptional() @IsString() allergens?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() remark?: string;
 
   @ApiProperty({ required: false })

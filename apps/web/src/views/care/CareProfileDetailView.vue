@@ -208,6 +208,7 @@ const editModel = ref({
   gestationalWeeks: null as number | null,
   expectedDeliveryDate: null as number | null,
   careNote: '',
+  allergens: '',
   primaryNurseId: null as string | null,
   remark: '',
 })
@@ -231,6 +232,7 @@ function openEdit() {
     gestationalWeeks: mother.value.gestationalWeeks,
     expectedDeliveryDate: mother.value.expectedDeliveryDate ? new Date(mother.value.expectedDeliveryDate).getTime() : null,
     careNote: mother.value.careNote ?? '',
+    allergens: mother.value.allergens ?? '',
     primaryNurseId: mother.value.primaryNurseId,
     remark: mother.value.remark ?? '',
   }
@@ -248,11 +250,12 @@ async function handleEditSubmit() {
       gestationalWeeks: editModel.value.gestationalWeeks ?? undefined,
       expectedDeliveryDate: editModel.value.expectedDeliveryDate ? new Date(editModel.value.expectedDeliveryDate).toISOString() : undefined,
       careNote: editModel.value.careNote || undefined,
+      allergens: editModel.value.allergens,
       primaryNurseId: editModel.value.primaryNurseId, // null = 清除
       remark: editModel.value.remark || undefined,
       version: mother.value.version,
     })
-    message.success('妈妈档案已更新')
+    message.success('产妇档案已更新')
     editVisible.value = false
     await fetchAll()
   } finally {
@@ -264,11 +267,11 @@ async function handleEditSubmit() {
 const babyVisible = ref(false)
 const babySubmitting = ref(false)
 const editingBaby = ref<BabyProfile | null>(null)
-const babyModel = ref<BabyProfileInput>({ name: '', gender: 'UNKNOWN', birthWeightGrams: undefined, apgarScore: '', remark: '', riskTagIds: [] })
+const babyModel = ref<BabyProfileInput>({ name: '', gender: 'UNKNOWN', birthWeightGrams: undefined, apgarScore: '', allergens: '', remark: '', riskTagIds: [] })
 
 function openAddBaby() {
   editingBaby.value = null
-  babyModel.value = { name: '', gender: 'UNKNOWN', birthWeightGrams: undefined, apgarScore: '', remark: '', riskTagIds: [] }
+  babyModel.value = { name: '', gender: 'UNKNOWN', birthWeightGrams: undefined, apgarScore: '', allergens: '', remark: '', riskTagIds: [] }
   babyVisible.value = true
 }
 
@@ -287,6 +290,7 @@ function openEditBaby(baby: BabyProfile) {
     birthDate: baby.birthDate ?? undefined,
     birthWeightGrams: baby.birthWeightGrams ?? undefined,
     apgarScore: baby.apgarScore ?? '',
+    allergens: baby.allergens ?? '',
     remark: baby.remark ?? '',
     // 只带出母婴风险分类的标签；误选的客户分类/类型标签保存时会被清掉
     riskTagIds: (babyRiskTags.value[baby.id] ?? []).filter((b) => b.tag.category === 'CARE_RISK').map((b) => b.tagId),
@@ -305,6 +309,7 @@ async function handleBabySubmit() {
         birthDate: babyModel.value.birthDate,
         birthWeightGrams: babyModel.value.birthWeightGrams,
         apgarScore: babyModel.value.apgarScore || undefined,
+        allergens: babyModel.value.allergens,
         remark: babyModel.value.remark || undefined,
         version: editingBaby.value.version,
       })
@@ -328,6 +333,7 @@ const babyColumns: DataTableColumns<BabyProfile> = [
   { key: 'birthDate', title: '出生日期', render: (row) => fmtBirth(row.birthDate) },
   { key: 'birthWeightGrams', title: '出生体重(g)', render: (row) => row.birthWeightGrams ?? '-' },
   { key: 'apgarScore', title: 'Apgar评分', render: (row) => row.apgarScore ?? '-' },
+  { key: 'allergens', title: '过敏源', render: (row) => row.allergens || '-' },
   {
     key: 'riskTags',
     title: '风险标签',
@@ -672,7 +678,7 @@ onMounted(fetchAll)
     </div>
     <n-tabs v-model:value="activeTab" :placement="isMobile ? 'top' : 'left'" :class="{ 'cp-nonav': isMobile }" type="line" animated display-directive="show:lazy">
       <n-tab-pane name="overview" tab="概览">
-    <n-card :title="'母婴档案'" style="margin-bottom: 16px">
+    <n-card :title="'产妇档案'" style="margin-bottom: 16px">
       <template #header-extra>
         <n-button size="small" @click="openEdit">编辑</n-button>
       </template>
@@ -692,6 +698,7 @@ onMounted(fetchAll)
           <b v-if="mother.primaryNurse">{{ mother.primaryNurse.realName }}</b>
           <a v-else style="color: #d9822b; cursor: pointer; text-decoration: underline" @click="openEdit">未指派，去指派</a>
         </n-descriptions-item>
+        <n-descriptions-item label="过敏源" :span="2"><span :style="mother.allergens ? 'color:#e24b4a;font-weight:600' : ''">{{ mother.allergens || '-' }}</span></n-descriptions-item>
         <n-descriptions-item label="医嘱" :span="2">{{ mother.careNote ?? '-' }}</n-descriptions-item>
         <n-descriptions-item label="备注" :span="2">{{ mother.remark ?? '-' }}</n-descriptions-item>
       </n-descriptions>
@@ -710,6 +717,7 @@ onMounted(fetchAll)
             <span class="cp-baby-sub">{{ BABY_GENDER_LABEL_MAP[b.gender] }}</span>
           </div>
           <div class="cp-baby-line">出生日期 {{ fmtBirth(b.birthDate) }} · 出生体重 {{ b.birthWeightGrams ?? '-' }} g · Apgar 评分 {{ b.apgarScore ?? '-' }}</div>
+          <div v-if="b.allergens" class="cp-baby-line" style="color: #e24b4a">过敏源：{{ b.allergens }}</div>
           <n-space v-if="(babyRiskTags[b.id] ?? []).length" :size="4" style="margin-top: 6px">
             <n-tag v-for="t in babyRiskTags[b.id]" :key="t.id" size="small" :color="{ color: t.tag.color ?? undefined }">{{ t.tag.name }}</n-tag>
           </n-space>
@@ -828,7 +836,7 @@ onMounted(fetchAll)
 
     <!-- 编辑妈妈档案 -->
     <n-modal :mask-closable="false" :show="editVisible" @update:show="(v) => (editVisible = v)">
-      <n-card title="编辑妈妈档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="编辑产妇档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="分娩方式">
             <n-select
@@ -847,6 +855,7 @@ onMounted(fetchAll)
           <n-form-item label="孕周"><n-input-number v-model:value="editModel.gestationalWeeks" :min="1" :max="45" style="width: 100%" /></n-form-item>
           <n-form-item label="预产期"><n-date-picker v-model:value="editModel.expectedDeliveryDate" type="date" style="width: 100%" clearable /></n-form-item>
           <n-form-item label="主责护理师"><nurse-select v-model="editModel.primaryNurseId" :store-id="mother?.storeId" /></n-form-item>
+          <n-form-item label="过敏源"><n-input v-model:value="editModel.allergens" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" placeholder="如：青霉素、海鲜；没有请填“无”" /></n-form-item>
           <n-form-item label="医嘱"><n-input v-model:value="editModel.careNote" placeholder="护理看板卡片上显示的简短提示" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="editModel.remark" type="textarea" /></n-form-item>
         </n-form>
@@ -877,6 +886,7 @@ onMounted(fetchAll)
           <n-form-item label="出生日期"><n-date-picker v-model:value="babyBirthTs" type="date" style="width: 100%" clearable placeholder="新生儿入所评估填了会自动带入" /></n-form-item>
           <n-form-item label="出生体重(g)"><n-input-number v-model:value="babyModel.birthWeightGrams" style="width: 100%" /></n-form-item>
           <n-form-item label="Apgar评分"><n-input v-model:value="babyModel.apgarScore" placeholder="如 9-10" /></n-form-item>
+          <n-form-item label="过敏源"><n-input v-model:value="babyModel.allergens" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" placeholder="如：青霉素、海鲜；没有请填“无”" /></n-form-item>
           <n-form-item label="风险标签">
             <n-select v-model:value="babyModel.riskTagIds" multiple :options="tagOptions" placeholder="早产/住院/托管等" />
             <template v-if="babyWrongTags.length" #feedback>以下标签不是风险标签，保存后会被清掉：{{ babyWrongTags.map((b) => b.tag.name).join('、') }}</template>

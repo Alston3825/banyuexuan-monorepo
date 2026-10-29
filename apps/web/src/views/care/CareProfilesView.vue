@@ -63,6 +63,7 @@ const model = ref({
   gestationalWeeks: null as number | null,
   expectedDeliveryDate: null as number | null,
   careNote: '',
+  allergens: '',
   remark: '',
   riskTagIds: [] as string[],
   babies: [] as (BabyProfileInput & { key: number })[],
@@ -81,6 +82,8 @@ const occupancyOptions = computed(() =>
 )
 async function onCustomerChange(customerId: string | null) {
   model.value.occupancyId = null
+  // 过敏源默认取客户资料里填的，可在这里改
+  model.value.allergens = customers.value.find((c) => c.id === customerId)?.allergens ?? ''
   customerOccupancies.value = customerId
     ? await roomOccupancyApi.list({ customerId, status: undefined }).then((list) => list.filter((o) => o.status === 'RESERVED' || o.status === 'CHECKED_IN'))
     : []
@@ -117,6 +120,7 @@ function openCreateModal() {
     gestationalWeeks: null,
     expectedDeliveryDate: null,
     careNote: '',
+    allergens: '',
     remark: '',
     riskTagIds: [],
     babies: [],
@@ -144,11 +148,12 @@ async function handleSubmit() {
       gestationalWeeks: model.value.gestationalWeeks ?? undefined,
       expectedDeliveryDate: model.value.expectedDeliveryDate ? new Date(model.value.expectedDeliveryDate).toISOString() : undefined,
       careNote: model.value.careNote || undefined,
+      allergens: model.value.allergens,
       remark: model.value.remark || undefined,
       riskTagIds: model.value.riskTagIds,
       babies: model.value.babies.map(({ key: _key, ...b }) => b),
     })
-    message.success('妈妈档案已建立')
+    message.success('产妇档案已建立')
     formVisible.value = false
     router.push(`/care/profiles/${created.id}`)
   } finally {
@@ -224,7 +229,7 @@ onMounted(fetchAll)
           <n-radio-button value="archived">已归档</n-radio-button>
         </n-radio-group>
       </n-space>
-      <n-button type="primary" @click="openCreateModal">建立母婴档案</n-button>
+      <n-button type="primary" @click="openCreateModal">建立产妇档案</n-button>
     </n-space>
 
     <!-- 手机：卡片列表（房号醒目 + 客户 + 宝宝信息），整张卡片点开档案 -->
@@ -248,7 +253,7 @@ onMounted(fetchAll)
     <record-removal-dialog v-if="removal" v-model:show="removalShow" kind="mother" :id="removal.id" :label="removal.label" @done="fetchAll" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="建立母婴档案" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="建立产妇档案" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="客户">
             <n-select v-model:value="model.customerId" :options="customerOptions" filterable placeholder="搜索客户姓名/手机号" @update:value="onCustomerChange" />
@@ -276,6 +281,7 @@ onMounted(fetchAll)
           <n-form-item label="孕周"><n-input-number v-model:value="model.gestationalWeeks" :min="1" :max="45" style="width: 100%" /></n-form-item>
           <n-form-item label="预产期"><n-date-picker v-model:value="model.expectedDeliveryDate" type="date" style="width: 100%" clearable /></n-form-item>
           <n-form-item label="风险标签"><n-select v-model:value="model.riskTagIds" multiple :options="tagOptions" placeholder="早产/传染病/高敏等" /></n-form-item>
+          <n-form-item label="过敏源"><n-input v-model:value="model.allergens" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" placeholder="如：青霉素、海鲜；没有请填“无”" /></n-form-item>
           <n-form-item label="医嘱"><n-input v-model:value="model.careNote" placeholder="护理看板卡片上显示的简短提示" /></n-form-item>
           <n-form-item label="备注"><n-input v-model:value="model.remark" type="textarea" :autosize="{ minRows: 2 }" /></n-form-item>
           <n-form-item label="宝宝">
@@ -291,6 +297,7 @@ onMounted(fetchAll)
                     { label: '未知', value: 'UNKNOWN' },
                   ]"
                 />
+                <n-input v-model:value="value.allergens" placeholder="宝宝过敏源（没有可不填）" style="width: min(220px, 94vw)" />
               </n-space>
             </n-dynamic-input>
           </n-form-item>

@@ -743,6 +743,7 @@ model Customer {
   emergencyContactPhone    String?        @map("emergency_contact_phone")
   // —— 2026-10 "新建客户页面按行业系统改版"新增的字段 ——
   birthday                 DateTime?      @map("birthday") @db.Date // 妈妈生日，填身份证时自动算出，可手改
+  allergens                String?        @map("allergens") @db.Text // 过敏源（自由文本）；建产妇档案时作为默认值带入
   dietTaboo                String?        @map("diet_taboo") // 饮食禁忌（自由文本，销售/前台录入，如：忌辛辣、对海鲜过敏）
   zone                     String?        @map("zone") // 片区（如 陆家嘴、世博小区），先用自由文本，以后可升级成基础资料
   hisNo                    String?        @map("his_no") // HIS 登记号（医院信息系统）
@@ -1475,6 +1476,8 @@ model MotherProfile {
   /// 护理要点/医嘱：护理看板卡片上展示的简短提示，与 remark（建档备注）分开维护；
   /// 后续会扩展成"护理重点概要"，现在先是一个自由文本字段。
   careNote             String?        @map("care_note") @db.Text
+  /// 过敏源（产妇本人）：建档时从客户资料带入可改；护理看板的“过敏/敏”以它为准（为空时才参考入所评估单）
+  allergens            String?        @map("allergens") @db.Text
   /// 主责护理师（责任护士）：从员工账号里选，在母婴档案里指派/更换；护理看板、房态看板展示。
   primaryNurseId       String?        @map("primary_nurse_id")
   remark               String?        @db.Text
@@ -1528,6 +1531,7 @@ model BabyProfile {
   birthDate        DateTime?  @map("birth_date")
   birthWeightGrams Int?       @map("birth_weight_grams")
   apgarScore       String?    @map("apgar_score")
+  allergens        String?    @map("allergens") @db.Text // 宝宝过敏源
   remark           String?    @db.Text
   createdBy        String     @map("created_by")
   createdAt        DateTime   @default(now()) @map("created_at")

@@ -36,6 +36,7 @@ export class CreateCustomerDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() remark?: string;
   @ApiProperty({ required: false, description: '身份证号（测试阶段按普通信息处理，不打码）；填了会校验长度/出生日期/校验位' }) @IsOptional() @IsString() idCardNo?: string;
   @ApiProperty({ required: false, description: '妈妈生日；不传且填了身份证时按身份证自动算' }) @IsOptional() @IsDateString() birthday?: string;
+  @ApiProperty({ required: false, description: '过敏源' }) @IsOptional() @IsString() allergens?: string;
   @ApiProperty({ required: false, description: '饮食禁忌' }) @IsOptional() @IsString() dietTaboo?: string;
   @ApiProperty({ required: false, description: 'HIS 登记号' }) @IsOptional() @IsString() hisNo?: string;
   @ApiProperty({ required: false, description: '国际证件号（护照等）' }) @IsOptional() @IsString() passportNo?: string;

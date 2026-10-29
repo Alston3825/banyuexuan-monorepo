@@ -151,6 +151,7 @@ export interface BabyProfile extends ScopedEntityBase {
   birthDate: string | null
   birthWeightGrams: number | null
   apgarScore: string | null
+  allergens: string | null
   remark: string | null
 }
 
@@ -160,6 +161,7 @@ export interface BabyProfileInput {
   birthDate?: string
   birthWeightGrams?: number
   apgarScore?: string
+  allergens?: string
   remark?: string
   riskTagIds?: string[]
 }
@@ -174,6 +176,7 @@ export interface UpdateBabyProfileDto {
   birthDate?: string
   birthWeightGrams?: number
   apgarScore?: string
+  allergens?: string
   remark?: string
   version: number
 }
@@ -192,6 +195,8 @@ export interface MotherProfile extends ScopedEntityBase {
   /** 主责护理师（员工账号） */
   primaryNurseId: string | null
   primaryNurse?: { id: string; realName: string } | null
+  /** 过敏源（产妇本人）；护理看板的过敏提示以它为准 */
+  allergens: string | null
   remark: string | null
   babies: BabyProfile[]
   /** 列表接口附带：客户姓名/手机、关联入住的房号 */
@@ -208,6 +213,7 @@ export interface CreateMotherProfileDto {
   expectedDeliveryDate?: string
   careNote?: string
   primaryNurseId?: string
+  allergens?: string
   remark?: string
   riskTagIds?: string[]
   babies?: BabyProfileInput[]
@@ -222,6 +228,7 @@ export interface UpdateMotherProfileDto {
   careNote?: string
   /** 传 null 表示清除护理师 */
   primaryNurseId?: string | null
+  allergens?: string
   remark?: string
   version: number
 }
