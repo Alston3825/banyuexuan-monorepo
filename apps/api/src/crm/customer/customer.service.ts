@@ -304,7 +304,7 @@ export class CustomerService {
     if (preview.conflicts.length > 0) throw new ConflictException(preview.conflicts.join('；'));
     const { source, target } = await this.loadMergePair(sourceId, targetId);
     const refs = await new TreeCollector(this.prisma).referrers('customers');
-    const fillable = ['wechat', 'serviceTypes', 'hospital', 'idCardNo', 'emergencyContactName', 'emergencyContactRelation', 'emergencyContactPhone', 'birthday', 'zone', 'hisNo', 'passportNo', 'expectedDueDate', 'region', 'address', 'assignedToId', 'phoneSalesId', 'channelTypeId', 'channelId', 'primaryStoreId'] as const;
+    const fillable = ['wechat', 'serviceTypes', 'hospital', 'idCardNo', 'emergencyContactName', 'emergencyContactRelation', 'emergencyContactPhone', 'birthday', 'dietTaboo', 'zone', 'hisNo', 'passportNo', 'expectedDueDate', 'region', 'address', 'assignedToId', 'phoneSalesId', 'channelTypeId', 'channelId', 'primaryStoreId'] as const;
     const patch: Record<string, unknown> = {};
     for (const f of fillable) {
       const tv = (target as Record<string, unknown>)[f];

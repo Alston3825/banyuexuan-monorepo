@@ -743,6 +743,7 @@ model Customer {
   emergencyContactPhone    String?        @map("emergency_contact_phone")
   // —— 2026-10 "新建客户页面按行业系统改版"新增的字段 ——
   birthday                 DateTime?      @map("birthday") @db.Date // 妈妈生日，填身份证时自动算出，可手改
+  dietTaboo                String?        @map("diet_taboo") // 饮食禁忌（自由文本，销售/前台录入，如：忌辛辣、对海鲜过敏）
   zone                     String?        @map("zone") // 片区（如 陆家嘴、世博小区），先用自由文本，以后可升级成基础资料
   hisNo                    String?        @map("his_no") // HIS 登记号（医院信息系统）
   passportNo               String?        @map("passport_no") // 国际证件号（护照等，没有身份证的外籍/港澳台客户）

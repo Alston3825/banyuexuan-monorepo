@@ -44,6 +44,7 @@ const model = reactive({
   expectedDueDate: null as number | null,
   idCardNo: '',
   birthday: null as number | null,
+  dietTaboo: '',
   provinceCode: null as string | null,
   cityCode: null as string | null,
   districtCode: null as string | null,
@@ -294,6 +295,7 @@ function buildPayload() {
     expectedDueDate: model.expectedDueDate ? new Date(model.expectedDueDate).toISOString() : null,
     idCardNo: emptyToNull(model.idCardNo),
     birthday: model.birthday ? ymd(model.birthday) : null,
+    dietTaboo: emptyToNull(model.dietTaboo),
     region: regionText(),
     address: emptyToNull(model.address),
     zone: emptyToNull(model.zone),
@@ -369,6 +371,7 @@ async function loadForEdit(id: string) {
   model.expectedDueDate = c.expectedDueDate ? new Date(c.expectedDueDate).getTime() : null
   model.idCardNo = c.idCardNo ?? ''
   model.birthday = c.birthday ? fromYmd(c.birthday) : null
+  model.dietTaboo = c.dietTaboo ?? ''
   parseRegion(c.region)
   model.address = c.address ?? ''
   model.zone = c.zone ?? ''
@@ -507,6 +510,10 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
 
         <n-form-item label="妈妈生日：">
           <n-date-picker v-model:value="model.birthday" type="date" clearable style="width: 250px" />
+        </n-form-item>
+
+        <n-form-item label="饮食禁忌：">
+          <n-input v-model:value="model.dietTaboo" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="200" show-count placeholder="如：忌辛辣、对海鲜过敏、不吃羊肉" style="max-width: 420px" />
         </n-form-item>
 
         <n-form-item label="地区：">

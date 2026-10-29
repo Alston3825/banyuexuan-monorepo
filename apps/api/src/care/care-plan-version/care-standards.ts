@@ -61,7 +61,6 @@ const L3: ServiceStd[] = [
   m('ROUND_RECOVERY', '产康查房', { kind: 'WEEKLY' }),
   m('HAIR_WASH', '中药水洗头', { kind: 'WEEKLY', afterDay: 14 }), // 宣教：产后 14 天后每周 1 次
   m('FOOT_SOAK', '中药水泡脚', { kind: 'WEEKLY', afterDay: 10 }), // 宣教：产后 10 天后每周 1 次
-  m('BEDDING', '床品更换', { kind: 'WEEKLY' }), // 宣教：床品每周更换一次
   b('BABY_BATH', '宝宝洗澡', { kind: 'EVERY_N_DAYS', n: 2 }), // 宣教：隔天 1 次
   b('BABY_SWIM', '宝宝游泳（脐带脱落后）', { kind: 'WEEKLY' }), // 宣教：每周 1 次
 ];

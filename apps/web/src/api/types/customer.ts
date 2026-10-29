@@ -35,6 +35,7 @@ export interface Customer extends ScopedEntityBase {
   remark: string | null
   idCardNo: string | null
   birthday: string | null
+  dietTaboo: string | null
   hisNo: string | null
   passportNo: string | null
   emergencyContactName: string | null
@@ -60,6 +61,7 @@ export interface CustomerFormFields {
   remark?: string | null
   idCardNo?: string | null
   birthday?: string | null
+  dietTaboo?: string | null
   hisNo?: string | null
   passportNo?: string | null
   emergencyContactName?: string | null

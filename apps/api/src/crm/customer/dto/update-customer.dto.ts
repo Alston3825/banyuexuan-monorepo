@@ -33,6 +33,7 @@ export class UpdateCustomerDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() remark?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() idCardNo?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsDateString() birthday?: string | null;
+  @ApiProperty({ required: false }) @IsOptional() @IsString() dietTaboo?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() hisNo?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() passportNo?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() emergencyContactName?: string | null;
