@@ -1,5 +1,5 @@
 import { nextFreeCodes } from './inventory-item-import.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
 import { itemMatchesKeyword } from '../common/item-match';
 import { nameSimilarity, normName } from '../common/item-similarity';
@@ -100,5 +100,55 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
       if (!cleaned.unit) throw new BadRequestException('计量单位不能为空');
     }
     return super.update(id, cleaned, expectedVersion);
+  }
+  /**
+   * 删除前检查：看这个物品有没有库存、有没有出现在单据里，决定能怎么删。
+   * - 没库存、没任何单据/批次记录：直接删除（DELETE）。
+   * - 没库存，但有记录：只能隐藏（HIDE，状态改“停用”，搜索/选物品时不再出现，历史单据照常显示，随时可在编辑里恢复）。
+   * - 还有库存：库管不能删（BLOCKED，先出库或盘点清零）；有 inventory.item.force-delete 的管理员可以隐藏。
+   */
+  async deleteCheck(id: string) {
+    const item = await this.prisma.inventoryItem.findFirst({
+      where: { id, tenantId: this.ctx.tenantId },
+      include: { _count: { select: { batches: true, purchaseOrderItems: true, purchaseRequestItems: true, goodsReceiptItems: true, stockIssueItems: true, stockTransferItems: true, stockCountItems: true } } },
+    });
+    if (!item) throw new NotFoundException('物品不存在');
+    const stock = await this.prisma.warehouseStock.aggregate({ where: { itemId: id }, _sum: { quantity: true } });
+    const stockQty = stock._sum.quantity ?? 0;
+    const recordCount = Object.values(item._count).reduce((a, b) => a + b, 0);
+    const canForce = await this.ctx.hasPermission('inventory.item.force-delete');
+    let outcome: 'DELETE' | 'HIDE' | 'BLOCKED';
+    let reason: string;
+    if (stockQty > 0) {
+      outcome = canForce ? 'HIDE' : 'BLOCKED';
+      reason = canForce
+        ? `这个物品还有库存 ${stockQty}${item.unit}，且有历史记录，删除只会隐藏（库存数据保留，随时可恢复）。`
+        : `这个物品还有库存 ${stockQty}${item.unit}，不能删除。请先出库或盘点清零；如果只是暂时不用，可以在“编辑”里改成“停用”。`;
+    } else if (recordCount > 0) {
+      outcome = 'HIDE';
+      reason = `这个物品已有 ${recordCount} 条单据/批次记录，删除只会隐藏（历史单据照常显示，随时可在“编辑”里恢复）。`;
+    } else {
+      outcome = 'DELETE';
+      reason = '这个物品没有库存也没有任何记录，将永久删除。';
+    }
+    return { item, stockQty, recordCount, outcome, reason };
+  }
+
+  async remove(id: string): Promise<{ outcome: 'DELETED' | 'HIDDEN'; message: string }> {
+    const check = await this.deleteCheck(id);
+    if (check.outcome === 'BLOCKED') throw new BadRequestException(check.reason);
+    if (check.outcome === 'HIDE') {
+      if (check.item.status !== 'INACTIVE') {
+        const after = await this.prisma.inventoryItem.update({ where: { id }, data: { status: 'INACTIVE', version: { increment: 1 } } });
+        await this.auditLogService.record({ action: 'UPDATE', entityType: this.entityType, entityId: id, beforeData: check.item, afterData: after, remark: '删除物品（有记录，仅隐藏）', ...this.auditContext() });
+      }
+      return { outcome: 'HIDDEN', message: `已隐藏“${check.item.name}”（有历史记录，未真正删除；需要时可在“编辑”里恢复为启用）` };
+    }
+    await this.prisma.$transaction([
+      this.prisma.warehouseStock.deleteMany({ where: { itemId: id } }),
+      this.prisma.inventoryItem.delete({ where: { id } }),
+    ]);
+    await this.auditLogService.record({ action: 'DELETE', entityType: this.entityType, entityId: id, beforeData: check.item, remark: '删除物品（无库存无记录）', ...this.auditContext() });
+    return { outcome: 'DELETED', message: `已删除“${check.item.name}”` };
   }
 }

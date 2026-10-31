@@ -99,7 +99,7 @@ export abstract class BaseScopedCrudService<T extends ScopedEntity> {
     });
   }
 
-  private auditContext() {
+  protected auditContext() {
     return {
       tenantId: this.ctx.tenantId,
       storeId: this.ctx.homeStoreId,

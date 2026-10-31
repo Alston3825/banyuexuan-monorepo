@@ -62,6 +62,10 @@ export const inventoryItemApi = {
     http.get<SimilarItem[]>('/inventory/items/similar', { params: { name, spec: spec || undefined } }).then((r) => r.data),
   create: (body: CreateInventoryItemDto) => http.post<InventoryItem>('/inventory/items', body).then((r) => r.data),
   update: (id: string, body: UpdateInventoryItemDto) => http.patch<InventoryItem>(`/inventory/items/${id}`, body).then((r) => r.data),
+  /** 删除前检查：DELETE=可直接删；HIDE=有记录只能隐藏；BLOCKED=还有库存不能删 */
+  deleteCheck: (id: string) =>
+    http.get<{ stockQty: number; recordCount: number; outcome: 'DELETE' | 'HIDE' | 'BLOCKED'; reason: string }>(`/inventory/items/${id}/delete-check`).then((r) => r.data),
+  remove: (id: string) => http.delete<{ outcome: 'DELETED' | 'HIDDEN'; message: string }>(`/inventory/items/${id}`).then((r) => r.data),
   /** Excel 导入第一步：上传表格，返回识别结果供核对（不入库） */
   importPreview: (file: File) => {
     const form = new FormData()

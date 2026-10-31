@@ -242,6 +242,7 @@ function storeManagerCodes(allCodes: string[]): string[] {
     'crm.customer.restore', // 回收站（还原/彻底删除）：只给超级管理员
     'platform.store.delete',
     'room.room.force-delete',
+    'inventory.item.force-delete', // 库存物品：有库存的物品也能删（隐藏）只给超级管理员；店长/库管只能删无库存的
     'care.profile.force-delete',
     'hr.employee-profile.change-no',
     'hr.employee-profile.restore',

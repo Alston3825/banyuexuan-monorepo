@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { WarehousePurpose } from '@prisma/client';
 import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
@@ -68,6 +68,20 @@ export class InventoryItemController {
   @RequirePermission('inventory.item.create')
   create(@Body() dto: CreateInventoryItemDto) {
     return this.inventoryItemService.create(dto);
+  }
+
+  /** 删除前检查（库管：没库存没记录可删；有记录只能隐藏；管理员另见 force-delete） */
+  @Get(':id/delete-check')
+  @RequirePermission('inventory.item.delete')
+  async deleteCheck(@Param('id') id: string) {
+    const { item: _item, ...rest } = await this.inventoryItemService.deleteCheck(id);
+    return rest;
+  }
+
+  @Delete(':id')
+  @RequirePermission('inventory.item.delete')
+  remove(@Param('id') id: string) {
+    return this.inventoryItemService.remove(id);
   }
 
   @Patch(':id')

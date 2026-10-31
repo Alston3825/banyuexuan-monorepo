@@ -440,7 +440,7 @@ async function main() {
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `inventory.warehouse.${action}`, name: `库存-仓库-${action}`, type: 'BUTTON', parentCode: 'inventory.warehouse' });
   }
-  for (const action of ['view', 'create', 'update']) {
+  for (const action of ['view', 'create', 'update', 'delete', 'force-delete']) {
     permSpecs.push({ code: `inventory.item.${action}`, name: `库存-物品-${action}`, type: 'BUTTON', parentCode: 'inventory.item' });
   }
   permSpecs.push({ code: 'inventory.warehouse-stock.view', name: '库存-库存查询-view', type: 'BUTTON', parentCode: 'inventory.warehouse-stock' });

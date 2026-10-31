@@ -6,7 +6,7 @@
  */
 import { computed, h, onMounted, ref } from 'vue'
 import {
-  NAutoComplete, NButton, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NTag, NAlert, NRadioGroup, NRadio, NEmpty,
+  NAutoComplete, NButton, NCheckbox, NSpace, NDataTable, NModal, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NTag, NAlert, NRadioGroup, NRadio, NEmpty,
   type DataTableColumns, type FormInst,
 } from 'naive-ui'
 import { inventoryItemApi } from '../../api/modules/inventory.api'
@@ -14,13 +14,19 @@ import type { InventoryItem, ItemImportPreview, ItemImportPreviewRow, ItemImport
 import { itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, COMMON_STATUS_MAP, WAREHOUSE_PURPOSE_LABEL_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import { useAuthStore } from '../../stores/auth'
 
 const rows = ref<InventoryItem[]>([])
 const loading = ref(false)
 const keyword = ref('')
+const auth = useAuthStore()
+const canDelete = computed(() => auth.hasAccess('inventory.item.delete'))
+/** 删除时“有记录”的物品只是隐藏（停用）；默认不显示已隐藏的，勾上可以看到并恢复 */
+const showHidden = ref(false)
 
 // 名称 / 规格 / 品牌 / 编码 / 分类 都能搜，也支持拼音（全拼或首字母，如 bxm = 保鲜膜）
-const shown = computed(() => rows.value.filter((r) => itemMatches(r, keyword.value)))
+const shown = computed(() => rows.value.filter((r) => (showHidden.value || r.status === 'ACTIVE') && itemMatches(r, keyword.value)))
+const hiddenCount = computed(() => rows.value.filter((r) => r.status !== 'ACTIVE').length)
 
 /** 已有的分类（给“分类”输入框做下拉候选，没有的直接输入就是新分类） */
 const categoryOptions = computed(() => [...new Set(rows.value.map((r) => r.category?.trim()).filter((c): c is string => !!c))].sort().map((c) => ({ label: c, value: c })))
@@ -133,11 +139,38 @@ const columns: DataTableColumns<InventoryItem> = [
   {
     key: 'actions',
     title: '操作',
-    width: 80,
+    width: canDelete.value ? 130 : 80,
     fixed: 'right',
-    render: (row) => h(NButton, { size: 'small', onClick: () => openEditModal(row) }, { default: () => '编辑' }),
+    render: (row) =>
+      h(NSpace, { size: 6, wrap: false }, {
+        default: () => [
+          h(NButton, { size: 'small', onClick: () => openEditModal(row) }, { default: () => '编辑' }),
+          ...(canDelete.value ? [h(NButton, { size: 'small', type: 'error', secondary: true, onClick: () => askDelete(row) }, { default: () => '删除' })] : []),
+        ],
+      }),
   },
 ]
+
+// ---------------- 删除 ----------------
+// 没库存没记录 → 永久删除；有记录没库存 → 隐藏（停用，可恢复）；还有库存 → 库管不能删，管理员只能隐藏
+async function askDelete(row: InventoryItem) {
+  const check = await inventoryItemApi.deleteCheck(row.id)
+  if (check.outcome === 'BLOCKED') {
+    dialog.warning({ title: `不能删除“${row.name}”`, content: check.reason, positiveText: '我知道了' })
+    return
+  }
+  dialog.warning({
+    title: check.outcome === 'DELETE' ? `删除“${row.name}”` : `隐藏“${row.name}”`,
+    content: check.reason,
+    positiveText: check.outcome === 'DELETE' ? '确认删除' : '确认隐藏',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      const r = await inventoryItemApi.remove(row.id)
+      message.success(r.message)
+      await fetchList()
+    },
+  })
+}
 
 // ---------------- Excel 导入 ----------------
 const importVisible = ref(false)
@@ -256,7 +289,10 @@ onMounted(fetchList)
 <template>
   <div>
     <n-space justify="space-between" style="margin-bottom: 12px">
-      <n-input v-model:value="keyword" clearable placeholder="🔍 搜索名称 / 规格 / 品牌 / 编码 / 拼音首字母" style="width: min(360px, 94vw)" />
+      <n-space align="center">
+        <n-input v-model:value="keyword" clearable placeholder="🔍 搜索名称 / 规格 / 品牌 / 编码 / 拼音首字母" style="width: min(360px, 94vw)" />
+        <n-checkbox v-if="hiddenCount > 0" v-model:checked="showHidden">显示已隐藏/停用的（{{ hiddenCount }}）</n-checkbox>
+      </n-space>
       <n-space>
         <n-button @click="openImport">从 Excel 导入</n-button>
         <n-button type="primary" @click="openCreateModal">新建物品</n-button>
