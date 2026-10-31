@@ -118,15 +118,9 @@ export class InventoryItemImportService {
     });
   }
 
-  /** 下一个物品编码：WP0001、WP0002…（表里没有编码，系统自动编） */
+  /** 下一批物品编码：WP0001、WP0002…（表里没有编码，系统自动编）；大小写、前后空格不同的老编码也算已占用，保证不撞号 */
   private async nextCodes(count: number): Promise<string[]> {
-    const rows = await this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId, code: { startsWith: 'WP' } }, select: { code: true } });
-    let max = 0;
-    for (const { code } of rows) {
-      const m = /^WP(\d+)$/.exec(code);
-      if (m) max = Math.max(max, Number(m[1]));
-    }
-    return Array.from({ length: count }, (_, i) => `WP${String(max + i + 1).padStart(4, '0')}`);
+    return nextFreeCodes(await this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId }, select: { code: true } }), count);
   }
 
   /**
@@ -225,4 +219,21 @@ export class InventoryItemImportService {
       skippedDetail: classified.filter((r) => !toCreate.includes(r) && !toUpdate.includes(r)).map((r) => ({ rowNo: r.rowNo, name: r.name, reason: r.message })),
     };
   }
+}
+
+/** 在已有编码之外，顺着 WP 序号往后取 count 个没被占用的编码（忽略大小写和首尾空格） */
+export function nextFreeCodes(rows: { code: string }[], count: number): string[] {
+  const used = new Set(rows.map((r) => r.code.trim().toUpperCase()));
+  let max = 0;
+  for (const c of used) {
+    const m = /^WP(\d+)$/.exec(c);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  const out: string[] = [];
+  while (out.length < count) {
+    max += 1;
+    const code = `WP${String(max).padStart(4, '0')}`;
+    if (!used.has(code)) out.push(code);
+  }
+  return out;
 }

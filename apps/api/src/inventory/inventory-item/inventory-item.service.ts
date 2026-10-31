@@ -1,3 +1,4 @@
+import { nextFreeCodes } from './inventory-item-import.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
 import { itemMatchesKeyword } from '../common/item-match';
@@ -61,13 +62,8 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
 
   /** 下一个自动编码：WP0001、WP0002……（取现有最大号 +1） */
   private async nextCode(): Promise<string> {
-    const rows = await this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId, code: { startsWith: 'WP' } }, select: { code: true } });
-    let max = 0;
-    for (const { code } of rows) {
-      const m = /^WP(\d+)$/.exec(code);
-      if (m) max = Math.max(max, Number(m[1]));
-    }
-    return `WP${String(max + 1).padStart(4, '0')}`;
+    const rows = await this.prisma.inventoryItem.findMany({ where: { tenantId: this.ctx.tenantId }, select: { code: true } });
+    return nextFreeCodes(rows, 1)[0];
   }
 
   async create(data: {
