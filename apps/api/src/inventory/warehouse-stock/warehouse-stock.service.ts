@@ -57,6 +57,14 @@ export class WarehouseStockService {
       where: { warehouseId: query.warehouseId, warehouse: { tenantId: this.ctx.tenantId }, itemId: { in: items.map((i) => i.id) } },
       include: { warehouse: { select: { id: true, name: true } } },
     });
+    // 最近一次入库的实际单价（分）
+    const recent = await this.prisma.stockBatch.findMany({
+      where: { tenantId: this.ctx.tenantId, sourceType: 'GOODS_RECEIPT', itemId: { in: items.map((i) => i.id) } },
+      select: { itemId: true, unitCost: true },
+      orderBy: { receivedAt: 'desc' },
+    });
+    const lastCostByItem = new Map<string, number>();
+    for (const b of recent) if (!lastCostByItem.has(b.itemId)) lastCostByItem.set(b.itemId, b.unitCost);
     const byItem = new Map<string, typeof stocks>();
     for (const st of stocks) byItem.set(st.itemId, [...(byItem.get(st.itemId) ?? []), st]);
 
@@ -78,6 +86,7 @@ export class WarehouseStockService {
         category: it.category,
         safetyStockThreshold: threshold,
         quantity,
+        lastCost: lastCostByItem.get(it.id) ?? null,
         avgCost: quantity > 0 ? Math.round(totalCost / quantity) : 0, // 分，按各仓库存加权
         status,
         warehouses: list.filter((st) => st.quantity !== 0).map((st) => ({ warehouseId: st.warehouseId, warehouseName: st.warehouse.name, quantity: st.quantity })),

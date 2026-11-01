@@ -70,6 +70,12 @@ export class InventoryItemController {
     return this.inventoryItemService.create(dto);
   }
 
+  /** 采购价格记录：每次入库的日期/单号/供应商/数量/实际单价 */
+  @Get(':id/price-history')
+  priceHistory(@Param('id') id: string) {
+    return this.inventoryItemService.priceHistory(id);
+  }
+
   /** 删除前检查（库管：没库存没记录可删；有记录只能隐藏；管理员另见 force-delete） */
   @Get(':id/delete-check')
   @RequirePermission('inventory.item.delete')

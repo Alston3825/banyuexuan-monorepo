@@ -1,5 +1,5 @@
 import { nextFreeCodes } from './inventory-item-import.service';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InventoryItem, WarehousePurpose } from '@prisma/client';
 import { itemMatchesKeyword } from '../common/item-match';
 import { nameSimilarity, normName } from '../common/item-similarity';
@@ -150,5 +150,45 @@ export class InventoryItemService extends BaseScopedCrudService<InventoryItem> {
     ]);
     await this.auditLogService.record({ action: 'DELETE', entityType: this.entityType, entityId: id, beforeData: check.item, remark: '删除物品（无库存无记录）', ...this.auditContext() });
     return { outcome: 'DELETED', message: `已删除“${check.item.name}”` };
+  }
+  /**
+   * 采购价格记录：这个物品每一次入库的日期、入库单/采购单号、供应商、数量和当次实际单价（分），新的在前。
+   * 同一物品不同时间价格不同，各批次按各自单价入账；这里就是查“某一批当时实际花了多少钱”的地方。
+   */
+  async priceHistory(id: string) {
+    if (!(await this.ctx.hasPermission('inventory.item.view')) && !(await this.ctx.hasPermission('inventory.warehouse-stock.view')) && !(await this.ctx.hasPermission('inventory.purchase-order.view'))) {
+      throw new ForbiddenException('没有查看采购价格的权限');
+    }
+    const item = await this.prisma.inventoryItem.findFirst({ where: { id, tenantId: this.ctx.tenantId }, select: { id: true, name: true, spec: true, unit: true } });
+    if (!item) throw new NotFoundException('物品不存在');
+    const receiptSelect = { id: true, receiptNo: true, tracked: true, completedAt: true, createdAt: true, warehouse: { select: { name: true } }, purchaseOrder: { select: { orderNo: true, supplier: { select: { name: true } } } } } as const;
+    // 逐项收货的入库单：每次到货确认一条
+    const confirmLines = await this.prisma.goodsReceiptConfirmationLine.findMany({
+      where: { receiptItem: { itemId: id, goodsReceipt: { tenantId: this.ctx.tenantId } } },
+      include: { confirmation: { select: { confirmedAt: true } }, receiptItem: { select: { unitCost: true, goodsReceipt: { select: receiptSelect } } } },
+    });
+    // 老的手工入库单：执行入库（COMPLETED）后整张入账
+    const legacy = await this.prisma.goodsReceiptItem.findMany({
+      where: { itemId: id, goodsReceipt: { tenantId: this.ctx.tenantId, tracked: false, status: 'COMPLETED' } },
+      include: { goodsReceipt: { select: receiptSelect } },
+    });
+    const rows = [
+      ...confirmLines.map((l) => ({ date: l.confirmation.confirmedAt, quantity: l.quantity, unitCost: l.receiptItem.unitCost, receipt: l.receiptItem.goodsReceipt })),
+      ...legacy.map((l) => ({ date: l.goodsReceipt.completedAt ?? l.goodsReceipt.createdAt, quantity: l.quantity, unitCost: l.unitCost, receipt: l.goodsReceipt })),
+    ]
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .map((r) => ({
+        date: r.date,
+        receiptId: r.receipt.id,
+        receiptNo: r.receipt.receiptNo,
+        orderNo: r.receipt.purchaseOrder?.orderNo ?? null,
+        supplierName: r.receipt.purchaseOrder?.supplier.name ?? null,
+        warehouseName: r.receipt.warehouse.name,
+        quantity: r.quantity,
+        unitCost: r.unitCost,
+      }));
+    const totalQty = rows.reduce((a, r) => a + r.quantity, 0);
+    const avgCost = totalQty > 0 ? Math.round(rows.reduce((a, r) => a + r.quantity * r.unitCost, 0) / totalQty) : 0;
+    return { item, rows, avgCost, minCost: rows.length ? Math.min(...rows.map((r) => r.unitCost)) : 0, maxCost: rows.length ? Math.max(...rows.map((r) => r.unitCost)) : 0 };
   }
 }

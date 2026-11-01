@@ -14,6 +14,7 @@ import type { InventoryItem, ItemImportPreview, ItemImportPreviewRow, ItemImport
 import { itemMatches } from '../../utils/item-search'
 import { renderStatusBadge, COMMON_STATUS_MAP, WAREHOUSE_PURPOSE_LABEL_MAP } from '../../utils/status-map'
 import { message, dialog } from '../../utils/discrete-api'
+import ItemPriceHistoryDialog from '../../components/inventory/ItemPriceHistoryDialog.vue'
 import { useAuthStore } from '../../stores/auth'
 
 const rows = ref<InventoryItem[]>([])
@@ -23,6 +24,8 @@ const auth = useAuthStore()
 const canDelete = computed(() => auth.hasAccess('inventory.item.delete'))
 /** 删除时“有记录”的物品只是隐藏（停用）；默认不显示已隐藏的，勾上可以看到并恢复 */
 const showHidden = ref(false)
+const priceShow = ref(false)
+const priceItemId = ref<string | null>(null)
 
 // 名称 / 规格 / 品牌 / 编码 / 分类 都能搜，也支持拼音（全拼或首字母，如 bxm = 保鲜膜）
 const shown = computed(() => rows.value.filter((r) => (showHidden.value || r.status === 'ACTIVE') && itemMatches(r, keyword.value)))
@@ -139,12 +142,13 @@ const columns: DataTableColumns<InventoryItem> = [
   {
     key: 'actions',
     title: '操作',
-    width: canDelete.value ? 130 : 80,
+    width: canDelete.value ? 190 : 140,
     fixed: 'right',
     render: (row) =>
       h(NSpace, { size: 6, wrap: false }, {
         default: () => [
           h(NButton, { size: 'small', onClick: () => openEditModal(row) }, { default: () => '编辑' }),
+          h(NButton, { size: 'small', onClick: () => ((priceItemId.value = row.id), (priceShow.value = true)) }, { default: () => '价格' }),
           ...(canDelete.value ? [h(NButton, { size: 'small', type: 'error', secondary: true, onClick: () => askDelete(row) }, { default: () => '删除' })] : []),
         ],
       }),
@@ -298,6 +302,7 @@ onMounted(fetchList)
         <n-button type="primary" @click="openCreateModal">新建物品</n-button>
       </n-space>
     </n-space>
+    <item-price-history-dialog v-model:show="priceShow" :item-id="priceItemId" />
     <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: InventoryItem) => r.id" :scroll-x="1300" />
 
     <!-- 新建/编辑 -->

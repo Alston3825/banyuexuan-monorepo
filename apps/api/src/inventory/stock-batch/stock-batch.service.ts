@@ -13,12 +13,17 @@ export class StockBatchService {
     private readonly ctx: RequestContextService,
   ) {}
 
-  findMany(query: QueryStockBatchDto = {}) {
-    return this.prisma.stockBatch.findMany({
+  async findMany(query: QueryStockBatchDto = {}) {
+    const batches = await this.prisma.stockBatch.findMany({
       where: { tenantId: this.ctx.tenantId, warehouseId: query.warehouseId, itemId: query.itemId, quantity: { gt: 0 } },
       include: includeBatch,
       orderBy: { expiresAt: 'asc' },
     });
+    // 附上来源入库单号，方便从批次回查实际采购价
+    const receiptIds = [...new Set(batches.filter((b) => b.sourceType === 'GOODS_RECEIPT').map((b) => b.sourceId))];
+    const receipts = receiptIds.length ? await this.prisma.goodsReceipt.findMany({ where: { id: { in: receiptIds } }, select: { id: true, receiptNo: true } }) : [];
+    const noById = new Map(receipts.map((r) => [r.id, r.receiptNo]));
+    return batches.map((b) => ({ ...b, sourceNo: b.sourceType === 'GOODS_RECEIPT' ? noById.get(b.sourceId) ?? null : null }));
   }
 
   /** 过期预警：已过期 + 临期（withinDays 天内到期），quantity=0 的批次（已耗尽）不参与预警。 */

@@ -117,9 +117,19 @@ export interface StockBatch {
   expiresAt: string | null
   sourceType: string
   sourceId: string
+  /** 来源入库单号（入库产生的批次才有） */
+  sourceNo?: string | null
   createdAt: string
   warehouse: Warehouse
   item: InventoryItem
+}
+export interface ItemPriceHistory {
+  item: { id: string; name: string; spec: string | null; unit: string }
+  rows: { date: string; receiptId: string; receiptNo: string; orderNo: string | null; supplierName: string | null; warehouseName: string; quantity: number; unitCost: number }[]
+  /** 以下三项单位：分 */
+  avgCost: number
+  minCost: number
+  maxCost: number
 }
 export interface StockBatchExpiryAlert extends StockBatch {
   isExpired: boolean
@@ -505,6 +515,8 @@ export interface StockOverviewRow {
   quantity: number
   /** 平均成本，分 */
   avgCost: number
+  /** 最近一次入库的实际单价，分；从没入过库为空 */
+  lastCost: number | null
   status: 'OUT' | 'LOW' | 'OK' | 'NO_THRESHOLD'
   warehouses: { warehouseId: string; warehouseName: string; quantity: number }[]
   updatedAt: string | null

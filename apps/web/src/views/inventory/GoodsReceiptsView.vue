@@ -383,7 +383,7 @@ onMounted(fetchAll)
             <div v-for="l in detailLines" :key="l.id" class="gr-lrow" :class="{ 'gr-done': remaining(l) === 0 }">
               <div class="gr-lname">
                 <b>{{ l.item.name }}</b><span v-if="l.item.spec" class="gr-sub"> {{ l.item.spec }}</span>
-                <div class="gr-sub">采购 {{ l.quantity }} {{ l.item.unit }} · 已到 {{ l.receivedQuantity }} · <span :style="remaining(l) ? 'color:#d9822b' : 'color:#18a058'">{{ remaining(l) ? `还差 ${remaining(l)}` : '已到齐 ✓' }}</span></div>
+                <div class="gr-sub">单价 {{ (l.unitCost / 100).toFixed(2) }} 元 · 采购 {{ l.quantity }} {{ l.item.unit }} · 已到 {{ l.receivedQuantity }} · <span :style="remaining(l) ? 'color:#d9822b' : 'color:#18a058'">{{ remaining(l) ? `还差 ${remaining(l)}` : '已到齐 ✓' }}</span></div>
               </div>
               <div v-if="isOpenTracked && canReceive && remaining(l) > 0" class="gr-input">
                 <n-input-number v-model:value="recvQty[l.id]" :min="0" :max="remaining(l)" :precision="0" placeholder="这次到货" size="small" style="width: 120px" />

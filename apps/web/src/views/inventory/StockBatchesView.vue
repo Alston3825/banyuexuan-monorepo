@@ -34,6 +34,8 @@ const columns: DataTableColumns<StockBatch | StockBatchExpiryAlert> = [
   { key: 'warehouse', title: '仓库', render: (row) => row.warehouse.name },
   { key: 'item', title: '物品', render: (row) => row.item.name },
   { key: 'batchNo', title: '批次号' },
+  { key: 'unitCost', title: '入库单价（元）', width: 110, render: (row) => (row.unitCost / 100).toFixed(2) },
+  { key: 'sourceNo', title: '来源入库单', width: 150, render: (row) => (row as StockBatch).sourceNo ?? '-' },
   { key: 'quantity', title: '剩余数量', render: (row) => `${row.quantity} ${row.item.unit}` },
   { key: 'receivedAt', title: '入库时间', render: (row) => new Date(row.receivedAt).toLocaleDateString() },
   { key: 'expiresAt', title: '到期日期', render: (row) => (row.expiresAt ? new Date(row.expiresAt).toLocaleDateString() : '不追踪') },
@@ -68,6 +70,6 @@ watch([warehouseId, expiryOnly, withinDays], fetchList)
         <n-input-number v-model:value="withinDays" :min="1" style="width: min(100px, 94vw)" />
       </n-space>
     </n-space>
-    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r) => r.id" :scroll-x="900" />
+    <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r) => r.id" :scroll-x="1100" />
   </div>
 </template>

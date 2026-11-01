@@ -263,6 +263,7 @@ export class GoodsReceiptService {
             });
           }
 
+          if (line.unitCost > 0) await tx.inventoryItem.update({ where: { id: line.itemId }, data: { referencePrice: line.unitCost / 100 } });
           await tx.stockBatch.create({
             data: {
               tenantId: this.ctx.tenantId!,
@@ -402,6 +403,8 @@ export class GoodsReceiptService {
     } else {
       await tx.warehouseStock.create({ data: { warehouseId: p.warehouseId, itemId: p.itemId, quantity: newQuantity, avgCost: newAvgCost } });
     }
+    // 物品资料的“参考单价”跟着最近一次实际采购价走（申购时参考）
+    if (p.unitCost > 0) await tx.inventoryItem.update({ where: { id: p.itemId }, data: { referencePrice: p.unitCost / 100 } });
     await tx.stockBatch.create({
       data: {
         tenantId: this.ctx.tenantId!,

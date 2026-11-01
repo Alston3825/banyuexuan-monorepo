@@ -7,6 +7,7 @@ import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NAlert, NButton, NDataTable, NInput, NRadioButton, NRadioGroup, NSelect, NSpace, NTag, type DataTableColumns } from 'naive-ui'
 import { warehouseApi, warehouseStockApi } from '../../api/modules/inventory.api'
+import ItemPriceHistoryDialog from '../../components/inventory/ItemPriceHistoryDialog.vue'
 import type { StockOverview, StockOverviewFilter, StockOverviewRow } from '../../api/types/inventory'
 
 const router = useRouter()
@@ -20,6 +21,9 @@ const status = ref<StockOverviewFilter>('ALL')
 const warehouseOptions = computed(() => warehouses.value.map((w) => ({ label: w.name, value: w.id })))
 const summary = computed(() => data.value?.summary)
 const yuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const priceShow = ref(false)
+const priceItemId = ref<string | null>(null)
 
 let seq = 0
 async function fetchList() {
@@ -61,7 +65,15 @@ const columns: DataTableColumns<StockOverviewRow> = [
     minWidth: 180,
     render: (r) => (r.warehouses.length === 0 ? h('span', { style: 'color:#bbb' }, '无库存') : r.warehouses.map((w) => `${w.warehouseName} ${w.quantity}`).join('；')),
   },
-  { key: 'avgCost', title: '平均成本（元）', width: 110, render: (r) => (r.quantity > 0 ? yuan(r.avgCost) : '-') },
+  { key: 'avgCost', title: '平均单价（元）', width: 110, render: (r) => (r.quantity > 0 ? yuan(r.avgCost) : '-') },
+  { key: 'lastCost', title: '最近采购价（元）', width: 120, render: (r) => (r.lastCost === null ? '-' : yuan(r.lastCost)) },
+  {
+    key: 'prices',
+    title: '价格记录',
+    width: 90,
+    fixed: 'right',
+    render: (r) => h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => ((priceItemId.value = r.itemId), (priceShow.value = true)) }, { default: () => '查看' }),
+  },
   { key: 'updatedAt', title: '最近变动', width: 150, render: (r) => (r.updatedAt ? new Date(r.updatedAt).toLocaleString('zh-CN', { hour12: false }) : '-') },
 ]
 
@@ -112,7 +124,8 @@ onMounted(async () => {
         <n-radio-button value="IN_STOCK">有库存</n-radio-button>
       </n-radio-group>
     </n-space>
-    <n-data-table :columns="columns" :data="data?.rows ?? []" :loading="loading" :row-key="(r: StockOverviewRow) => r.itemId" :scroll-x="980" :pagination="{ pageSize: 30 }" />
+    <item-price-history-dialog v-model:show="priceShow" :item-id="priceItemId" />
+    <n-data-table :columns="columns" :data="data?.rows ?? []" :loading="loading" :row-key="(r: StockOverviewRow) => r.itemId" :scroll-x="1200" :pagination="{ pageSize: 30 }" />
   </div>
 </template>
 

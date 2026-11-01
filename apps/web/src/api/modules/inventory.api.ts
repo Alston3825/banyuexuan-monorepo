@@ -1,5 +1,6 @@
 import { http } from '../client'
 import type {
+  ItemPriceHistory,
   StockOverview,
   StockOverviewFilter,
   CreateGoodsReceiptDto,
@@ -65,6 +66,7 @@ export const inventoryItemApi = {
   /** 删除前检查：DELETE=可直接删；HIDE=有记录只能隐藏；BLOCKED=还有库存不能删 */
   deleteCheck: (id: string) =>
     http.get<{ stockQty: number; recordCount: number; outcome: 'DELETE' | 'HIDE' | 'BLOCKED'; reason: string }>(`/inventory/items/${id}/delete-check`).then((r) => r.data),
+  priceHistory: (id: string) => http.get<ItemPriceHistory>(`/inventory/items/${id}/price-history`).then((r) => r.data),
   remove: (id: string) => http.delete<{ outcome: 'DELETED' | 'HIDDEN'; message: string }>(`/inventory/items/${id}`).then((r) => r.data),
   /** Excel 导入第一步：上传表格，返回识别结果供核对（不入库） */
   importPreview: (file: File) => {
