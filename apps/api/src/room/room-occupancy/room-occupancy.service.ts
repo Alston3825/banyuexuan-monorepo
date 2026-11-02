@@ -6,6 +6,7 @@ import { RequestContextService } from '../../common/context/request-context.serv
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
 import { CustomerService } from '../../crm/customer/customer.service';
+import { CheckInRoomOccupancyDto } from './dto/check-in-room-occupancy.dto';
 import { CreateRoomOccupancyDto } from './dto/create-room-occupancy.dto';
 import { brief, computeConflicts, ConflictBrief, ConflictOccupancy, overlapsWithBuffer, RoomConflict } from './room-conflicts.util';
 import { QueryRoomOccupancyDto } from './dto/query-room-occupancy.dto';
@@ -208,40 +209,115 @@ export class RoomOccupancyService {
     return { ...created, conflicts };
   }
 
-  /** 入住：仅允许从 RESERVED 迁移。 */
-  async checkIn(id: string, expectedVersion: number): Promise<RoomOccupancy> {
+  /**
+   * 办理入住时的选房列表：同门店所有房间 + 各自现在的情况。
+   * state：FREE 空闲 / PENDING_CLEANING 待清扫（可选，提醒一下）/ RESERVED_CLASH 这段时间另有预订（可选，会进冲突清单）
+   * / OVERDUE 上一位已过预计离店日还没办离店（勾选“已离开”可选）/ IN_HOUSE 现在住着人（不可选）/ MAINTENANCE 维修中（不可选）。
+   */
+  async checkInRooms(id: string, from?: string, to?: string) {
+    const occ = await this.findOneOrThrow(id);
+    const buf = await this.bufferDays();
+    const checkIn = from ? new Date(from) : occ.plannedCheckIn;
+    const checkOut = to ? new Date(to) : occ.plannedCheckOut;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [rooms, active] = await Promise.all([
+      this.prisma.room.findMany({ where: { tenantId: this.ctx.tenantId, storeId: occ.storeId }, include: { roomType: { select: { name: true } } }, orderBy: { roomNo: 'asc' } }),
+      this.prisma.roomOccupancy.findMany({
+        where: { tenantId: this.ctx.tenantId, storeId: occ.storeId, status: { in: ['RESERVED', 'CHECKED_IN'] }, id: { not: id } },
+        include: { customer: { select: { name: true } } },
+      }),
+    ]);
+    return rooms.map((r) => {
+      const mine = active.filter((a) => a.roomId === r.id);
+      const inHouse = mine.find((a) => a.status === 'CHECKED_IN');
+      const clash = mine.filter((a) => a.status === 'RESERVED' && overlapsWithBuffer(checkIn, checkOut, a.plannedCheckIn, a.plannedCheckOut, buf));
+      let state: 'FREE' | 'PENDING_CLEANING' | 'RESERVED_CLASH' | 'OVERDUE' | 'IN_HOUSE' | 'MAINTENANCE' = 'FREE';
+      let note = '';
+      if (r.underMaintenance) {
+        state = 'MAINTENANCE';
+        note = r.maintenanceNote ?? '维修中';
+      } else if (inHouse) {
+        state = inHouse.plannedCheckOut < today ? 'OVERDUE' : 'IN_HOUSE';
+        note = `${inHouse.customer.name} 在住，计划 ${inHouse.plannedCheckOut.toISOString().slice(0, 10)} 离店`;
+      } else if (clash.length) {
+        state = 'RESERVED_CLASH';
+        note = `这段时间另有预订：${clash.map((c) => `${c.customer.name}（${c.plannedCheckIn.toISOString().slice(5, 10)}~${c.plannedCheckOut.toISOString().slice(5, 10)}）`).join('、')}`;
+      } else if (r.needsCleaning) {
+        state = 'PENDING_CLEANING';
+        note = '待清扫';
+      }
+      return { id: r.id, roomNo: r.roomNo, floor: r.floor, roomTypeName: r.roomType.name, isBooked: r.id === occ.roomId, state, note };
+    });
+  }
+
+  /**
+   * 入住：仅允许从 RESERVED 迁移。预订只是“预计”，办理入住时由现场销售按实际情况定房间、入住日期、天数，
+   * 所以这里可以改房间/入住日期/离店日期；入住后这条记录就是房态上的“在住”，预订时的计划被实际取代。
+   * 硬拦：目标房间现在确实住着人（没过预计离店日）、维修中。上一位早已过预计离店日却忘了办离店的，勾选确认后替他办离店。
+   */
+  async checkIn(id: string, dto: CheckInRoomOccupancyDto): Promise<RoomOccupancy & { conflicts: ConflictBrief[] }> {
     const before = await this.findOneOrThrow(id);
-    this.assertVersion(before, expectedVersion);
+    this.assertVersion(before, dto.version);
     if (before.status !== 'RESERVED') {
       throw new BadRequestException(`占用记录当前状态「${before.status}」不允许入住`);
     }
-    // 唯一的硬拦：这间房现在还住着别人（还没办离店），就不能再办入住
+    const roomId = dto.roomId ?? before.roomId;
+    const room = await this.prisma.room.findFirst({ where: { id: roomId, tenantId: this.ctx.tenantId, storeId: before.storeId } });
+    if (!room) throw new BadRequestException('所选房间不存在或不属于本门店');
+    if (room.underMaintenance) throw new ConflictException(`${room.roomNo} 房正在维修，请换一间`);
+    const startOfDay = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+    const actualIn = dto.checkInDate ? new Date(dto.checkInDate) : new Date();
+    const plannedIn = dto.checkInDate ? startOfDay(actualIn) : before.plannedCheckIn;
+    const plannedOut = dto.plannedCheckOut ? new Date(dto.plannedCheckOut) : before.plannedCheckOut;
+    if (plannedOut <= (dto.checkInDate ? plannedIn : startOfDay(new Date()))) throw new BadRequestException('离店日期必须晚于入住日期');
     const inHouse = await this.prisma.roomOccupancy.findFirst({
-      where: { roomId: before.roomId, status: 'CHECKED_IN', id: { not: id } },
+      where: { roomId, status: 'CHECKED_IN', id: { not: id } },
       include: { customer: { select: { name: true } } },
     });
+    let release: typeof inHouse = null;
     if (inHouse) {
-      throw new ConflictException(
-        `这间房现在还住着 ${inHouse.customer.name}（${inHouse.occupancyNo}，计划 ${inHouse.plannedCheckOut.toLocaleDateString()} 离店）。请先给上一位办理离店，或把这位客户换到其他空房（“预订冲突”页面可以一键换房）`,
-      );
+      if (inHouse.plannedCheckOut >= startOfDay(new Date())) {
+        throw new ConflictException(`这间房现在还住着 ${inHouse.customer.name}（计划 ${inHouse.plannedCheckOut.toISOString().slice(0, 10)} 离店），请换一间空房，或先给 TA 办理离店`);
+      }
+      if (!dto.releaseOverdue) {
+        throw new ConflictException(`${room.roomNo} 房上一位客户 ${inHouse.customer.name} 已过预计离店日（${inHouse.plannedCheckOut.toISOString().slice(0, 10)}）但还没办理离店。如果 TA 已经离开，请勾选“已离开，同时替 TA 办离店”`);
+      }
+      release = inHouse;
     }
-    const updated = await runVersionedUpdate(() =>
-      this.prisma.roomOccupancy.update({
-        where: { id, version: expectedVersion },
-        data: { status: 'CHECKED_IN', actualCheckInAt: new Date(), version: { increment: 1 } },
-      }),
-    );
+    const conflicts = await this.softConflicts(roomId, plannedIn, plannedOut, id);
+    const checkInOp = this.prisma.roomOccupancy.update({
+      where: { id, version: dto.version },
+      data: { status: 'CHECKED_IN', roomId, plannedCheckIn: plannedIn, plannedCheckOut: plannedOut, actualCheckInAt: actualIn, version: { increment: 1 } },
+    });
+    const updated = release
+      ? (
+          await runVersionedUpdate(() =>
+            this.prisma.$transaction([
+              this.prisma.roomOccupancy.update({ where: { id: release.id }, data: { status: 'CHECKED_OUT', actualCheckOutAt: release.plannedCheckOut, version: { increment: 1 } } }),
+              checkInOp,
+            ]),
+          )
+        )[1]
+      : await runVersionedUpdate(() => checkInOp);
+    if (release) {
+      await this.auditLogService.record({ action: 'STATE_TRANSITION', entityType: 'RoomOccupancy', entityId: release.id, remark: `CHECKED_IN -> CHECKED_OUT（办理 ${before.occupancyNo} 入住时确认已离开，补办离店）`, ...this.auditCtx() });
+    }
     await this.auditLogService.record({
       action: 'STATE_TRANSITION',
       entityType: 'RoomOccupancy',
       entityId: id,
       beforeData: before,
       afterData: updated,
-      remark: 'RESERVED -> CHECKED_IN',
+      remark: `RESERVED -> CHECKED_IN${roomId !== before.roomId ? `（实际换房：${before.roomId} -> ${roomId}）` : ''}`,
       ...this.auditCtx(),
     });
     await this.linkMotherProfile(updated);
-    return updated;
+    return { ...updated, conflicts };
   }
 
   /** 离店：仅允许从 CHECKED_IN 迁移，同时把关联房间标记为待清扫。 */

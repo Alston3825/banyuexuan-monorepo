@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { NSpace, NSelect, NDatePicker, NCard, NGrid, NGi, NModal, NForm, NFormItem, NInput, NButton, NDescriptions, NDescriptionsItem, NEmpty } from 'naive-ui'
 import { roomApi } from '../../api/modules/room.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
+import CheckInDialog from '../../components/room/CheckInDialog.vue'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { RoomBoardEntry, ComputedRoomStatus } from '../../api/types/room'
@@ -183,19 +184,15 @@ async function handleClearMaintenance() {
 }
 
 // 办理入住
-const checkInSubmitting = ref(false)
-async function handleCheckIn() {
+const checkInShow = ref(false)
+const checkInId = ref<string | null>(null)
+const checkInName = ref<string | null>(null)
+function handleCheckIn() {
   if (!selectedEntry.value?.occupancyId) return
-  checkInSubmitting.value = true
-  try {
-    const occ = await roomOccupancyApi.get(selectedEntry.value.occupancyId)
-    await roomOccupancyApi.checkIn(selectedEntry.value.occupancyId, occ.version)
-    message.success('已办理入住')
-    actionVisible.value = false
-    await fetchBoard()
-  } finally {
-    checkInSubmitting.value = false
-  }
+  checkInId.value = selectedEntry.value.occupancyId
+  checkInName.value = selectedEntry.value.customerName ?? null
+  actionVisible.value = false
+  checkInShow.value = true
 }
 
 // 取消预订
@@ -346,7 +343,7 @@ onMounted(async () => {
               <n-descriptions-item label="客户">{{ selectedEntry.customerName }}</n-descriptions-item>
             </n-descriptions>
             <n-space style="margin-bottom: 16px">
-              <n-button type="primary" :loading="checkInSubmitting" @click="handleCheckIn">办理入住</n-button>
+              <n-button type="primary" @click="handleCheckIn">办理入住</n-button>
             </n-space>
             <h4>取消预订</h4>
             <n-form label-placement="left" label-width="80">
@@ -385,6 +382,7 @@ onMounted(async () => {
         </template>
       </n-card>
     </n-modal>
+    <CheckInDialog v-model:show="checkInShow" :occupancy-id="checkInId" :customer-name="checkInName" @done="fetchBoard" />
   </div>
 </template>
 

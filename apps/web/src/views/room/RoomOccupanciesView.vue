@@ -18,6 +18,7 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
+import CheckInDialog from '../../components/room/CheckInDialog.vue'
 import { roomApi } from '../../api/modules/room.api'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
@@ -118,18 +119,13 @@ async function handleSubmit() {
 }
 
 // ---------------- 行内状态机操作 ----------------
+const checkInShow = ref(false)
+const checkInId = ref<string | null>(null)
+const checkInName = ref<string | null>(null)
 function handleCheckIn(row: RoomOccupancy) {
-  dialog.warning({
-    title: '办理入住',
-    content: `确认「${row.occupancyNo}」办理入住？`,
-    positiveText: '确认',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      await roomOccupancyApi.checkIn(row.id, row.version)
-      message.success('已办理入住')
-      await fetchList()
-    },
-  })
+  checkInId.value = row.id
+  checkInName.value = customerNameById.value[row.customerId] ?? null
+  checkInShow.value = true
 }
 
 function handleCheckOut(row: RoomOccupancy) {
@@ -449,5 +445,6 @@ onMounted(async () => {
         </template>
       </n-card>
     </n-modal>
+    <CheckInDialog v-model:show="checkInShow" :occupancy-id="checkInId" :customer-name="checkInName" @done="fetchList" />
   </div>
 </template>

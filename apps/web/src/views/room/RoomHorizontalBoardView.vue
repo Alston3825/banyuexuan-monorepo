@@ -5,6 +5,7 @@ import { NSpace, NSelect, NDatePicker, NButton, NModal, NCard, NForm, NFormItem,
 import { roomApi } from '../../api/modules/room.api'
 import { roomTypeApi } from '../../api/modules/room-type.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
+import CheckInDialog from '../../components/room/CheckInDialog.vue'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
 import { contractApi } from '../../api/modules/contract.api'
@@ -265,7 +266,7 @@ function barsForRoom(roomId: string): Bar[] {
       width: Math.max(1, endIdx - startIdx) * CELL_WIDTH - 2,
       clippedLeft: rawStart < 0,
       clippedRight: rawEnd > dayCount.value,
-      label: `${custName}，${diffDays(ci, co)}晚，${fmtMD(ci)}-${fmtMD(co)}`,
+      label: `${occ.status === 'CHECKED_IN' ? '【住】' : '【预】'}${custName}，${diffDays(ci, co)}晚，${fmtMD(ci)}-${fmtMD(co)}`,
       conflict: conflictIds.value.has(occ.id),
     })
   }
@@ -447,17 +448,13 @@ async function handleReschedule() {
   }
 }
 
-async function handleCheckIn() {
+const checkInShow = ref(false)
+const checkInId = ref<string | null>(null)
+function handleCheckIn() {
   if (!detailOcc.value) return
-  detailSubmitting.value = true
-  try {
-    await roomOccupancyApi.checkIn(detailOcc.value.id, detailOcc.value.version)
-    message.success('已办理入住')
-    detailVisible.value = false
-    await fetchBoard()
-  } finally {
-    detailSubmitting.value = false
-  }
+  checkInId.value = detailOcc.value.id
+  detailVisible.value = false
+  checkInShow.value = true
 }
 
 async function handleCheckOut() {
@@ -548,8 +545,8 @@ onMounted(async () => {
       <n-button @click="jumpToday">今天</n-button>
       <n-date-picker :value="locateValue" type="date" clearable placeholder="定位到日期" style="width: min(150px, 94vw)" @update:value="onLocate" />
       <n-space :size="6" style="margin-left: 12px">
-        <n-tag size="small" :bordered="false" style="background: #e6f3ff; color: #1a73c7">■ 预订中</n-tag>
-        <n-tag size="small" :bordered="false" style="background: #e3f7ea; color: #1a8f4c">■ 已入住</n-tag>
+        <n-tag size="small" :bordered="false" style="background: #e6f3ff; color: #1a73c7">■ 预订中（虚线，预计）</n-tag>
+        <n-tag size="small" :bordered="false" style="background: #e3f7ea; color: #1a8f4c">■ 已入住（实心，实际）</n-tag>
         <n-tag size="small" :bordered="false" style="background: #eeeeee; color: #777">■ 已离店</n-tag>
         <n-tag size="small" :bordered="false" style="background: repeating-linear-gradient(45deg,#eee,#eee 4px,#e2e2e2 4px,#e2e2e2 8px); color: #888">▦ 维修中</n-tag>
       </n-space>
@@ -735,6 +732,7 @@ onMounted(async () => {
         </template>
       </n-card>
     </n-modal>
+    <CheckInDialog v-model:show="checkInShow" :occupancy-id="checkInId" @done="fetchBoard" />
   </div>
 </template>
 
@@ -903,7 +901,10 @@ onMounted(async () => {
   display: inline-block;
 }
 .occ-bar.reserved {
-  background: #4098fc;
+  /* 预订=计划：浅蓝底 + 虚线框；办理入住后变成实心绿色（房间/日期以实际入住为准） */
+  background: repeating-linear-gradient(135deg, #4098fc 0, #4098fc 8px, #5aa8ff 8px, #5aa8ff 16px);
+  outline: 2px dashed #1a5fb4;
+  outline-offset: -2px;
 }
 .occ-bar.checked_in {
   background: #2bb673;

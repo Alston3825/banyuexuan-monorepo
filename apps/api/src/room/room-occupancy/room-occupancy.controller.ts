@@ -40,6 +40,13 @@ export class RoomOccupancyController {
     return this.roomOccupancyService.freeRooms(id);
   }
 
+  /** 办理入住时可选的房间（含每间房当前状态，同一门店） */
+  @Get(':id/checkin-rooms')
+  @RequirePermission('room.occupancy.view')
+  checkInRooms(@Param('id') id: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.roomOccupancyService.checkInRooms(id, from, to);
+  }
+
   @Get(':id')
   @RequirePermission('room.occupancy.view')
   findOne(@Param('id') id: string) {
@@ -55,7 +62,7 @@ export class RoomOccupancyController {
   @Post(':id/check-in')
   @RequirePermission('room.occupancy.checkin')
   checkIn(@Param('id') id: string, @Body() dto: CheckInRoomOccupancyDto) {
-    return this.roomOccupancyService.checkIn(id, dto.version);
+    return this.roomOccupancyService.checkIn(id, dto);
   }
 
   @Post(':id/check-out')

@@ -76,3 +76,20 @@ export interface RescheduleRoomOccupancyDto {
   plannedCheckOut: string
   version: number
 }
+
+export type CheckInRoomState = 'FREE' | 'PENDING_CLEANING' | 'RESERVED_CLASH' | 'OVERDUE' | 'IN_HOUSE' | 'MAINTENANCE'
+export interface CheckInRoom {
+  id: string
+  roomNo: string
+  floor: string
+  roomTypeName: string
+  isBooked: boolean
+  state: CheckInRoomState
+  note: string
+}
+export interface CheckInBody {
+  roomId?: string
+  checkInDate?: string
+  plannedCheckOut?: string
+  releaseOverdue?: boolean
+}
