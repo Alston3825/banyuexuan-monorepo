@@ -5,10 +5,10 @@ import { NButton, NDatePicker, NEmpty, NInput, NSelect, NSpace, NSpin, NTag } fr
 import { satisfactionApi } from '../../api/modules/satisfaction.api'
 import type { SurveyStats } from '../../api/types/satisfaction'
 
-const props = defineProps<{ formOptions: { label: string; value: number }[] }>()
+const props = defineProps<{ formOptions: { label: string; value: string }[] }>()
 const emit = defineEmits<{ (e: 'goPending'): void }>()
 
-const formNo = ref<number | null>(null)
+const templateId = ref<string | null>(null)
 const range = ref<[number, number] | null>(null)
 const steward = ref('')
 const data = ref<SurveyStats | null>(null)
@@ -18,7 +18,7 @@ const ymd = (ts: number) => {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-const filter = computed(() => ({ formNo: formNo.value ?? undefined, from: range.value ? ymd(range.value[0]) : undefined, to: range.value ? ymd(range.value[1]) : undefined, steward: steward.value.trim() || undefined }))
+const filter = computed(() => ({ templateId: templateId.value ?? undefined, from: range.value ? ymd(range.value[0]) : undefined, to: range.value ? ymd(range.value[1]) : undefined, steward: steward.value.trim() || undefined }))
 
 let seq = 0
 async function load() {
@@ -32,7 +32,7 @@ async function load() {
   }
 }
 let t: ReturnType<typeof setTimeout> | null = null
-watch([formNo, range, steward], () => {
+watch([templateId, range, steward], () => {
   if (t) clearTimeout(t)
   t = setTimeout(load, 300)
 })
@@ -41,14 +41,13 @@ defineExpose({ reload: load })
 
 const pct = (n: number, total: number) => (total ? (n / total) * 100 : 0)
 const color = (avg: number | null) => (avg === null ? '#bbb' : avg >= 10 ? '#18a058' : avg <= 6 ? '#d03050' : '#f0a020')
-const dayLabel = (n: number) => `第${n}张`
-void props
+const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.label ?? ''
 </script>
 
 <template>
   <div>
     <n-space style="margin-bottom: 12px" align="center" :wrap="true">
-      <n-select v-model:value="formNo" :options="formOptions" clearable placeholder="全部调查表" style="width: min(200px, 94vw)" />
+      <n-select v-model:value="templateId" :options="formOptions" clearable placeholder="全部调查表" style="width: min(200px, 94vw)" />
       <n-date-picker v-model:value="range" type="daterange" clearable style="width: min(300px, 94vw)" />
       <n-input v-model:value="steward" clearable placeholder="按管家姓名筛选" style="width: min(180px, 94vw)" />
     </n-space>
@@ -57,9 +56,9 @@ void props
       <template v-if="data">
         <div class="st-tiles">
           <div class="st-tile"><div class="st-num">{{ data.total }}</div><div class="st-cap">已统计的调查表</div></div>
-          <div v-for="f in data.forms" :key="f.formNo" class="st-tile">
+          <div v-for="f in data.forms" :key="f.templateId" class="st-tile">
             <div class="st-num" :style="{ color: color(f.avg) }">{{ f.avg ?? '-' }}<small> / {{ data.scoreMax }}</small></div>
-            <div class="st-cap">第 {{ f.day }} 天表 · {{ f.count }} 份 · 满意率 {{ f.satisfiedRate === null ? '-' : f.satisfiedRate + '%' }}</div>
+            <div class="st-cap">{{ f.title }} · {{ f.count }} 份 · 满意率 {{ f.satisfiedRate === null ? '-' : f.satisfiedRate + '%' }}</div>
           </div>
           <div v-if="data.pending > 0" class="st-tile st-pending" @click="emit('goPending')">
             <div class="st-num">{{ data.pending }}</div>
@@ -75,13 +74,13 @@ void props
             <div class="st-h">最需要关注：得分最低的 5 项</div>
             <div v-for="(it, i) in data.lowItems" :key="it.key" class="st-low">
               <span class="st-rank">{{ i + 1 }}</span>
-              <span class="st-lbl">{{ it.label }}<small>（第 {{ it.formNo === 1 ? 5 : it.formNo === 2 ? 15 : 25 }} 天表 · {{ it.groupTitle }}）</small></span>
+              <span class="st-lbl">{{ it.label }}<small>（{{ it.formTitle }} · {{ it.groupTitle }}）</small></span>
               <b :style="{ color: color(it.avg) }">{{ it.avg }}</b>
             </div>
           </div>
 
-          <div v-for="f in data.forms.filter((x) => x.count > 0)" :key="f.formNo" class="st-card">
-            <div class="st-h">{{ f.title }}（住满第 {{ f.day }} 天）· {{ f.count }} 份 · 平均 <b :style="{ color: color(f.avg) }">{{ f.avg }}</b> 分</div>
+          <div v-for="f in data.forms.filter((x) => x.count > 0)" :key="f.templateId" class="st-card">
+            <div class="st-h">{{ f.title }}<span v-if="f.day">（住满第 {{ f.day }} 天）</span> · {{ f.count }} 份 · 平均 <b :style="{ color: color(f.avg) }">{{ f.avg }}</b> 分</div>
             <template v-for="g in f.groups" :key="g.key">
               <div class="st-g">{{ g.title }}<span v-if="g.avg !== null"> · 平均 {{ g.avg }}</span></div>
               <div v-for="it in g.items" :key="it.key" class="st-item">
@@ -103,7 +102,7 @@ void props
           <div v-if="data.trend.length" class="st-card">
             <div class="st-h">按月趋势（平均分）</div>
             <div class="st-trend">
-              <div v-for="t in data.trend" :key="t.month + t.formNo" class="st-tchip"><span>{{ t.month }}</span><n-tag size="small" :bordered="false">{{ dayLabel(t.formNo) }}</n-tag><b :style="{ color: color(t.avg) }">{{ t.avg }}</b></div>
+              <div v-for="t in data.trend" :key="t.month + t.templateId" class="st-tchip"><span>{{ t.month }}</span><n-tag size="small" :bordered="false">{{ nameOf(t.templateId) }}</n-tag><b :style="{ color: color(t.avg) }">{{ t.avg }}</b></div>
             </div>
           </div>
 

@@ -10,7 +10,7 @@ import { SatisfactionService, SurveyPatch } from './satisfaction.service';
 const MAX_FILE_BYTES = 30 * 1024 * 1024;
 
 class FilterDto {
-  @IsOptional() @Type(() => Number) @IsInt() formNo?: number;
+  @IsOptional() @IsString() templateId?: string;
   @IsOptional() @IsString() from?: string;
   @IsOptional() @IsString() to?: string;
   @IsOptional() @IsString() storeId?: string;
@@ -19,7 +19,7 @@ class FilterDto {
   @IsOptional() @IsString() keyword?: string;
 }
 class CreateDto {
-  @Type(() => Number) @IsInt() formNo: number;
+  @IsString() templateId: string;
   @IsOptional() @IsString() customerId?: string;
 }
 class PatchDto implements SurveyPatch {

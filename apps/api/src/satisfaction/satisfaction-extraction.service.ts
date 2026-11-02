@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiGatewayClient } from '../ai/ai-gateway/ai-gateway.client';
 import { CareStorageService } from '../care/care-document/care-storage.service';
-import { formItems, formSpec, SCORE_MAX, surveyAiSpec } from './survey-specs';
+import { formItems, SCORE_MAX, surveyAiSpec } from './survey-specs';
+import { toSpec } from './satisfaction-template.service';
 
 const MAX_CONCURRENT = 2;
 
@@ -65,8 +66,9 @@ export class SatisfactionExtractionService implements OnModuleInit {
   private async run(id: string): Promise<void> {
     const survey = await this.prisma.satisfactionSurvey.findUnique({ where: { id }, include: { files: { orderBy: { sortOrder: 'asc' } } } });
     if (!survey) return;
-    const spec = formSpec(survey.formNo);
-    if (!spec) throw new Error('不认识的调查表类型');
+    const tpl = survey.templateId ? await this.prisma.satisfactionTemplate.findUnique({ where: { id: survey.templateId } }) : null;
+    if (!tpl) throw new Error('这份调查对应的模板不存在');
+    const spec = toSpec(tpl);
     if (survey.files.length === 0) throw new Error('还没有上传照片，无法识别');
     await this.prisma.satisfactionSurvey.update({ where: { id }, data: { extractStatus: 'RUNNING' } });
 
@@ -119,6 +121,6 @@ export class SatisfactionExtractionService implements OnModuleInit {
         extractedAt: new Date(),
       },
     });
-    this.logger.log(`满意度调查 ${id}（表${survey.formNo}）识别完成：${Object.keys(scores).length}/${formItems(spec).length} 项评分，${warnings.length} 条提醒`);
+    this.logger.log(`满意度调查 ${id}（${spec.name}）识别完成：${Object.keys(scores).length}/${formItems(spec).length} 项评分，${warnings.length} 条提醒`);
   }
 }

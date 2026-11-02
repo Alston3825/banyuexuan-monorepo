@@ -6,7 +6,8 @@ import { RequestContextService } from '../common/context/request-context.service
 import { AiGatewayClient } from '../ai/ai-gateway/ai-gateway.client';
 import { CareStorageService } from '../care/care-document/care-storage.service';
 import { SatisfactionExtractionService } from './satisfaction-extraction.service';
-import { formItems, formSpec, SATISFIED_MIN, SCORE_MAX, SURVEY_FORMS, UNSATISFIED_MAX } from './survey-specs';
+import { formItems, SATISFIED_MIN, SCORE_MAX, UNSATISFIED_MAX } from './survey-specs';
+import { ensureDefaultTemplates, toSpec } from './satisfaction-template.service';
 
 const filesSelect = { orderBy: { sortOrder: 'asc' as const }, select: { id: true, fileName: true, mimeType: true, sizeBytes: true, sortOrder: true } };
 const isHeic = (f: Express.Multer.File) => /^image\/hei[cf]$/i.test(f.mimetype) || /\.hei[cf]$/i.test(f.originalname);
@@ -14,7 +15,7 @@ const isPdf = (f: Express.Multer.File) => f.buffer.subarray(0, 4).toString() ===
 const dayStr = (d: Date) => d.toISOString().slice(0, 10);
 
 export interface SurveyFilter {
-  formNo?: number;
+  templateId?: string;
   from?: string;
   to?: string;
   storeId?: string;
@@ -44,8 +45,17 @@ export class SatisfactionService {
     private readonly ctx: RequestContextService,
   ) {}
 
-  specs() {
-    return { forms: SURVEY_FORMS, scoreMax: SCORE_MAX, satisfiedMin: SATISFIED_MIN, unsatisfiedMax: UNSATISFIED_MAX };
+  /** 模板（含停用的，历史记录要用）；没有模板时先生成内置三张 */
+  async specs() {
+    await ensureDefaultTemplates(this.prisma, this.ctx.tenantId!, this.ctx.accountId!);
+    const rows = await this.prisma.satisfactionTemplate.findMany({ where: { tenantId: this.ctx.tenantId! }, orderBy: [{ sortNo: 'asc' }, { createdAt: 'asc' }] });
+    return { templates: rows.map((t) => ({ ...toSpec(t), status: t.status })), scoreMax: SCORE_MAX, satisfiedMin: SATISFIED_MIN, unsatisfiedMax: UNSATISFIED_MAX };
+  }
+
+  private async templateOf(templateId: string | null) {
+    const t = templateId ? await this.prisma.satisfactionTemplate.findFirst({ where: { id: templateId, tenantId: this.ctx.tenantId! } }) : null;
+    if (!t) throw new NotFoundException('这份调查对应的模板不存在');
+    return t;
   }
 
   private where(f: SurveyFilter & { status?: string; keyword?: string }): Prisma.SatisfactionSurveyWhereInput {
@@ -55,7 +65,7 @@ export class SatisfactionService {
     const k = f.keyword?.trim();
     return {
       tenantId: this.ctx.tenantId!,
-      formNo: f.formNo || undefined,
+      templateId: f.templateId || undefined,
       status: f.status || undefined,
       storeId: f.storeId || undefined,
       stewardName: f.steward || undefined,
@@ -85,8 +95,11 @@ export class SatisfactionService {
   }
 
   /** 上传一份纸质调查表（可含多张照片）：自动识别；不传照片也能建（手工录入）。 */
-  async create(files: Express.Multer.File[], dto: { formNo: number; customerId?: string }) {
-    if (!formSpec(dto.formNo)) throw new BadRequestException('请选择是第几张调查表（第 5/15/25 天）');
+  async create(files: Express.Multer.File[], dto: { templateId: string; customerId?: string }) {
+    await ensureDefaultTemplates(this.prisma, this.ctx.tenantId!, this.ctx.accountId!);
+    const tpl = await this.prisma.satisfactionTemplate.findFirst({ where: { id: dto.templateId, tenantId: this.ctx.tenantId! } });
+    if (!tpl) throw new BadRequestException('请选择调查表模板');
+    if (tpl.status !== 'ACTIVE') throw new BadRequestException('这个模板已停用，请选择启用中的模板');
     for (const f of files ?? []) {
       if (!isPdf(f) && !/^image\/(jpeg|png|webp|hei[cf])$/i.test(f.mimetype) && !isHeic(f)) {
         throw new BadRequestException(`文件「${this.fileName(f)}」不是照片（JPG/PNG/HEIC）或 PDF`);
@@ -102,7 +115,8 @@ export class SatisfactionService {
       data: {
         tenantId: this.ctx.tenantId!,
         storeId,
-        formNo: dto.formNo,
+        formNo: tpl.sortNo,
+        templateId: tpl.id,
         customerId: dto.customerId ?? null,
         scores: {},
         extractStatus: files?.length ? 'PENDING' : 'NONE',
@@ -113,7 +127,7 @@ export class SatisfactionService {
       await this.saveFiles(created.id, files, 0);
       this.extraction.enqueue(created.id);
     }
-    await this.audit('CREATE', created.id, { formNo: dto.formNo, files: files?.length ?? 0 });
+    await this.audit('CREATE', created.id, { template: tpl.name, files: files?.length ?? 0 });
     return this.getOne(created.id);
   }
 
@@ -126,7 +140,7 @@ export class SatisfactionService {
 
   async update(id: string, patch: SurveyPatch) {
     const row = await this.getOne(id);
-    const spec = formSpec(row.formNo)!;
+    const spec = toSpec(await this.templateOf(row.templateId));
     const data: Prisma.SatisfactionSurveyUpdateInput = { version: { increment: 1 } };
     const str = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() || null);
     if (patch.customerName !== undefined) data.customerName = str(patch.customerName);
@@ -209,8 +223,9 @@ export class SatisfactionService {
     const rows = await this.prisma.satisfactionSurvey.findMany({ where: this.where({ ...f, status: 'CONFIRMED' }), orderBy: { surveyDate: 'asc' } });
     const level = (v: number) => (v >= SATISFIED_MIN ? 'good' : v <= UNSATISFIED_MAX ? 'bad' : 'mid');
     const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100 : null);
-    const forms = SURVEY_FORMS.filter((s) => !f.formNo || s.formNo === f.formNo).map((spec) => {
-      const list = rows.filter((r) => r.formNo === spec.formNo);
+    const tpls = (await this.prisma.satisfactionTemplate.findMany({ where: { tenantId: this.ctx.tenantId!, ...(f.templateId ? { id: f.templateId } : {}) }, orderBy: [{ sortNo: 'asc' }, { createdAt: 'asc' }] })).map(toSpec);
+    const forms = tpls.map((spec) => {
+      const list = rows.filter((r) => r.templateId === spec.id);
       const scoresOf = (key: string) => list.map((r) => (r.scores as Record<string, number> | null)?.[key]).filter((v): v is number => typeof v === 'number');
       const groups = spec.groups.map((g) => {
         const items = g.items.map((it) => {
@@ -222,8 +237,8 @@ export class SatisfactionService {
       });
       const all = formItems(spec).flatMap((i) => scoresOf(i.key));
       return {
-        formNo: spec.formNo,
-        title: spec.title,
+        templateId: spec.id,
+        title: spec.name,
         day: spec.day,
         count: list.length,
         avg: avg(all),
@@ -233,20 +248,21 @@ export class SatisfactionService {
     });
     // 得分最低的评分项（至少有 1 份回答）
     const lowItems = forms
-      .flatMap((fm) => fm.groups.flatMap((g) => g.items.map((i) => ({ formNo: fm.formNo, groupTitle: g.title, key: i.key, label: i.label, avg: i.avg, count: i.count, bad: i.bad }))))
+      .flatMap((fm) => fm.groups.flatMap((g) => g.items.map((i) => ({ templateId: fm.templateId, formTitle: fm.title, groupTitle: g.title, key: i.key, label: i.label, avg: i.avg, count: i.count, bad: i.bad }))))
       .filter((i) => i.avg !== null)
       .sort((a, b) => a.avg! - b.avg!)
       .slice(0, 5);
     // 按月趋势：每张表每月的平均分
-    const trend = new Map<string, { month: string; formNo: number; sum: number; n: number }>();
+    const trend = new Map<string, { month: string; templateId: string; sum: number; n: number }>();
     for (const r of rows) {
       if (!r.surveyDate) continue;
-      const spec = formSpec(r.formNo)!;
+      const spec = tpls.find((t) => t.id === r.templateId);
+      if (!spec) continue;
       const sc = (r.scores as Record<string, number> | null) ?? {};
       for (const it of formItems(spec)) {
         if (typeof sc[it.key] !== 'number') continue;
-        const key = `${dayStr(r.surveyDate).slice(0, 7)}|${r.formNo}`;
-        const t = trend.get(key) ?? { month: dayStr(r.surveyDate).slice(0, 7), formNo: r.formNo, sum: 0, n: 0 };
+        const key = `${dayStr(r.surveyDate).slice(0, 7)}|${spec.id}`;
+        const t = trend.get(key) ?? { month: dayStr(r.surveyDate).slice(0, 7), templateId: spec.id, sum: 0, n: 0 };
         t.sum += sc[it.key];
         t.n += 1;
         trend.set(key, t);
@@ -270,7 +286,7 @@ export class SatisfactionService {
       scoreMax: SCORE_MAX,
       forms,
       lowItems,
-      trend: [...trend.values()].sort((a, b) => a.month.localeCompare(b.month) || a.formNo - b.formNo).map((t) => ({ month: t.month, formNo: t.formNo, avg: Math.round((t.sum / t.n) * 100) / 100 })),
+      trend: [...trend.values()].sort((a, b) => a.month.localeCompare(b.month) || a.templateId.localeCompare(b.templateId)).map((t) => ({ month: t.month, templateId: t.templateId, avg: Math.round((t.sum / t.n) * 100) / 100 })),
       staff: [...staff.values()].filter((s) => s.n > 0).map((s) => ({ name: s.name, surveys: s.surveys, avg: Math.round((s.sum / s.n) * 100) / 100 })).sort((a, b) => b.avg - a.avg),
     };
   }
@@ -281,7 +297,7 @@ export class SatisfactionService {
       where: { ...this.where({ ...f, status: 'CONFIRMED' }), OR: [{ suggestion: { not: null } }, { praise: { not: null } }] },
       orderBy: [{ surveyDate: 'desc' }, { createdAt: 'desc' }],
       take: 300,
-      select: { id: true, formNo: true, customerName: true, roomNo: true, stewardName: true, surveyDate: true, suggestion: true, praise: true },
+      select: { id: true, formNo: true, templateId: true, customerName: true, roomNo: true, stewardName: true, surveyDate: true, suggestion: true, praise: true },
     });
     return rows;
   }
@@ -289,7 +305,7 @@ export class SatisfactionService {
   /** AI 归纳：把一批意见建议/表扬归成主题，给出出现次数和改进建议 */
   async summarize(f: SurveyFilter) {
     const rows = await this.comments(f);
-    const sug = rows.filter((r) => r.suggestion).map((r, i) => `${i + 1}. [表${r.formNo}] ${r.suggestion!.replace(/\s+/g, ' ')}`);
+    const sug = rows.filter((r) => r.suggestion).map((r, i) => `${i + 1}. ${r.suggestion!.replace(/\s+/g, ' ')}`);
     const pra = rows.filter((r) => r.praise).map((r, i) => `${i + 1}. ${r.praise!.replace(/\s+/g, ' ')}`);
     if (sug.length + pra.length === 0) return { content: '还没有客户手写的意见、建议或表扬，暂时没有可汇总的内容。', suggestionCount: 0, praiseCount: 0 };
     const prompt = [

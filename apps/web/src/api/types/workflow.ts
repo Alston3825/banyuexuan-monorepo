@@ -172,7 +172,7 @@ export interface ApprovalRow {
   actedAt?: string | null
 }
 
-export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE' | 'ROOM_CONFLICT'
+export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE' | 'ROOM_CONFLICT' | 'SATISFACTION'
 
 export interface TodoItem {
   key: string

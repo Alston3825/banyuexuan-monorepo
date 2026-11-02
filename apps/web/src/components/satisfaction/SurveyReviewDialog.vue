@@ -24,7 +24,7 @@ const images = ref<{ id: string; url: string; pdf: boolean }[]>([])
 const customers = ref<{ label: string; value: string }[]>([])
 let timer: ReturnType<typeof setTimeout> | null = null
 
-const spec = computed<SurveyFormSpec | undefined>(() => props.specs?.forms.find((f) => f.formNo === survey.value?.formNo))
+const spec = computed<SurveyFormSpec | undefined>(() => props.specs?.templates.find((f) => f.id === survey.value?.templateId))
 const locked = computed(() => survey.value?.status === 'CONFIRMED' || !canEdit.value)
 
 // 表单草稿（本地编辑，保存时一起提交）
@@ -184,7 +184,7 @@ const running = computed(() => survey.value?.extractStatus === 'PENDING' || surv
 
 <template>
   <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
-    <n-card :title="survey ? `${spec?.title ?? '满意度调查'}（住满第 ${spec?.day} 天）` : '满意度调查'" style="width: min(1180px, 98vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true" closable @close="emit('update:show', false)">
+    <n-card :title="survey ? `${spec?.name ?? '满意度调查'}${spec?.day ? `（住满第 ${spec.day} 天）` : ''}` : '满意度调查'" style="width: min(1180px, 98vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true" closable @close="emit('update:show', false)">
       <n-spin :show="loading">
         <div v-if="survey" class="sv-wrap">
           <!-- 原图 -->

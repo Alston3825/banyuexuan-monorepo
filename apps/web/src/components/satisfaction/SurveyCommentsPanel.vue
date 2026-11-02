@@ -6,9 +6,9 @@ import { satisfactionApi } from '../../api/modules/satisfaction.api'
 import type { SurveyComment } from '../../api/types/satisfaction'
 import { message } from '../../utils/discrete-api'
 
-defineProps<{ formOptions: { label: string; value: number }[] }>()
+const props = defineProps<{ formOptions: { label: string; value: string }[] }>()
 
-const formNo = ref<number | null>(null)
+const templateId = ref<string | null>(null)
 const range = ref<[number, number] | null>(null)
 const keyword = ref('')
 const rows = ref<SurveyComment[]>([])
@@ -20,7 +20,7 @@ const ymd = (ts: number) => {
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-const filter = computed(() => ({ formNo: formNo.value ?? undefined, from: range.value ? ymd(range.value[0]) : undefined, to: range.value ? ymd(range.value[1]) : undefined, keyword: keyword.value.trim() || undefined }))
+const filter = computed(() => ({ templateId: templateId.value ?? undefined, from: range.value ? ymd(range.value[0]) : undefined, to: range.value ? ymd(range.value[1]) : undefined, keyword: keyword.value.trim() || undefined }))
 
 async function load() {
   loading.value = true
@@ -31,7 +31,7 @@ async function load() {
   }
 }
 let t: ReturnType<typeof setTimeout> | null = null
-watch([formNo, range, keyword], () => {
+watch([templateId, range, keyword], () => {
   summary.value = null
   if (t) clearTimeout(t)
   t = setTimeout(load, 300)
@@ -41,7 +41,7 @@ onMounted(load)
 async function summarize() {
   summarizing.value = true
   try {
-    summary.value = await satisfactionApi.summarize({ formNo: filter.value.formNo, from: filter.value.from, to: filter.value.to })
+    summary.value = await satisfactionApi.summarize({ templateId: filter.value.templateId, from: filter.value.from, to: filter.value.to })
   } catch {
     message.error('AI 汇总失败，请稍后再试')
   } finally {
@@ -49,13 +49,13 @@ async function summarize() {
   }
 }
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : '-')
-const dayNo = (n: number) => (n === 1 ? 5 : n === 2 ? 15 : 25)
+const tplName = (id: string | null) => props.formOptions.find((o) => o.value === id)?.label ?? '调查表'
 </script>
 
 <template>
   <div>
     <n-space style="margin-bottom: 12px" align="center" :wrap="true">
-      <n-select v-model:value="formNo" :options="formOptions" clearable placeholder="全部调查表" style="width: min(200px, 94vw)" />
+      <n-select v-model:value="templateId" :options="formOptions" clearable placeholder="全部调查表" style="width: min(200px, 94vw)" />
       <n-date-picker v-model:value="range" type="daterange" clearable style="width: min(300px, 94vw)" />
       <n-input v-model:value="keyword" clearable placeholder="🔍 搜索意见内容 / 客户 / 管家" style="width: min(260px, 94vw)" />
       <n-button type="primary" :loading="summarizing" :disabled="rows.length === 0" @click="summarize">AI 汇总分析（{{ rows.length }} 条）</n-button>
@@ -69,7 +69,7 @@ const dayNo = (n: number) => (n === 1 ? 5 : n === 2 ? 15 : 25)
     <n-spin :show="loading">
       <n-empty v-if="!loading && rows.length === 0" description="没有客户手写的意见或表扬（只统计已确认的调查）" style="margin: 30px 0" />
       <div v-for="r in rows" :key="r.id" class="cm-card">
-        <div class="cm-meta">{{ day(r.surveyDate) }} · 第 {{ dayNo(r.formNo) }} 天表 · {{ r.customerName || '未填姓名' }}<span v-if="r.roomNo"> · {{ r.roomNo }} 房</span><span v-if="r.stewardName"> · 管家 {{ r.stewardName }}</span></div>
+        <div class="cm-meta">{{ day(r.surveyDate) }} · {{ tplName(r.templateId) }} · {{ r.customerName || '未填姓名' }}<span v-if="r.roomNo"> · {{ r.roomNo }} 房</span><span v-if="r.stewardName"> · 管家 {{ r.stewardName }}</span></div>
         <div v-if="r.suggestion" class="cm-row"><b class="cm-tag cm-sug">意见建议</b>{{ r.suggestion }}</div>
         <div v-if="r.praise" class="cm-row"><b class="cm-tag cm-pra">表扬</b>{{ r.praise }}</div>
       </div>

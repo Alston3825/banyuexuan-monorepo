@@ -4318,7 +4318,8 @@ model SatisfactionSurvey {
   id             String                @id @default(cuid())
   tenantId       String                @map("tenant_id")
   storeId        String?               @map("store_id")
-  formNo         Int                   @map("form_no") // 1=第5天 2=第15天 3=第25天
+  formNo         Int                   @map("form_no") // 所用模板的序号（1/2/3 是内置三张表）；统计、筛选以 templateId 为准
+  templateId     String?               @map("template_id") // 满意度模板（SatisfactionTemplate）
   customerId     String?               @map("customer_id") // 对上的客户（姓名匹配或人工选择）
   customerName   String?               @map("customer_name") // 纸上手写的姓名（客户没对上时也保留）
   roomNo         String?               @map("room_no")
@@ -4345,6 +4346,7 @@ model SatisfactionSurvey {
   files SatisfactionSurveyFile[]
 
   @@index([tenantId, formNo, status])
+  @@index([tenantId, templateId])
   @@index([tenantId, customerId])
   @@map("satisfaction_surveys")
 }
@@ -4366,4 +4368,29 @@ model SatisfactionSurveyFile {
 
   @@index([surveyId])
   @@map("satisfaction_survey_files")
+}
+
+/// 满意度调查模板：评分项分组、评分尺文字、两个手写栏的名称。day = 客户入住第几天做这张调查（空=不自动提醒）。
+/// 内置三张（第5/15/25天）首次使用时自动生成；也可手工新建，或上传 Word/Excel/PDF/图片由 AI 生成后再修改条款。
+/// groups: [{ key, title, items: [{ key, label }] }]；评分项 key 一旦生成就不变（历史评分按 key 存），改文字不影响历史数据。
+model SatisfactionTemplate {
+  id              String       @id @default(cuid())
+  tenantId        String       @map("tenant_id")
+  name            String
+  sortNo          Int          @default(1) @map("sort_no")
+  day             Int?
+  goodWord        String       @default("好") @map("good_word")
+  badWord         String       @default("不好") @map("bad_word")
+  suggestionLabel String       @map("suggestion_label")
+  praiseLabel     String       @map("praise_label")
+  groups          Json
+  status          CommonStatus @default(ACTIVE) // ACTIVE=正在使用；INACTIVE=停用/草稿
+  source          String       @default("MANUAL") // BUILTIN 内置 / MANUAL 手工 / UPLOAD 上传文件生成
+  createdBy       String       @map("created_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  version         Int          @default(0)
+
+  @@index([tenantId, status])
+  @@map("satisfaction_templates")
 }

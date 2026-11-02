@@ -17,7 +17,7 @@ interface ZipEntry {
   localOffset: number;
 }
 
-function readZip(buf: Buffer): Map<string, Buffer> {
+export function readZip(buf: Buffer): Map<string, Buffer> {
   // 从尾部找“目录结束标记”(PK\x05\x06)
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {

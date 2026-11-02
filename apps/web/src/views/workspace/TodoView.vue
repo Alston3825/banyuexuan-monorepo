@@ -11,7 +11,7 @@ const data = ref<TodoSummary | null>(null)
 const loading = ref(false)
 const filter = ref<TodoKind | 'ALL'>('ALL')
 
-const KIND_LABEL: Record<TodoKind, string> = { APPROVAL: '待我审批', REJECTED: '被驳回', EXPIRY: '证件/合同到期', OUTREACH: '回访任务', COLLECT: '待汇总', PURCHASE: '待采购', RECEIVE: '待收货', ROOM_CONFLICT: '预订冲突' }
+const KIND_LABEL: Record<TodoKind, string> = { APPROVAL: '待我审批', REJECTED: '被驳回', EXPIRY: '证件/合同到期', OUTREACH: '回访任务', COLLECT: '待汇总', PURCHASE: '待采购', RECEIVE: '待收货', ROOM_CONFLICT: '预订冲突', SATISFACTION: '满意度调查' }
 const LEVEL_TAG: Record<string, 'error' | 'warning' | 'info'> = { danger: 'error', warning: 'warning', info: 'info' }
 
 async function load() {

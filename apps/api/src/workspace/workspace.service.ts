@@ -5,7 +5,7 @@ import { DataScopeService } from '../common/scope/data-scope.service';
 import { WorkflowQueryService } from '../workflow/workflow-engine/workflow-query.service';
 import { computeConflicts } from '../room/room-occupancy/room-conflicts.util';
 
-export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE' | 'ROOM_CONFLICT';
+export type TodoKind = 'APPROVAL' | 'REJECTED' | 'EXPIRY' | 'OUTREACH' | 'COLLECT' | 'PURCHASE' | 'RECEIVE' | 'ROOM_CONFLICT' | 'SATISFACTION';
 export type TodoLevel = 'danger' | 'warning' | 'info';
 
 export interface TodoItem {
@@ -153,6 +153,9 @@ export class WorkspaceService {
     // 6) 房间预订冲突（同一间房日期重叠或间隔不够整理）：需要排房的人去协调
     items.push(...(await this.roomConflictTodos()));
 
+    // 7) 满意度调查：入住第 N 天提醒客服去做；拖过 5 天没做完提醒店长监督
+    items.push(...(await this.satisfactionTodos()));
+
     items.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.sortAt - b.sortAt);
     const count = (k: TodoKind) => items.filter((i) => i.kind === k).length;
     return {
@@ -167,6 +170,7 @@ export class WorkspaceService {
         PURCHASE: count('PURCHASE'),
         RECEIVE: count('RECEIVE'),
         ROOM_CONFLICT: count('ROOM_CONFLICT'),
+        SATISFACTION: count('SATISFACTION'),
       },
       items,
     };
@@ -377,6 +381,81 @@ export class WorkspaceService {
         sortAt: Date.now() + Math.max(0, first.startsInDays) * DAY,
       },
     ];
+  }
+
+  /**
+   * 满意度调查提醒（现算，不存提醒记录，所以做完就自动消失）：
+   * - 在住客户入住第 N 天（N 取自启用中的满意度模板的“入住第几天”，入住当天算第 1 天）起，提醒“客服”去做这张调查；
+   * - 超过 5 天（到期日后第 6 天起）还没做，提醒“店长”监督，客服那条同时标红；
+   * - 该客户的这张模板已经有调查记录（上传/录入过）、或客户已退房，提醒就取消。
+   */
+  private async satisfactionTodos(): Promise<TodoItem[]> {
+    const tenantId = this.ctx.tenantId!;
+    const me = this.ctx.accountId!;
+    const assigns = await this.prisma.accountRoleAssignment.findMany({
+      where: { accountId: me, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], role: { code: { in: ['CUSTOMER_SERVICE', 'STORE_MANAGER'] } } },
+      select: { scopeType: true, scopeId: true, role: { select: { code: true } } },
+    });
+    if (assigns.length === 0) return [];
+    const templates = await this.prisma.satisfactionTemplate.findMany({ where: { tenantId, status: 'ACTIVE', day: { not: null } }, select: { id: true, name: true, day: true } });
+    if (templates.length === 0) return [];
+    const maxDay = Math.max(...templates.map((t) => t.day!));
+    const occs = await this.prisma.roomOccupancy.findMany({
+      where: { tenantId, status: 'CHECKED_IN', actualCheckInAt: { not: null, gte: new Date(Date.now() - (maxDay + 40) * DAY) } },
+      include: { customer: { select: { name: true } }, room: { select: { roomNo: true } } },
+      take: 500,
+    });
+    if (occs.length === 0) return [];
+    const done = await this.prisma.satisfactionSurvey.findMany({
+      where: { tenantId, customerId: { in: [...new Set(occs.map((o) => o.customerId))] }, templateId: { in: templates.map((t) => t.id) } },
+      select: { customerId: true, templateId: true, createdAt: true },
+    });
+    const storeIds = [...new Set(occs.map((o) => o.storeId))];
+    const regionOf = new Map((await this.prisma.store.findMany({ where: { id: { in: storeIds } }, select: { id: true, regionId: true } })).map((s) => [s.id, s.regionId]));
+    const covers = (code: string, storeId: string) =>
+      assigns.some((a) => a.role.code === code && (a.scopeType === 'TENANT' || (a.scopeType === 'STORE' && a.scopeId === storeId) || (a.scopeType === 'REGION' && a.scopeId === regionOf.get(storeId))));
+    const calDay = (t: number) => Math.floor((t + 8 * 3600_000) / DAY);
+    const today = calDay(Date.now());
+    const out: TodoItem[] = [];
+    for (const o of occs) {
+      const checkIn = calDay(o.actualCheckInAt!.getTime());
+      for (const t of templates) {
+        const due = checkIn + t.day! - 1; // 入住当天=第 1 天
+        const late = today - due; // 超过到期日几天
+        if (late < 0) continue;
+        if (done.some((d) => d.customerId === o.customerId && d.templateId === t.id && calDay(d.createdAt.getTime()) >= checkIn)) continue;
+        const dueDate = new Date(due * DAY - 8 * 3600_000);
+        const who = `${o.room.roomNo} 房 ${o.customer.name}`;
+        const link = `/satisfaction/surveys?upload=1&templateId=${t.id}&customerId=${o.customerId}`;
+        if (covers('CUSTOMER_SERVICE', o.storeId)) {
+          out.push({
+            key: `satisfaction:${o.id}:${t.id}`,
+            kind: 'SATISFACTION',
+            title: `${who}：该做「${t.name}」了`,
+            desc: late === 0 ? `今天是入住第 ${t.day} 天，请让客户填写纸质调查表，拍照上传` : `入住第 ${t.day} 天的调查已拖了 ${late} 天，请尽快请客户填写并拍照上传`,
+            link,
+            dueAt: dueDate,
+            overdue: late > 0,
+            level: late > 5 ? 'danger' : late > 0 ? 'warning' : 'info',
+            sortAt: dueDate.getTime(),
+          });
+        }
+        if (late > 5 && covers('STORE_MANAGER', o.storeId)) {
+          out.push({
+            key: `satisfaction-sup:${o.id}:${t.id}`,
+            kind: 'SATISFACTION',
+            title: `【监督】${who}：「${t.name}」已超期 ${late} 天未完成`,
+            desc: `入住第 ${t.day} 天应完成，客服还没有录入，请督促客服尽快处理`,
+            link: '/satisfaction/surveys',
+            dueAt: dueDate,
+            overdue: true,
+            level: 'danger',
+            sortAt: dueDate.getTime(),
+          });
+        }
+      }
+    }
+    return out;
   }
 
   /** 顶栏小红点用：只数数量（轻量）。 */

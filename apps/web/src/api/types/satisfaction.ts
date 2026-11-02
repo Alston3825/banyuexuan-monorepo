@@ -8,9 +8,12 @@ export interface SurveyGroupSpec {
   items: SurveyItemSpec[]
 }
 export interface SurveyFormSpec {
-  formNo: 1 | 2 | 3
-  title: string
-  day: number
+  id: string
+  name: string
+  sortNo: number
+  /** 入住第几天做；空 = 不自动提醒 */
+  day: number | null
+  status: 'ACTIVE' | 'INACTIVE'
   goodWord: string
   badWord: string
   groups: SurveyGroupSpec[]
@@ -18,7 +21,7 @@ export interface SurveyFormSpec {
   praiseLabel: string
 }
 export interface SurveySpecs {
-  forms: SurveyFormSpec[]
+  templates: SurveyFormSpec[]
   scoreMax: number
   satisfiedMin: number
   unsatisfiedMax: number
@@ -36,7 +39,8 @@ export interface SurveyFile {
 export interface Survey {
   id: string
   storeId: string | null
-  formNo: 1 | 2 | 3
+  formNo: number
+  templateId: string | null
   customerId: string | null
   customer?: { id: string; name: string; phone: string } | null
   customerName: string | null
@@ -70,7 +74,7 @@ export interface SurveyPatch {
   praise?: string | null
 }
 export interface SurveyFilter {
-  formNo?: number
+  templateId?: string
   from?: string
   to?: string
   steward?: string
@@ -93,25 +97,44 @@ export interface SurveyStats {
   pending: number
   scoreMax: number
   forms: {
-    formNo: number
+    templateId: string
     title: string
-    day: number
+    day: number | null
     count: number
     avg: number | null
     satisfiedRate: number | null
     groups: { key: string; title: string; avg: number | null; items: SurveyItemStat[] }[]
   }[]
-  lowItems: { formNo: number; groupTitle: string; key: string; label: string; avg: number; count: number; bad: number }[]
-  trend: { month: string; formNo: number; avg: number }[]
+  lowItems: { templateId: string; formTitle: string; groupTitle: string; key: string; label: string; avg: number; count: number; bad: number }[]
+  trend: { month: string; templateId: string; avg: number }[]
   staff: { name: string; surveys: number; avg: number }[]
 }
 export interface SurveyComment {
   id: string
   formNo: number
+  templateId: string | null
   customerName: string | null
   roomNo: string | null
   stewardName: string | null
   surveyDate: string | null
   suggestion: string | null
   praise: string | null
+}
+
+export interface SurveyTemplate extends SurveyFormSpec {
+  source: 'BUILTIN' | 'MANUAL' | 'UPLOAD'
+  version: number
+  surveyCount: number
+  itemCount: number
+}
+export interface SurveyTemplateInput {
+  name?: string
+  day?: number | null
+  goodWord?: string
+  badWord?: string
+  suggestionLabel?: string
+  praiseLabel?: string
+  groups?: { key?: string; title: string; items: { key?: string; label: string }[] }[]
+  status?: 'ACTIVE' | 'INACTIVE'
+  version?: number
 }

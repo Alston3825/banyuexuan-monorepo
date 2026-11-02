@@ -146,7 +146,7 @@ export const DEFAULT_ROLES: RoleDefault[] = [
       'inventory.purchase-request.view', 'inventory.purchase-request.create', 'inventory.purchase-request.update', 'inventory.purchase-request.submit', 'inventory.purchase-request.cancel', 'inventory.purchase-request.convert', 'inventory.purchase-request.collect',
       'inventory.purchase-order.view', 'inventory.goods-receipt.view', 'inventory.goods-receipt.receive',
       'inventory.item.view', 'inventory.warehouse.view', 'inventory.supplier.view', 'inventory.warehouse-stock.view',
-      'satisfaction.survey.view', 'satisfaction.survey.create', 'satisfaction.survey.update',
+      'satisfaction.survey.view', 'satisfaction.survey.create', 'satisfaction.survey.update', 'satisfaction.template.view',
       ...SELF_SERVICE,
     ],
   },
