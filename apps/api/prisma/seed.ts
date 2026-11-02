@@ -181,6 +181,8 @@ async function main() {
     { code: 'payment', name: '收款管理', type: 'MODULE' },
     { code: 'payment.record', name: '收款管理-收款', type: 'PAGE', parentCode: 'payment' },
 
+    { code: 'satisfaction', name: '满意度调查', type: 'MODULE' },
+    { code: 'satisfaction.survey', name: '满意度调查-调查记录与统计', type: 'PAGE', parentCode: 'satisfaction' },
     { code: 'care', name: '护理', type: 'MODULE' },
     { code: 'care.field', name: '护理-护理字段管理', type: 'PAGE', parentCode: 'care' },
     { code: 'care.form-template', name: '护理-护理项目管理', type: 'PAGE', parentCode: 'care' },
@@ -439,6 +441,9 @@ async function main() {
   }
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `inventory.warehouse.${action}`, name: `库存-仓库-${action}`, type: 'BUTTON', parentCode: 'inventory.warehouse' });
+  }
+  for (const action of ['view', 'create', 'update', 'delete']) {
+    permSpecs.push({ code: `satisfaction.survey.${action}`, name: `满意度调查-调查记录-${action}`, type: 'BUTTON', parentCode: 'satisfaction.survey' });
   }
   for (const action of ['view', 'create', 'update', 'delete', 'force-delete']) {
     permSpecs.push({ code: `inventory.item.${action}`, name: `库存-物品-${action}`, type: 'BUTTON', parentCode: 'inventory.item' });

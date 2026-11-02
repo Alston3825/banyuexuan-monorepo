@@ -4309,3 +4309,61 @@ model BabyGrowthShare {
   @@index([tenantId, babyProfileId])
   @@map("baby_growth_shares")
 }
+
+
+// ==================== 满意度调查 ====================
+/// 客户满意度调查（纸质表《客户满意度调查表 一/二/三》，住满第 5/15/25 天各一张）。客服不定期收回纸质表后拍照上传，
+/// AI 识别出每个评分项的分值（0~12，打勾的格子）和手写意见，人工核对确认后才计入统计。
+model SatisfactionSurvey {
+  id             String                @id @default(cuid())
+  tenantId       String                @map("tenant_id")
+  storeId        String?               @map("store_id")
+  formNo         Int                   @map("form_no") // 1=第5天 2=第15天 3=第25天
+  customerId     String?               @map("customer_id") // 对上的客户（姓名匹配或人工选择）
+  customerName   String?               @map("customer_name") // 纸上手写的姓名（客户没对上时也保留）
+  roomNo         String?               @map("room_no")
+  stewardName    String?               @map("steward_name") // 管家姓名
+  nurseName      String?               @map("nurse_name") // 责任护士
+  phone          String?
+  surveyDate     DateTime?             @map("survey_date") @db.Date
+  scores         Json?                 // { 评分项key: 0~12 }，没打勾的项不出现
+  suggestion     String?               @db.Text // 其它意见和建议 / 需要改进的地方
+  praise         String?               @db.Text // 值得表扬的人、事、物
+  status         String                @default("DRAFT") // DRAFT 待核对 / CONFIRMED 已确认（计入统计）
+  extractStatus  ContractExtractStatus @default(NONE) @map("extract_status")
+  extractError   String?               @map("extract_error") @db.Text
+  extractWarnings Json?                @map("extract_warnings")
+  extractModel   String?               @map("extract_model")
+  extractedAt    DateTime?             @map("extracted_at")
+  confirmedBy    String?               @map("confirmed_by")
+  confirmedAt    DateTime?             @map("confirmed_at")
+  createdBy      String                @map("created_by")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  version        Int                   @default(0)
+
+  files SatisfactionSurveyFile[]
+
+  @@index([tenantId, formNo, status])
+  @@index([tenantId, customerId])
+  @@map("satisfaction_surveys")
+}
+
+model SatisfactionSurveyFile {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  surveyId     String   @map("survey_id")
+  fileName     String   @map("file_name")
+  storagePath  String   @map("storage_path")
+  originalPath String?  @map("original_path")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  survey SatisfactionSurvey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@map("satisfaction_survey_files")
+}

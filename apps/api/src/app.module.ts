@@ -14,6 +14,7 @@ import { CrmModule } from './crm/crm.module';
 import { ContractModule } from './contract/contract.module';
 import { RoomModule } from './room/room.module';
 import { PaymentModule } from './payment/payment.module';
+import { SatisfactionModule } from './satisfaction/satisfaction.module';
 import { CareModule } from './care/care.module';
 import { MealModule } from './meal/meal.module';
 import { ServiceModule } from './service/service.module';
@@ -53,6 +54,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     RoomModule,
     PaymentModule,
     CareModule,
+    SatisfactionModule,
     MealModule,
     ServiceModule,
     InventoryModule,

@@ -71,6 +71,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'care/plan-templates', redirect: '/care/settings?tab=plans' },
       { path: 'care/outreach-templates', redirect: '/care/settings?tab=outreach' },
       { path: 'care/outreach-tasks', name: 'care-outreach-tasks', component: () => import('../views/care/CareOutreachTasksView.vue'), meta: { title: '待跟进关怀' } },
+      { path: 'satisfaction/surveys', name: 'satisfaction-surveys', component: () => import('../views/satisfaction/SatisfactionView.vue'), meta: { title: '满意度调查' } },
       { path: 'care/profiles', name: 'care-profiles', component: () => import('../views/care/CareProfilesView.vue'), meta: { title: '母婴档案' } },
       { path: 'care/profiles/:id', name: 'care-profile-detail', component: () => import('../views/care/CareProfileDetailView.vue'), meta: { title: '母婴档案详情' } },
       { path: 'meal/items', name: 'meal-items', component: () => import('../views/meal/MealItemsView.vue'), meta: { title: '菜品管理' } },

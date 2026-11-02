@@ -159,6 +159,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: '满意度调查',
+    key: 'group-satisfaction',
+    items: [{ label: '满意度调查', to: '/satisfaction/surveys', icon: HeartOutline, perm: 'satisfaction.survey' }],
+  },
+  {
     label: '月子餐',
     key: 'group-meal',
     items: [
