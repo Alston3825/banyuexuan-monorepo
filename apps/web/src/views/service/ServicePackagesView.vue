@@ -92,7 +92,7 @@ onMounted(fetchList)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: ServicePackage) => r.id" :scroll-x="700" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑服务包' : '新建服务包'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑服务包' : '新建服务包'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 back_10x" />

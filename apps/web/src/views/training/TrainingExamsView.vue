@@ -172,7 +172,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: TrainingExam) => r.id" :scroll-x="800" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑试卷' : '新建试卷'" style="width: min(720px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑试卷' : '新建试卷'" style="width: min(720px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item label="试卷名称" path="title" :rule="{ required: true, message: '请输入试卷名称' }">
             <n-input v-model:value="model.title" />

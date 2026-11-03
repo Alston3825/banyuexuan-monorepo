@@ -187,7 +187,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="shown" :loading="loading" :row-key="(r: StockIssue) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建出库/领用单" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建出库/领用单" style="width: min(820px, 96vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="仓库"><n-select v-model:value="model.warehouseId" :options="warehouseOptions" /></n-form-item>

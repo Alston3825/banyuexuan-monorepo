@@ -315,6 +315,8 @@ onMounted(async () => {
         style="width: min(480px, 94vw)"
         :bordered="false"
         role="dialog"
+        closable
+        @close="actionVisible = false"
         aria-modal="true"
       >
         <template v-if="selectedEntry">

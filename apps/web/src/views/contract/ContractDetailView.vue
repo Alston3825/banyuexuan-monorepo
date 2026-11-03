@@ -545,7 +545,7 @@ function goAssignRoom() {
     </div>
 
     <n-modal :mask-closable="false" :show="confirmVisible" @update:show="(v) => (confirmVisible = v)">
-      <n-card title="确认入库" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="确认入库" style="width: min(520px, 94vw)" :bordered="false" role="dialog" closable @close="confirmVisible = false" aria-modal="true">
         <div style="margin-bottom: 8px">这份合同对应哪位客户？</div>
         <n-radio-group v-model:value="chosenCustomer" vertical>
           <n-radio v-for="m in matches" :key="m.id" :value="m.id">
@@ -564,7 +564,7 @@ function goAssignRoom() {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="voidVisible" @update:show="(v) => (voidVisible = v)">
-      <n-card title="作废合同" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="作废合同" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="voidVisible = false" aria-modal="true">
         <n-input v-model:value="voidReason" type="textarea" :autosize="{ minRows: 3 }" placeholder="请填写作废原因" />
         <template #footer>
           <n-space justify="end">

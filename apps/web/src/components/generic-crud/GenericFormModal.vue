@@ -72,7 +72,7 @@ async function handleSubmit() {
 
 <template>
   <n-modal :mask-closable="false" :show="visible" @update:show="(v: boolean) => emit('update:visible', v)">
-    <n-card :title="title" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+    <n-card :title="title" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="emit('update:visible', false)" aria-modal="true">
       <n-form ref="formRef" :model="model" :rules="rules" label-placement="left" label-width="90">
         <n-form-item v-for="f in visibleFields" :key="f.key" :label="f.label" :path="f.key">
           <n-input v-if="f.component === 'input'" v-model:value="model[f.key] as string" :placeholder="f.placeholder" />

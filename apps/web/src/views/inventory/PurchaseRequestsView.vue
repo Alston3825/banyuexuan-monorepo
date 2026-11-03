@@ -579,7 +579,7 @@ onMounted(async () => {
 
     <!-- Excel 导入 -->
     <n-modal :mask-closable="false" :show="importVisible" @update:show="(v) => (importVisible = v)">
-      <n-card title="从 Excel 导入申购表" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="从 Excel 导入申购表" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="importVisible = false" aria-modal="true">
         <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onFileChosen" />
         <n-space align="center" style="margin-bottom: 10px">
           <n-button type="primary" :loading="parsing" @click="fileInput?.click()">{{ preview ? '重新选择文件' : '选择申购表（.xlsx）' }}</n-button>
@@ -619,7 +619,7 @@ onMounted(async () => {
 
     <!-- 新建部门申购单 -->
     <n-modal :mask-closable="false" :show="deptVisible" @update:show="(v) => (deptVisible = v)">
-      <n-card title="新建部门申购单" style="width: min(860px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建部门申购单" style="width: min(860px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="deptVisible = false" aria-modal="true">
         <p class="pr-tip">填写本部门要买的东西。申请部门和申请人会自动带出（取自你的账号）。提交后自动汇总给客服，由客服统一提交店长审批。单价不知道可以不填，客服会补。</p>
         <item-lines-editor v-model="deptLines" />
         <n-input v-model:value="deptRemark" type="textarea" placeholder="备注（选填）" :autosize="{ minRows: 1 }" style="margin-top: 10px" />
@@ -635,7 +635,7 @@ onMounted(async () => {
 
     <!-- 手动新建申购单 -->
     <n-modal :mask-closable="false" :show="manualVisible" @update:show="(v) => (manualVisible = v)">
-      <n-card title="手动新建申购单" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="手动新建申购单" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="manualVisible = false" aria-modal="true">
         <p class="pr-tip">先在搜索框里找物品库里已有的物品，点一下加入；之前没采购过的东西点“添加未录入的新物品”自己填。保存后是草稿，可以再补单价、改数量，没问题再提交审批。</p>
         <n-space align="center" :size="14" style="margin-bottom: 10px" :wrap="true">
           <n-space align="center" :size="6"><span>门店</span><n-select v-model:value="manual.storeId" :options="stores" style="width: 170px" /></n-space>
@@ -655,7 +655,7 @@ onMounted(async () => {
 
     <!-- 详情 -->
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card v-if="detail" :title="`${isDept ? '部门申购单' : '汇总申购单'} ${detail.requestNo}`" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detail" :title="`${isDept ? '部门申购单' : '汇总申购单'} ${detail.requestNo}`" style="width: min(1150px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="detailVisible = false" aria-modal="true">
         <template #header-extra><component :is="() => renderStatusBadge(detail!.status, PURCHASE_REQUEST_STATUS_MAP)" /></template>
         <n-descriptions :column="isMobile ? 1 : 4" label-placement="left" size="small" bordered style="margin-bottom: 10px">
           <n-descriptions-item v-if="isDept" label="申请部门">{{ detail.departmentName ?? '-' }}</n-descriptions-item>
@@ -691,7 +691,7 @@ onMounted(async () => {
 
     <!-- 修改/新增一行 -->
     <n-modal :mask-closable="false" :show="lineVisible" @update:show="(v) => (lineVisible = v)">
-      <n-card :title="lineEditing ? '修改这一行' : '加一行'" style="width: min(520px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="lineEditing ? '修改这一行' : '加一行'" style="width: min(520px, 96vw)" :bordered="false" role="dialog" closable @close="lineVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="100" size="small">
           <n-form-item v-if="allItems.length > 0" label="从物品库选"><item-select :model-value="lineItemId" :items="allItems" @update:model-value="pickLineItem" /></n-form-item>
           <n-form-item label="物品名称"><n-input v-model:value="lineModel.name" placeholder="没在物品库里的新物品直接填名称" @update:value="lineItemId = null" /></n-form-item>
@@ -712,7 +712,7 @@ onMounted(async () => {
 
     <!-- 取消 -->
     <n-modal :mask-closable="false" :show="cancelVisible" @update:show="(v) => (cancelVisible = v)">
-      <n-card title="取消申购单" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="取消申购单" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="cancelVisible = false" aria-modal="true">
         <n-input v-model:value="cancelReason" type="textarea" placeholder="请填写取消原因" :autosize="{ minRows: 2 }" />
         <template #footer>
           <n-space justify="end"><n-button @click="cancelVisible = false">不取消</n-button><n-button type="error" @click="doCancel">确认取消</n-button></n-space>
@@ -722,7 +722,7 @@ onMounted(async () => {
 
     <!-- 生成采购单 -->
     <n-modal :mask-closable="false" :show="convertVisible" @update:show="(v) => (convertVisible = v)">
-      <n-card title="生成采购单" style="width: min(760px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="生成采购单" style="width: min(760px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="convertVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80" size="small">
           <n-form-item label="供应商"><n-select v-model:value="conv.supplierId" :options="suppliers.map((s) => ({ label: s.name, value: s.id }))" filterable placeholder="选择供应商" /></n-form-item>
           <n-form-item label="入库仓库"><n-select v-model:value="conv.warehouseId" :options="warehouses.map((w) => ({ label: w.name, value: w.id }))" placeholder="选择收货入库的仓库" /></n-form-item>

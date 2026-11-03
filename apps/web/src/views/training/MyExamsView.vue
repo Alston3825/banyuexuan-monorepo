@@ -106,7 +106,7 @@ onMounted(fetchAll)
     </n-tabs>
 
     <n-modal :mask-closable="false" :show="!!takingExam" @update:show="(v) => !v && (takingExam = null)">
-      <n-card v-if="takingExam" :title="takingExam.title" style="width: min(640px, 94vw); max-height: 80vh; overflow-y: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="takingExam" :title="takingExam.title" style="width: min(640px, 94vw); max-height: 80vh; overflow-y: auto" :bordered="false" role="dialog" closable @close="takingExam = null" aria-modal="true">
         <n-space vertical :size="16">
           <n-card v-for="(q, idx) in takingExam.questions" :key="q.id" size="small" embedded>
             <template #header>{{ idx + 1 }}. [{{ EXAM_QUESTION_TYPE_LABEL_MAP[q.type] }}，{{ q.score }}分] {{ q.content }}</template>

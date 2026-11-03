@@ -250,7 +250,7 @@ onMounted(fetchList)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Role) => r.id" :scroll-x="820" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑角色' : '新建角色'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑角色' : '新建角色'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="80">
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />

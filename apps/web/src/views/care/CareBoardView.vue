@@ -219,7 +219,7 @@ onMounted(async () => {
       </n-grid>
     </div>
     <n-modal :show="!!nurseForm" @update:show="(v) => !v && (nurseForm = null)">
-      <n-card v-if="nurseForm" :title="`指派护理师：${nurseForm.entry.room.roomNo} ${nurseForm.entry.customerName ?? ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="nurseForm" :title="`指派护理师：${nurseForm.entry.room.roomNo} ${nurseForm.entry.customerName ?? ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="nurseForm = null" aria-modal="true">
         <nurse-select v-model="nurseForm.nurseId" :store-id="selectedStoreId ?? undefined" />
         <div style="margin-top: 8px; color: #999; font-size: 12px">护理师从员工账号里选；换人后以最新指派为准，历史记录里的签字不受影响。</div>
         <template #footer>

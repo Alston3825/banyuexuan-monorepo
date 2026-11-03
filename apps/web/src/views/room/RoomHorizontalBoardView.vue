@@ -668,6 +668,8 @@ onMounted(async () => {
         style="width: min(440px, 94vw)"
         :bordered="false"
         role="dialog"
+        closable
+        @close="createVisible = false"
         aria-modal="true"
       >
         <n-form label-placement="left" label-width="80">
@@ -686,7 +688,7 @@ onMounted(async () => {
 
     <!-- 详情/改期/入住/离店/取消（点色块触发） -->
     <n-modal :mask-closable="false" :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card v-if="detailOcc" :title="`${detailOcc.occupancyNo}（${customerNameById[detailOcc.customerId] ?? ''}）`" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detailOcc" :title="`${detailOcc.occupancyNo}（${customerNameById[detailOcc.customerId] ?? ''}）`" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="detailVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="计划日期">
             <n-date-picker v-model:value="detailDateRange" type="daterange" style="width: 100%" :disabled="!['RESERVED', 'CHECKED_IN'].includes(detailOcc.status)" />
@@ -713,7 +715,7 @@ onMounted(async () => {
 
     <!-- 维修状态维护（点房间号触发） -->
     <n-modal :mask-closable="false" :show="maintVisible" @update:show="(v) => (maintVisible = v)">
-      <n-card :title="maintTarget ? `维修状态 - ${maintTarget.roomNo}` : ''" style="width: min(400px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="maintTarget ? `维修状态 - ${maintTarget.roomNo}` : ''" style="width: min(400px, 94vw)" :bordered="false" role="dialog" closable @close="maintVisible = false" aria-modal="true">
         <template v-if="maintTarget">
           <template v-if="!maintTarget.underMaintenance">
             <n-form label-placement="left" label-width="80">

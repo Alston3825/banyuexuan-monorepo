@@ -110,7 +110,7 @@ onMounted(fetchList)
     </n-space>
 
     <n-modal :show="detailVisible" @update:show="(v) => (detailVisible = v)">
-      <n-card title="审计详情" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="审计详情" style="width: min(640px, 94vw)" :bordered="false" role="dialog" closable @close="detailVisible = false" aria-modal="true">
         <template v-if="detailRow">
           <p>IP：{{ detailRow.ip ?? '-' }}　User-Agent：{{ detailRow.userAgent ?? '-' }}</p>
           <p>备注：{{ detailRow.remark ?? '-' }}</p>

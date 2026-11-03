@@ -171,7 +171,7 @@ const canAct = computed(() => !!data.value && (data.value.me.canApprove || data.
     <n-empty v-else-if="!loading" description="这张单据还没有提交审批" />
 
     <n-modal :mask-closable="false" :show="visible" @update:show="(v) => (visible = v)">
-      <n-card :title="TITLE[kind]" style="width: min(440px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="TITLE[kind]" style="width: min(440px, 94vw)" :bordered="false" role="dialog" closable @close="visible = false" aria-modal="true">
         <n-form label-placement="top">
           <n-form-item v-if="kind === 'reassign' || kind === 'add-approver'" label="选择人员">
             <n-select v-model:value="form.accountId" :options="staff" filterable placeholder="选择员工" />

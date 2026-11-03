@@ -131,7 +131,7 @@ onMounted(load)
     />
 
     <n-modal :mask-closable="false" :show="!!stopping" @update:show="(v) => !v && (stopping = null)">
-      <n-card v-if="stopping" title="停药" style="width: min(440px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="stopping" title="停药" style="width: min(440px, 94vw)" :bordered="false" role="dialog" closable @close="stopping = null" aria-modal="true">
         <p style="margin: 0 0 8px">这份委托书（{{ stopping.auth.items.map((i) => i.drugName).join('、') }}）将标记为“已停药”，历史保留。</p>
         <n-input v-model:value="stopping.note" type="textarea" :autosize="{ minRows: 2 }" placeholder="停药原因/说明（必填），如：病愈，医生同意停药" />
         <template #footer>

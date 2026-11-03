@@ -267,7 +267,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Lead) => r.id" :scroll-x="1900" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item label="姓名" path="name" :rule="{ required: true, message: '请输入姓名' }">
             <n-input v-model:value="model.name" />
@@ -301,7 +301,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="assignVisible" @update:show="(v) => (assignVisible = v)">
-      <n-card title="分配处理人" style="width: min(380px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="分配处理人" style="width: min(380px, 94vw)" :bordered="false" role="dialog" closable @close="assignVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="处理人">
             <n-select v-model:value="assignAccountId" :options="accountOptions" placeholder="选择母婴顾问" />
@@ -317,7 +317,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="processVisible" @update:show="(v) => (processVisible = v)">
-      <n-card title="处理客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="处理客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="processVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="处理结果">
             <n-checkbox-group v-model:value="processModel.processResults">

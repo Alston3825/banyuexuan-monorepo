@@ -252,7 +252,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Room) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑房间' : '新建房间'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑房间' : '新建房间'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="门店">
             <n-select v-model:value="model.storeId" :options="storeOptions" :disabled="!!editingRow" />
@@ -271,7 +271,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="maintenanceVisible" @update:show="(v) => (maintenanceVisible = v)">
-      <n-card title="标记维修" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="标记维修" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="maintenanceVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="维修备注"><n-input v-model:value="maintenanceNote" type="textarea" :autosize="{ minRows: 3 }" /></n-form-item>
         </n-form>
@@ -290,6 +290,8 @@ onMounted(async () => {
         style="width: min(480px, 94vw)"
         :bordered="false"
         role="dialog"
+        closable
+        @close="deleteVisible = false"
         aria-modal="true"
       >
         <template v-if="deleteCheck && deleteTarget">

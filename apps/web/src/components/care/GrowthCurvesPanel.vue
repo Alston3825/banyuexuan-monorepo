@@ -253,7 +253,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
     </template>
 
     <n-modal :mask-closable="false" :show="!!form" @update:show="(v: boolean) => !v && (form = null)">
-      <n-card v-if="form" title="记录一次测量" style="width: min(420px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="form" title="记录一次测量" style="width: min(420px, 96vw)" :bordered="false" role="dialog" closable @close="form = null" aria-modal="true">
         <n-space vertical :size="10">
           <div><div class="gc-lab">测量日期</div><n-date-picker v-model:value="form.date" type="date" style="width: 100%" :is-date-disabled="(ts: number) => ts > Date.now()" /></div>
           <div class="gc-two">

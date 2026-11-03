@@ -184,7 +184,7 @@ onMounted(fetchAll)
     </n-tabs>
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="modalTitle" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="modalTitle" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-space vertical :size="12">
           <n-select v-if="formKind === 'channel'" v-model:value="form.typeId" :options="typeOptions" :disabled="editing?.kind === 'channel'" placeholder="渠道类型" />
           <n-input

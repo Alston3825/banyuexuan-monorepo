@@ -472,7 +472,7 @@ onMounted(async () => {
 
     <!-- 新建/编辑 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑账号' : '新建账号'" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑账号' : '新建账号'" style="width: min(520px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <div v-if="!editingRow" class="acc-drop" :class="{ 'acc-drop-on': dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop="onDrop" @click="fileInput?.click()">
           📄 有员工信息表？把 Excel 拖到这里（或点击选择），批量开通账号
         </div>
@@ -528,7 +528,7 @@ onMounted(async () => {
 
     <!-- 重置密码 -->
     <n-modal :mask-closable="false" :show="resetPwdVisible" @update:show="(v) => (resetPwdVisible = v)">
-      <n-card title="重置密码" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="重置密码" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="resetPwdVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="新密码">
             <n-input v-model:value="resetPwdModel.newPassword" type="password" show-password-on="click" />

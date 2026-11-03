@@ -198,7 +198,7 @@ defineExpose({ reload: load })
     <service-sheet-import-dialog v-model:show="importShow" :mother-profile-id="motherProfileId" @done="load" />
 
     <n-modal :mask-closable="false" :show="!!form" @update:show="(v) => !v && (form = null)">
-      <n-card v-if="form" :title="`记一次：${form.row.name}${form.row.babyLabel ? '（' + form.row.babyLabel + '）' : ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="form" :title="`记一次：${form.row.name}${form.row.babyLabel ? '（' + form.row.babyLabel + '）' : ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="form = null" aria-modal="true">
         <n-space vertical :size="10">
           <div class="sl-two">
             <div><div class="sl-lab">日期</div><n-date-picker v-model:value="form.date" type="date" style="width: 100%" :is-date-disabled="(ts: number) => ts > Date.now()" /></div>

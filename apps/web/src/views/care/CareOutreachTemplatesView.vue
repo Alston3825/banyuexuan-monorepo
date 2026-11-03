@@ -115,7 +115,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: CareOutreachTemplate) => r.id" :scroll-x="700" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑关怀模板' : '新建关怀模板'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑关怀模板' : '新建关怀模板'" style="width: min(640px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" placeholder="如 default_outreach" />

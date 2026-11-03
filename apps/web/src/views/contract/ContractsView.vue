@@ -198,7 +198,7 @@ const emptyHint = computed(() => (tab.value === 'UNASSIGNED' ? '没有待排房�
     </n-data-table>
 
     <n-modal :mask-closable="false" :show="uploadVisible" @update:show="(v) => (uploadVisible = v)">
-      <n-card title="上传纸质合同" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="上传纸质合同" style="width: min(560px, 94vw)" :bordered="false" role="dialog" closable @close="uploadVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="70">
           <n-form-item label="门店"><n-select v-model:value="uploadStoreId" :options="storeOptions" /></n-form-item>
         </n-form>

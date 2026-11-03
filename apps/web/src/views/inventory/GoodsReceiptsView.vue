@@ -362,7 +362,7 @@ onMounted(fetchAll)
 
     <!-- 详情 / 收货确认 -->
     <n-modal :mask-closable="false" :show="!!detail" @update:show="(v) => !v && (detail = null)">
-      <n-card v-if="detail" :title="`入库单 ${detail.receiptNo}`" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detail" :title="`入库单 ${detail.receiptNo}`" style="width: min(900px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="detail = null" aria-modal="true">
         <template #header-extra><component :is="() => renderStatusBadge(detail!.status, GOODS_RECEIPT_STATUS_MAP)" /></template>
         <n-descriptions :column="isMobile ? 1 : 3" label-placement="left" size="small" bordered style="margin-bottom: 10px">
           <n-descriptions-item label="仓库">{{ detail.warehouse.name }}</n-descriptions-item>
@@ -423,7 +423,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <n-modal :mask-closable="false" :show="shortVisible" @update:show="(v) => (shortVisible = v)">
-      <n-card title="结束收货" style="width: min(440px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="结束收货" style="width: min(440px, 94vw)" :bordered="false" role="dialog" closable @close="shortVisible = false" aria-modal="true">
         <p class="gr-hint" style="margin-top: 0">没到的货不会再入库，入库单和采购单都会标记完成。请写明原因，留作记录。</p>
         <n-input v-model:value="shortReason" type="textarea" placeholder="如：供应商缺货，已退款" :autosize="{ minRows: 2 }" />
         <template #footer>
@@ -434,7 +434,7 @@ onMounted(fetchAll)
 
     <!-- 手工新建 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="手工新建入库单（临时入库）" style="width: min(820px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="手工新建入库单（临时入库）" style="width: min(820px, 96vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="关联采购单">
@@ -478,7 +478,7 @@ onMounted(fetchAll)
 
     <!-- 新物品和已有物品名称相近：人工核对 -->
     <n-modal :mask-closable="false" :show="similarVisible" @update:show="(v) => (similarVisible = v)">
-      <n-card title="发现名称相近的物品，请核对" style="width: min(640px, 96vw); max-height: 90vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="发现名称相近的物品，请核对" style="width: min(640px, 96vw); max-height: 90vh; overflow: auto" :bordered="false" role="dialog" closable @close="similarVisible = false" aria-modal="true">
         <p class="gr-hint" style="margin-top: 0">下面这些新物品，物品管理里已经有名字很像的。请逐个选择：是同一种东西就用已有的（避免重复），确实是新东西再单独新增。</p>
         <div v-for="c in similarChecks" :key="c.rowKey" class="sim-card">
           <div class="sim-title">新物品：<b>{{ c.name }}</b><span v-if="c.spec"> · {{ c.spec }}</span> · {{ c.unit }}</div>

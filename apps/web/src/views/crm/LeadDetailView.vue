@@ -224,7 +224,7 @@ onMounted(async () => {
     <FollowUpTimeline business-type="LEAD" :business-id="leadId" />
 
     <n-modal :mask-closable="false" :show="assignVisible" @update:show="(v) => (assignVisible = v)">
-      <n-card title="分配线索" style="width: min(380px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="分配线索" style="width: min(380px, 94vw)" :bordered="false" role="dialog" closable @close="assignVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="负责人"><n-select v-model:value="assignAccountId" :options="accountOptions" /></n-form-item>
         </n-form>
@@ -238,7 +238,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="loseVisible" @update:show="(v) => (loseVisible = v)">
-      <n-card title="标记流失" style="width: min(380px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="标记流失" style="width: min(380px, 94vw)" :bordered="false" role="dialog" closable @close="loseVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="流失原因"><n-input v-model:value="loseReason" type="textarea" /></n-form-item>
         </n-form>
@@ -252,7 +252,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="processVisible" @update:show="(v) => (processVisible = v)">
-      <n-card title="处理客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="处理客户线索" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="processVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="处理结果">
             <n-checkbox-group v-model:value="processModel.processResults">

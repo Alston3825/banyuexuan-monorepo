@@ -200,7 +200,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: ServiceAppointment) => r.id" :scroll-x="1100" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建预约" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建预约" style="width: min(520px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="客户"><n-select v-model:value="model.customerId" :options="customerOptions" filterable placeholder="搜索客户姓名/手机号" /></n-form-item>
@@ -222,7 +222,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <n-modal :mask-closable="false" :show="feedbackVisible" @update:show="(v) => (feedbackVisible = v)">
-      <n-card title="服务评价" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="服务评价" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="feedbackVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="评分"><n-input-number v-model:value="feedbackRating" :min="1" :max="5" style="width: 100%" /></n-form-item>
           <n-form-item label="评语"><n-input v-model:value="feedbackComment" type="textarea" /></n-form-item>

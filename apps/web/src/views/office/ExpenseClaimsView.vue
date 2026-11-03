@@ -130,7 +130,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: ExpenseClaim) => r.id" :scroll-x="900" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建报销申请" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建报销申请" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item label="金额(元)"><n-input-number v-model:value="model.amountYuan" :min="0.01" style="width: 100%" /></n-form-item>

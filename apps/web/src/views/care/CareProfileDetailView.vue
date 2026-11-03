@@ -803,7 +803,7 @@ onMounted(fetchAll)
 
     <!-- 编辑妈妈的风险标签 -->
     <n-modal :mask-closable="false" :show="mrtVisible" @update:show="(v) => (mrtVisible = v)">
-      <n-card title="编辑风险标签" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="编辑风险标签" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="mrtVisible = false" aria-modal="true">
         <p v-if="motherWrongTags.length" style="margin: 0 0 10px; color: #d9822b; font-size: 13px; line-height: 1.7">
           这份档案上有不属于风险标签的标签：{{ motherWrongTags.map((b) => b.tag.name).join('、') }}（销售用的客户分类/客户类型，被误选进来了）。点“保存”后会自动清掉。
         </p>
@@ -819,7 +819,7 @@ onMounted(fetchAll)
 
     <!-- 管理员：连同评估表/纸质资料一起删除宝宝档案 -->
     <n-modal :mask-closable="false" :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
-      <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="babyDel = null" aria-modal="true">
         <p style="margin: 0 0 10px; line-height: 1.7">
           “<b>{{ babyDel.name }}</b>”名下已有：<b style="color: #c0392b">{{ babyDel.attached.join('、') }}</b>。<br />
           继续删除会把这个宝宝档案和上面这些数据（含纸质原件照片）<b>一起永久删除</b>，不能恢复，操作会记入审计日志。
@@ -836,7 +836,7 @@ onMounted(fetchAll)
 
     <!-- 编辑妈妈档案 -->
     <n-modal :mask-closable="false" :show="editVisible" @update:show="(v) => (editVisible = v)">
-      <n-card title="编辑产妇档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="编辑产妇档案" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="editVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="分娩方式">
             <n-select
@@ -870,7 +870,7 @@ onMounted(fetchAll)
 
     <!-- 新增/编辑宝宝 -->
     <n-modal :mask-closable="false" :show="babyVisible" @update:show="(v) => (babyVisible = v)">
-      <n-card :title="editingBaby ? '编辑宝宝档案' : '新增宝宝档案'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingBaby ? '编辑宝宝档案' : '新增宝宝档案'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="babyVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="姓名/编号"><n-input v-model:value="babyModel.name" /></n-form-item>
           <n-form-item label="性别">
@@ -904,7 +904,7 @@ onMounted(fetchAll)
 
     <!-- 生成护理计划 -->
     <n-modal :mask-closable="false" :show="planFormVisible" @update:show="(v) => (planFormVisible = v)">
-      <n-card title="生成护理计划" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="生成护理计划" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="planFormVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item label="对象">
             <n-select v-model:value="planTargetKey" :options="targetOptions" @update:value="planTemplateId = null" />
@@ -931,6 +931,8 @@ onMounted(fetchAll)
         style="width: min(720px, 94vw)"
         :bordered="false"
         role="dialog"
+        closable
+        @close="taskDrawerVisible = false"
         aria-modal="true"
       >
         <template #header-extra>
@@ -947,7 +949,7 @@ onMounted(fetchAll)
 
     <!-- 提交/更正护理记录 -->
     <n-modal :mask-closable="false" :show="recordVisible" @update:show="(v) => (recordVisible = v)">
-      <n-card :title="recordMode === 'correct' ? '更正护理记录' : '提交护理记录'" style="width: min(600px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="recordMode === 'correct' ? '更正护理记录' : '提交护理记录'" style="width: min(600px, 94vw)" :bordered="false" role="dialog" closable @close="recordVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="对象">
             <n-select v-model:value="recordTargetKey" :options="targetOptions" :disabled="!!recordCarePlanTaskId || recordMode === 'correct'" @update:value="recordFormTemplateId = null" />
@@ -1002,7 +1004,7 @@ onMounted(fetchAll)
 
     <!-- 护理记录详情 -->
     <n-modal :show="recordDetailVisible" @update:show="(v) => (recordDetailVisible = v)">
-      <n-card v-if="recordDetail" title="护理记录详情" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="recordDetail" title="护理记录详情" style="width: min(560px, 94vw)" :bordered="false" role="dialog" closable @close="recordDetailVisible = false" aria-modal="true">
         <n-descriptions :column="1" label-placement="left">
           <n-descriptions-item label="护理项目">{{ recordDetail.formTemplate.name }}</n-descriptions-item>
           <n-descriptions-item label="发生时间">{{ new Date(recordDetail.occurredAt).toLocaleString() }}</n-descriptions-item>
@@ -1023,7 +1025,7 @@ onMounted(fetchAll)
 
     <!-- 护理异常处理 -->
     <n-modal :show="abnormalityDrawerVisible" @update:show="(v) => (abnormalityDrawerVisible = v)">
-      <n-card v-if="activeAbnormality" title="护理异常处理" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="activeAbnormality" title="护理异常处理" style="width: min(560px, 94vw)" :bordered="false" role="dialog" closable @close="abnormalityDrawerVisible = false" aria-modal="true">
         <n-descriptions :column="1" label-placement="left" style="margin-bottom: 12px">
           <n-descriptions-item label="对象">{{ targetLabel(activeAbnormality) }}</n-descriptions-item>
           <n-descriptions-item label="异常字段">{{ activeAbnormality.field.name }}</n-descriptions-item>

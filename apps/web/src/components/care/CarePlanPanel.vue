@@ -140,7 +140,7 @@ defineExpose({ reload: load })
     <PlanDialog v-model:show="dlg.show" :mode="dlg.mode" :mother-profile-id="motherProfileId" :baby-profile-id="dlg.babyId" :subject-label="dlg.label" :plan="dlg.plan" @saved="onSaved" />
 
     <n-modal :mask-closable="false" :show="!!decide" @update:show="(v) => !v && (decide = null)">
-      <n-card v-if="decide" :title="decide.kind === 'approve' ? '审核通过' : '驳回'" style="width: min(440px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="decide" :title="decide.kind === 'approve' ? '审核通过' : '驳回'" style="width: min(440px, 94vw)" :bordered="false" role="dialog" closable @close="decide = null" aria-modal="true">
         <p style="margin: 0 0 8px">第 {{ decide.plan.versionNo }} 版（{{ CARE_LEVEL_LABEL[decide.plan.level] }}）{{ decide.kind === 'approve' ? '通过后立即生效，上一版自动变为“已替换”。' : '驳回后护理长修改再提交。' }}</p>
         <n-input v-model:value="decide.comment" type="textarea" :autosize="{ minRows: 2 }" :placeholder="decide.kind === 'approve' ? '审核意见（可不填）' : '驳回原因（必填）'" />
         <template #footer>

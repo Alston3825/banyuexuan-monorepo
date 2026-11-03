@@ -307,7 +307,7 @@ onMounted(fetchList)
 
     <!-- 新建/编辑 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑物品' : '新建物品'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑物品' : '新建物品'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="110">
           <n-form-item label="编码">
             <span v-if="editingRow" style="color: #666">{{ model.code }}（自动生成，不能修改）</span>
@@ -359,7 +359,7 @@ onMounted(fetchList)
 
     <!-- Excel 导入 -->
     <n-modal :mask-closable="false" :show="importVisible" @update:show="(v) => (importVisible = v)">
-      <n-card title="从 Excel 导入物品" style="width: min(1000px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="从 Excel 导入物品" style="width: min(1000px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="importVisible = false" aria-modal="true">
         <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onFileChosen" />
         <n-space align="center" style="margin-bottom: 10px">
           <n-button type="primary" :loading="parsing" @click="fileInput?.click()">{{ preview ? '重新选择文件' : '选择 Excel 文件（.xlsx）' }}</n-button>

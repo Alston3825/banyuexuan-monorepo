@@ -336,7 +336,7 @@ watch(keyword, () => {
 
     <!-- 详情 -->
     <n-modal :show="!!detailRow" @update:show="(v) => !v && (detailRow = null)">
-      <n-card v-if="detailRow" :title="`${detailRow.account.realName} 的员工档案`" style="width: min(760px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="detailRow" :title="`${detailRow.account.realName} 的员工档案`" style="width: min(760px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" closable @close="detailRow = null" aria-modal="true">
         <template #header-extra>
           <n-space :size="6">
             <template v-if="detailRow.archivedAt">
@@ -399,7 +399,7 @@ watch(keyword, () => {
 
     <!-- 离职归档 -->
     <n-modal :mask-closable="false" :show="!!archiveRow" @update:show="(v) => !v && (archiveRow = null)">
-      <n-card v-if="archiveRow" :title="`离职归档：${archiveRow.account.realName}（工号 ${archiveRow.employeeNo}）`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="archiveRow" :title="`离职归档：${archiveRow.account.realName}（工号 ${archiveRow.employeeNo}）`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" closable @close="archiveRow = null" aria-modal="true">
         <n-form label-placement="top" size="small">
           <n-form-item label="离职日期"><n-date-picker v-model:value="archiveModel.terminationDate" type="date" style="width: 100%" /></n-form-item>
           <n-form-item label="离职原因（选填）"><n-input v-model:value="archiveModel.reason" /></n-form-item>
@@ -416,7 +416,7 @@ watch(keyword, () => {
 
     <!-- 恢复在职 -->
     <n-modal :mask-closable="false" :show="!!restoreRow" @update:show="(v) => !v && (restoreRow = null)">
-      <n-card v-if="restoreRow" :title="`恢复在职：${restoreRow.account.realName}`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card v-if="restoreRow" :title="`恢复在职：${restoreRow.account.realName}`" style="width: min(480px, 96vw)" :bordered="false" role="dialog" closable @close="restoreRow = null" aria-modal="true">
         <n-form label-placement="top" size="small">
           <n-form-item label="工号（原工号如果已被新员工使用，请换一个）"><n-input v-model:value="restoreNo" /></n-form-item>
         </n-form>
@@ -432,7 +432,7 @@ watch(keyword, () => {
 
     <!-- 新建 / 编辑 -->
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? `编辑员工档案：${editingRow.account.realName}` : '建立员工档案'" style="width: min(720px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? `编辑员工档案：${editingRow.account.realName}` : '建立员工档案'" style="width: min(720px, 96vw); max-height: 92vh; overflow: auto" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="top" size="small">
           <div class="ep-sec">基本信息</div>
           <div class="ep-grid">

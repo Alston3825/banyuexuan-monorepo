@@ -108,7 +108,7 @@ const close = () => emit('update:show', false)
 
 <template>
   <n-modal :show="show" :mask-closable="!submitting" @update:show="(v) => emit('update:show', v)">
-    <n-card :title="`批量开通账号${file ? '：' + file.name : ''}`" style="width: min(1040px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" aria-modal="true">
+    <n-card :title="`批量开通账号${file ? '：' + file.name : ''}`" style="width: min(1040px, 96vw); max-height: 94vh; overflow: auto" :bordered="false" role="dialog" closable @close="emit('update:show', false)" aria-modal="true">
       <n-spin :show="loading">
         <div v-if="loading && !preview" style="min-height: 120px" />
 

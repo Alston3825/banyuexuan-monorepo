@@ -159,7 +159,7 @@ onMounted(fetchAll)
     </n-card>
 
     <n-modal :mask-closable="false" :show="selectVisible" @update:show="(v) => (selectVisible = v)">
-      <n-card title="自选餐" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="自选餐" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="selectVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="菜品"><n-select v-model:value="selectMealItemId" :options="mealItemOptions" filterable /></n-form-item>
         </n-form>
@@ -173,7 +173,7 @@ onMounted(fetchAll)
     </n-modal>
 
     <n-modal :mask-closable="false" :show="feedbackVisible" @update:show="(v) => (feedbackVisible = v)">
-      <n-card title="用餐评价" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="用餐评价" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="feedbackVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="评分"><n-input-number v-model:value="feedbackRating" :min="1" :max="5" style="width: 100%" /></n-form-item>
           <n-form-item label="评语"><n-input v-model:value="feedbackComment" type="textarea" /></n-form-item>

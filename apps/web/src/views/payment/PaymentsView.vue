@@ -156,7 +156,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Payment) => r.id" :scroll-x="1000" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="登记收款" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="登记收款" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="合同"><n-select v-model:value="model.contractId" :options="contractOptions" filterable /></n-form-item>
           <n-form-item label="金额（元）"><n-input-number v-model:value="model.amountYuan" style="width: 100%" /></n-form-item>
@@ -185,7 +185,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="refundVisible" @update:show="(v) => (refundVisible = v)">
-      <n-card title="申请退款" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="申请退款" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="refundVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="退款原因"><n-input v-model:value="refundReason" type="textarea" /></n-form-item>
         </n-form>

@@ -79,7 +79,7 @@ const doDelete = () =>
 
 <template>
   <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
-    <n-card :title="`处理${subject}：${label}`" style="width: min(520px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+    <n-card :title="`处理${subject}：${label}`" style="width: min(520px, 94vw)" :bordered="false" role="dialog" closable @close="emit('update:show', false)" aria-modal="true">
       <p v-if="loading || !check" style="color: #999">正在检查有没有关联数据…</p>
       <template v-else>
         <!-- 已归档：只能恢复（或在没有痕迹时删除） -->

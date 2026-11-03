@@ -74,7 +74,7 @@ async function doMerge() {
 
 <template>
   <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
-    <n-card title="合并重复客户" style="width: min(560px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+    <n-card title="合并重复客户" style="width: min(560px, 94vw)" :bordered="false" role="dialog" closable @close="emit('update:show', false)" aria-modal="true">
       <p style="margin: 0 0 10px; line-height: 1.7">
         要合并掉的重复客户：<b style="color: #c0392b">{{ sourceLabel }}</b><br />
         请搜索并选择<b>要保留</b>的那一个客户，重复客户名下的合同、入住、收款、母婴档案、线索、标签、跟进记录会<b>全部转到保留的客户名下</b>，保留客户缺的资料（医院、预产期等）会用重复客户的补上。

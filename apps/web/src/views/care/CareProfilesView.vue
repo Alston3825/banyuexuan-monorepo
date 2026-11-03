@@ -253,7 +253,7 @@ onMounted(fetchAll)
     <record-removal-dialog v-if="removal" v-model:show="removalShow" kind="mother" :id="removal.id" :label="removal.label" @done="fetchAll" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="建立产妇档案" style="width: min(640px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="建立产妇档案" style="width: min(640px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="100">
           <n-form-item label="客户">
             <n-select v-model:value="model.customerId" :options="customerOptions" filterable placeholder="搜索客户姓名/手机号" @update:value="onCustomerChange" />

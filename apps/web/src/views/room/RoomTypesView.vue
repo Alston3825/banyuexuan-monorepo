@@ -103,7 +103,7 @@ onMounted(fetchList)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: RoomType) => r.id" :scroll-x="700" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑房型' : '新建房型'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑房型' : '新建房型'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="编码" path="code" :rule="{ required: true, message: '请输入编码' }">
             <n-input v-model:value="model.code" />

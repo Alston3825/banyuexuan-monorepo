@@ -113,7 +113,7 @@ onMounted(async () => {
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: UtilityExpense) => r.id" :scroll-x="900" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑水电费登记' : '新建水电费登记'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑水电费登记' : '新建水电费登记'" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="90">
           <n-form-item v-if="!editingRow" label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" /></n-form-item>
           <n-form-item v-if="!editingRow" label="月份"><n-date-picker v-model:value="model.periodMs" type="month" style="width: 100%" /></n-form-item>

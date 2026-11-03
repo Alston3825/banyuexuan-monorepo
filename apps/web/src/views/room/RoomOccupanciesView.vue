@@ -371,7 +371,7 @@ onMounted(async () => {
     />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card title="新建预订" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="新建预订" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="门店"><n-select v-model:value="model.storeId" :options="storeOptions" @update:value="onStoreChange" /></n-form-item>
           <n-form-item label="房间"><n-select v-model:value="model.roomId" :options="roomOptionsByStore" /></n-form-item>
@@ -388,7 +388,7 @@ onMounted(async () => {
     </n-modal>
 
     <n-modal :mask-closable="false" :show="cancelVisible" @update:show="(v) => (cancelVisible = v)">
-      <n-card title="取消预订" style="width: min(420px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card title="取消预订" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="cancelVisible = false" aria-modal="true">
         <n-form label-placement="left" label-width="80">
           <n-form-item label="取消原因"><n-input v-model:value="cancelReason" type="textarea" /></n-form-item>
         </n-form>
@@ -408,6 +408,8 @@ onMounted(async () => {
         style="width: min(720px, 94vw)"
         :bordered="false"
         role="dialog"
+        closable
+        @close="opsVisible = false"
         aria-modal="true"
       >
         <n-tabs type="line" default-value="call">

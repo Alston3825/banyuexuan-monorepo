@@ -116,7 +116,7 @@ onMounted(fetchAll)
     <n-data-table :columns="columns" :data="rows" :loading="loading" :row-key="(r: Warehouse) => r.id" :scroll-x="800" />
 
     <n-modal :mask-closable="false" :show="formVisible" @update:show="(v) => (formVisible = v)">
-      <n-card :title="editingRow ? '编辑仓库' : '新建仓库'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" aria-modal="true">
+      <n-card :title="editingRow ? '编辑仓库' : '新建仓库'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="100">
           <n-form-item v-if="!editingRow" label="所属门店">
             <n-select v-model:value="model.storeId" :options="storeOptions" />
