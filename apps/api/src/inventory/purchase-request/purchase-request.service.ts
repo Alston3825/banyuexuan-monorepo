@@ -106,6 +106,21 @@ export class PurchaseRequestService {
     return this.reconcileStatus(row);
   }
 
+  /** 我是不是这张汇总申购单当前这一步的待审批人（审批人在通过前可以改明细） */
+  private async isCurrentApprover(id: string): Promise<boolean> {
+    const row = await this.prisma.workflowInstanceApprover.findFirst({
+      where: { accountId: this.ctx.accountId!, status: 'PENDING', role: { in: ['APPROVER', 'ADDED_APPROVER'] }, instance: { tenantId: this.ctx.tenantId, businessType: BUSINESS_TYPE, businessId: id, status: 'IN_REVIEW' } },
+      include: { instance: { select: { currentNodeSeq: true } } },
+    });
+    return !!row && row.nodeSeq === row.instance.currentNodeSeq;
+  }
+
+  /** 详情 + 当前登录人能不能“以审批人身份改明细”（待审批状态下的当前审批人可以） */
+  async detail(id: string) {
+    const row = await this.findOneOrThrow(id);
+    return { ...row, canApproverEdit: row.kind === 'SUMMARY' && row.status === 'PENDING_APPROVAL' && (await this.isCurrentApprover(id)) };
+  }
+
   // ---------------- 手动新建（汇总申购单） ----------------
   /**
    * 手动新建申购单（汇总申购单，草稿）：物品可以从物品库里选（带 itemId），也可以填之前没采购过的新物品；
@@ -269,12 +284,32 @@ export class PurchaseRequestService {
     return summary;
   }
 
-  // ---------------- 明细（只有草稿能改） ----------------
+  // ---------------- 明细（草稿能改；待审批时当前审批人也能改，改完再通过） ----------------
   private async draftOrThrow(id: string, expectedVersion?: number) {
     const req = await this.findOneOrThrow(id);
-    if (req.status !== 'DRAFT') throw new BadRequestException('只有草稿状态的申购单可以修改明细');
+    const byApprover = req.status === 'PENDING_APPROVAL' && req.kind === 'SUMMARY' && (await this.isCurrentApprover(id));
+    if (req.status !== 'DRAFT' && !byApprover) throw new BadRequestException('只有草稿状态的申购单可以修改明细（待审批的只有当前审批人能改）');
     if (expectedVersion !== undefined && req.version !== expectedVersion) throw new ConflictException('数据已被他人修改，请刷新后重试');
-    return req;
+    return { ...req, byApprover };
+  }
+
+  /** 审批人改明细要留痕：谁、改了哪一行、改前改后 */
+  private async auditLineChange(req: { id: string; storeId: string; byApprover: boolean }, remark: string, before: unknown, after: unknown) {
+    if (!req.byApprover) return;
+    await this.auditLogService.record({
+      action: 'UPDATE',
+      entityType: 'PurchaseRequest',
+      entityId: req.id,
+      beforeData: before as Prisma.InputJsonValue,
+      afterData: after as Prisma.InputJsonValue,
+      remark: `审批人修改明细：${remark}`,
+      tenantId: this.ctx.tenantId,
+      storeId: req.storeId,
+      accountId: this.ctx.accountId,
+      ip: this.ctx.ip,
+      userAgent: this.ctx.userAgent,
+      requestId: this.ctx.requestId,
+    });
   }
 
   private async resolveItem(name: string, spec: string | null) {
@@ -307,7 +342,7 @@ export class PurchaseRequestService {
   }
 
   async addLine(id: string, body: RequestLineBody, expectedVersion: number) {
-    await this.draftOrThrow(id, expectedVersion);
+    const req = await this.draftOrThrow(id, expectedVersion);
     if (!body.name?.trim()) throw new BadRequestException('请填写物品名称');
     if (body.quantity === undefined) throw new BadRequestException('请填写数量');
     const data = this.normalize(body);
@@ -320,11 +355,12 @@ export class PurchaseRequestService {
       });
       await this.recalc(tx, id);
     });
-    return this.findOneOrThrow(id);
+    await this.auditLineChange(req, `新增一行「${body.name}」×${body.quantity}`, null, body);
+    return this.detail(id);
   }
 
   async updateLine(id: string, lineId: string, body: RequestLineBody, expectedVersion: number) {
-    await this.draftOrThrow(id, expectedVersion);
+    const req = await this.draftOrThrow(id, expectedVersion);
     const line = await this.prisma.purchaseRequestItem.findFirst({ where: { id: lineId, purchaseRequestId: id } });
     if (!line) throw new NotFoundException('这一行不存在');
     const data = this.normalize(body);
@@ -342,7 +378,8 @@ export class PurchaseRequestService {
       });
       await this.recalc(tx, id);
     });
-    return this.findOneOrThrow(id);
+    await this.auditLineChange(req, `修改「${line.name}」`, { name: line.name, spec: line.spec, brand: line.brand, unit: line.unit, quantity: line.quantity, unitPrice: line.unitPrice }, body);
+    return this.detail(id);
   }
 
   async removeLine(id: string, lineId: string, expectedVersion: number) {
@@ -354,7 +391,8 @@ export class PurchaseRequestService {
       await tx.purchaseRequestItem.delete({ where: { id: lineId } });
       await this.recalc(tx, id);
     });
-    return this.findOneOrThrow(id);
+    await this.auditLineChange(req, `删除「${line.name}」`, { name: line.name, spec: line.spec, quantity: line.quantity }, null);
+    return this.detail(id);
   }
 
   // ---------------- 流程 ----------------

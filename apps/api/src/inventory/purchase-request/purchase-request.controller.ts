@@ -130,7 +130,7 @@ export class PurchaseRequestController {
   @Get(':id')
   @RequirePermission('inventory.purchase-request.view')
   findOne(@Param('id') id: string) {
-    return this.service.findOneOrThrow(id);
+    return this.service.detail(id);
   }
 
   @Post(':id/items')

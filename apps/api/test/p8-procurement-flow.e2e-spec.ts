@@ -134,6 +134,19 @@ describe('P8 采购全流程：部门申购→汇总→店长审批→采购→�
     const submitted = (await post(csToken, `/inventory/purchase-requests/${summary.id}/submit`, { version: cur.version }).expect(201)).body;
     expect(submitted.status).toBe('PENDING_APPROVAL');
 
+    // 审批人（店长）通过前可以改明细；提交人（客服）、其他人不能
+    const ver = async () => (await get(managerToken, `/inventory/purchase-requests/${summary.id}`).expect(200)).body as Json;
+    const before = await ver();
+    expect(before.canApproverEdit).toBe(true);
+    expect(((await get(csToken, `/inventory/purchase-requests/${summary.id}`).expect(200)).body as Json).canApproverEdit).toBe(false);
+    await patch(csToken, `/inventory/purchase-requests/${summary.id}/items/${before.items[0].id}`, { quantity: 99, version: before.version }).expect(400);
+    const edited = (await patch(managerToken, `/inventory/purchase-requests/${summary.id}/items/${before.items[0].id}`, { quantity: 12, brand: '店长改的品牌', version: before.version }).expect(200)).body as Json;
+    expect(edited.items[0]).toMatchObject({ quantity: 12, brand: '店长改的品牌' });
+    expect(Number(edited.totalAmount)).toBe(12 * 20 + 4 * 35.5); // 合计跟着重算
+    expect(edited.canApproverEdit).toBe(true);
+    expect(await prisma.auditLog.count({ where: { entityType: 'PurchaseRequest', entityId: summary.id, remark: { startsWith: '审批人修改明细' } } })).toBe(1);
+    await patch(managerToken, `/inventory/purchase-requests/${summary.id}/items/${before.items[0].id}`, { quantity: 10, version: edited.version }).expect(200); // 改回去，不影响后面的用例
+
     const mgr = await todos(managerToken);
     const item = mgr.items.find((i: Json) => i.kind === 'APPROVAL' && i.title.includes(submitted.requestNo));
     expect(item).toBeTruthy();

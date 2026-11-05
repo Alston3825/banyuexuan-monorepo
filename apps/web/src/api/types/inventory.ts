@@ -428,6 +428,8 @@ export interface PurchaseRequestItem {
 
 export interface PurchaseRequest {
   id: string
+  /** 详情接口附带：当前登录人是待审批的当前审批人，可以在通过前修改明细 */
+  canApproverEdit?: boolean
   kind: PurchaseRequestKind
   departmentName: string | null
   createdBy: string

@@ -361,6 +361,8 @@ async function openDetail(id: string) {
   detailVisible.value = true
 }
 const isDraft = computed(() => detail.value?.status === 'DRAFT')
+/** 草稿，或待审批时我是当前审批人 → 可以改明细 */
+const canEditLines = computed(() => isDraft.value || !!detail.value?.canApproverEdit)
 const isDept = computed(() => detail.value?.kind === 'DEPARTMENT')
 const isMine = computed(() => !!detail.value && detail.value.createdBy === auth.account?.id)
 async function doRecall() {
@@ -401,7 +403,7 @@ const detailColumns: DataTableColumns<PurchaseRequestItem> = [
     width: 130,
     fixed: 'right',
     render: (l) =>
-      isDraft.value
+      canEditLines.value
         ? h(NSpace, { size: 4 }, { default: () => [h(NButton, { size: 'tiny', onClick: () => openLine(l) }, { default: () => '修改' }), h(NButton, { size: 'tiny', type: 'error', quaternary: true, onClick: () => removeLine(l) }, { default: () => '删除' })] })
         : '',
   },
@@ -537,6 +539,8 @@ onMounted(async () => {
   const list = await storeApi.list()
   stores.value = list.map((s) => ({ label: s.name, value: s.id }))
   await fetchList()
+  // 从审批详情点“去看申购单”过来：直接打开这张单（审批人可以在里面改明细再通过）
+  if (typeof route.query.open === 'string') void openDetail(route.query.open)
 })
 </script>
 
@@ -674,7 +678,8 @@ onMounted(async () => {
         <n-card v-if="!isDept && detail.status !== 'DRAFT'" size="small" title="审批进度" style="margin-bottom: 10px; background: #fcfaf6">
           <ApprovalProgress :key="detail.id + detail.status" business-type="PURCHASE_REQUEST" :business-id="detail.id" @changed="onApprovalChanged" />
         </n-card>
-        <n-space v-if="isDraft" style="margin-bottom: 8px"><n-button size="small" @click="openLine(null)">＋ 加一行</n-button></n-space>
+        <n-alert v-if="detail.canApproverEdit" type="info" :show-icon="false" style="margin-bottom: 8px">你是当前审批人：通过前可以直接修改下面的物品名称、规格型号、数量、单价等，也可以加行、删行，改动会留下记录。改好后在上面的“审批进度”里点通过。</n-alert>
+        <n-space v-if="canEditLines" style="margin-bottom: 8px"><n-button size="small" @click="openLine(null)">＋ 加一行</n-button></n-space>
         <n-input v-if="detail.items.length > 6" v-model:value="detailKeyword" clearable placeholder="🔍 在这张申购单里搜物品（名称 / 规格 / 拼音首字母）" style="margin-bottom: 8px; max-width: 420px" />
         <n-data-table :columns="detailColumns" :data="detailLines" :row-key="(l: PurchaseRequestItem) => l.id" :scroll-x="1250" :max-height="380" size="small" />
         <template #footer>

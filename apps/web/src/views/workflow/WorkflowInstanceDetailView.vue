@@ -17,7 +17,7 @@ const info = ref<WorkflowProgress | null>(null)
     <template #header-extra>
       <n-space>
         <n-button size="small" @click="router.back()">返回</n-button>
-        <n-button v-if="info?.businessPath" size="small" type="primary" secondary @click="router.push(info!.businessPath!)">去看{{ info.businessLabel }}</n-button>
+        <n-button v-if="info?.businessPath" size="small" type="primary" secondary @click="router.push(info!.businessType === 'PURCHASE_REQUEST' ? `${info!.businessPath}?tab=summary&open=${info!.businessId}` : info!.businessPath!)">去看{{ info.businessLabel }}</n-button>
       </n-space>
     </template>
     <ApprovalProgress :instance-id="instanceId" @loaded="(p) => (info = p)" />
