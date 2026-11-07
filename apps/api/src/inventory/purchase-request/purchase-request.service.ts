@@ -110,7 +110,14 @@ export class PurchaseRequestService {
   private async isCurrentApprover(id: string): Promise<boolean> {
     // 管理员（有“流程设置”权限）即使不是被指派的那一位，审批期间也能改
     const pending = await this.prisma.workflowInstance.count({ where: { tenantId: this.ctx.tenantId, businessType: BUSINESS_TYPE, businessId: id, status: 'IN_REVIEW' } });
-    if (pending > 0 && (await this.ctx.hasPermission('workflow.definition.update'))) return true;
+    if (pending > 0) {
+      if (await this.ctx.hasPermission('workflow.definition.update')) return true;
+      // 店长（该门店范围内）审核期间也能改，不必是被指派的那一位
+      const mgr = await this.prisma.accountRoleAssignment.count({
+        where: { accountId: this.ctx.accountId!, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }], role: { code: { in: ['STORE_MANAGER', 'SUPER_ADMIN'] } } },
+      });
+      if (mgr > 0) return true;
+    }
     const row = await this.prisma.workflowInstanceApprover.findFirst({
       where: { accountId: this.ctx.accountId!, status: 'PENDING', role: { in: ['APPROVER', 'ADDED_APPROVER'] }, instance: { tenantId: this.ctx.tenantId, businessType: BUSINESS_TYPE, businessId: id, status: 'IN_REVIEW' } },
       include: { instance: { select: { currentNodeSeq: true } } },
