@@ -140,6 +140,7 @@ describe('P8 采购全流程：部门申购→汇总→店长审批→采购→�
     expect(before.canApproverEdit).toBe(true);
     expect(((await get(csToken, `/inventory/purchase-requests/${summary.id}`).expect(200)).body as Json).canApproverEdit).toBe(false);
     await patch(csToken, `/inventory/purchase-requests/${summary.id}/items/${before.items[0].id}`, { quantity: 99, version: before.version }).expect(400);
+    expect(((await get(adminToken, `/inventory/purchase-requests/${summary.id}`).expect(200)).body as Json).canApproverEdit).toBe(true); // 管理员也能改
     const edited = (await patch(managerToken, `/inventory/purchase-requests/${summary.id}/items/${before.items[0].id}`, { quantity: 12, brand: '店长改的品牌', version: before.version }).expect(200)).body as Json;
     expect(edited.items[0]).toMatchObject({ quantity: 12, brand: '店长改的品牌' });
     expect(Number(edited.totalAmount)).toBe(12 * 20 + 4 * 35.5); // 合计跟着重算

@@ -108,6 +108,9 @@ export class PurchaseRequestService {
 
   /** 我是不是这张汇总申购单当前这一步的待审批人（审批人在通过前可以改明细） */
   private async isCurrentApprover(id: string): Promise<boolean> {
+    // 管理员（有“流程设置”权限）即使不是被指派的那一位，审批期间也能改
+    const pending = await this.prisma.workflowInstance.count({ where: { tenantId: this.ctx.tenantId, businessType: BUSINESS_TYPE, businessId: id, status: 'IN_REVIEW' } });
+    if (pending > 0 && (await this.ctx.hasPermission('workflow.definition.update'))) return true;
     const row = await this.prisma.workflowInstanceApprover.findFirst({
       where: { accountId: this.ctx.accountId!, status: 'PENDING', role: { in: ['APPROVER', 'ADDED_APPROVER'] }, instance: { tenantId: this.ctx.tenantId, businessType: BUSINESS_TYPE, businessId: id, status: 'IN_REVIEW' } },
       include: { instance: { select: { currentNodeSeq: true } } },
