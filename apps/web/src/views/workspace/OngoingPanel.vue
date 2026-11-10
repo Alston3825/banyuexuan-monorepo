@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 正在进行中：需要持续推进的工作，按节点依次完成并留痕；可随时追加后面要做的节点。 */
 import { onMounted, ref } from 'vue'
-import { NButton, NCard, NDropdown, NEmpty, NForm, NFormItem, NInput, NModal, NSpace } from 'naive-ui'
+import { NButton, NCard, NDropdown, NInputGroup, NEmpty, NForm, NFormItem, NInput, NModal, NSpace } from 'naive-ui'
 import { workbenchApi, type OngoingWork, type WorkStep } from '../../api/modules/workbench.api'
 import { message } from '../../utils/discrete-api'
 
@@ -83,7 +83,10 @@ async function onMenu(w: OngoingWork, key: string) {
           <n-button v-else size="tiny" quaternary @click="undoStep(w, s)">撤销</n-button>
           <n-button v-if="!s.done" size="tiny" quaternary type="error" @click="removeStep(w, s)">删</n-button>
         </div>
-        <div class="og-add"><n-input v-model:value="newStep[w.id]" size="small" placeholder="+ 添加后面要做的事项，回车保存" @keyup.enter="addStep(w)" /></div>
+        <n-input-group class="og-add">
+          <n-input v-model:value="newStep[w.id]" placeholder="添加后面要做的事项" maxlength="200" @keyup.enter="addStep(w)" />
+          <n-button type="primary" :disabled="!(newStep[w.id] ?? '').trim()" @click="addStep(w)">添加</n-button>
+        </n-input-group>
       </div>
     </div>
 
@@ -124,5 +127,5 @@ async function onMenu(w: OngoingWork, key: string) {
 .og-sdone .og-dot { background: #18a058; border-color: #18a058; }
 .og-stext { flex: 1; min-width: 0; word-break: break-all; }
 .og-sdone .og-stext > div:first-child { color: #888; text-decoration: line-through; }
-.og-add { margin-top: 6px; }
+.og-add { margin-top: 8px; }
 </style>

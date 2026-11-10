@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 效率四象限：横轴紧急、纵轴重要；任务可拖到别的象限（手机上用“⋯→移动到”），点圆圈完成后划线。 */
 import { computed, onMounted, ref } from 'vue'
-import { NButton, NDropdown, NEmpty, NForm, NFormItem, NInput, NModal, NCard, NSelect, NSpace } from 'naive-ui'
+import { NButton, NDropdown, NInputGroup, NEmpty, NForm, NFormItem, NInput, NModal, NCard, NSelect, NSpace } from 'naive-ui'
 import { workbenchApi, type PersonalTask, type Quadrant } from '../../api/modules/workbench.api'
 import { message } from '../../utils/discrete-api'
 
@@ -126,7 +126,10 @@ async function saveEdit() {
             <n-dropdown trigger="click" :options="menu(t)" @select="(k: string) => onMenu(t, k)"><button class="qd-more" aria-label="更多">⋯</button></n-dropdown>
           </div>
           <n-empty v-if="!loading && byQ(q.key).length === 0" size="small" description="还没有事项" class="qd-empty" />
-          <div class="qd-add"><n-input v-model:value="drafts[q.key]" size="small" placeholder="+ 添加事项，回车保存" @keyup.enter="add(q.key)" /></div>
+          <n-input-group class="qd-add">
+            <n-input v-model:value="drafts[q.key]" placeholder="写下要做的事" maxlength="200" @keyup.enter="add(q.key)" />
+            <n-button type="primary" :disabled="!drafts[q.key].trim()" @click="add(q.key)">添加</n-button>
+          </n-input-group>
         </section>
       </div>
     </div>
@@ -167,7 +170,7 @@ async function saveEdit() {
 .qd-done .qd-title, .qd-done .qd-sub { text-decoration: line-through; color: #aaa; }
 .qd-more { flex: none; border: 0; background: transparent; font-size: 20px; line-height: 1; color: #8a7f70; cursor: pointer; padding: 2px 8px; min-height: 28px; }
 .qd-empty { margin: 8px 0; }
-.qd-add { margin-top: 6px; }
+.qd-add { margin-top: 8px; }
 .qd-tip { margin-top: 10px; font-size: 12px; color: #8a7f70; }
 @media (max-width: 767px) {
   .qd-grid { grid-template-columns: 1fr; }
