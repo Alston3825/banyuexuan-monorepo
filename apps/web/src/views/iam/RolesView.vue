@@ -182,12 +182,17 @@ async function handleCheckedKeysChange(newKeys: (string | number)[]) {
     try {
       await saveWithRetry(roleId, added, removed)
     } catch {
-      // 接口失败要把这次改动在界面上退回去，不能让界面显示的跟后端实际保存的对不上
-      const cur = new Set(checkedKeys.value)
-      added.forEach((k) => cur.delete(k))
-      removed.forEach((k) => cur.add(k))
-      checkedKeys.value = [...cur]
-      message.error('权限保存失败，请重试')
+      // 没拿到回应不代表没保存成功（请求可能已到服务器、只是回应丢了）：以服务器上的实际权限为准重新显示，
+      // 这样界面显示的永远跟后端一致
+      try {
+        const fresh = await roleApi.get(roleId)
+        checkedKeys.value = fresh.permissions.map((p) => p.permissionPointId)
+        const ok = added.every((k) => checkedKeys.value.includes(k)) && removed.every((k) => !checkedKeys.value.includes(k))
+        if (ok) message.success('权限已保存（网络有点慢，已核对服务器上的结果）')
+        else message.error('权限没有保存成功，已恢复为服务器上的实际权限，请重新勾选一次')
+      } catch {
+        message.error('网络不稳定，没能确认是否保存成功，请刷新页面后查看')
+      }
     }
   })
   await saveQueue

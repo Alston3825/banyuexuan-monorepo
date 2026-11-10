@@ -9,7 +9,7 @@ export const roleApi = {
   remove: (id: string) => http.delete(`/platform/roles/${id}`).then((r) => r.data),
   /** 批量调整权限（一次请求，勾选大模块也不会被限流） */
   changePermissions: (id: string, grant: string[], revoke: string[]) =>
-    http.put<{ granted: number; revoked: number }>(`/platform/roles/${id}/permissions`, { grant, revoke }).then((r) => r.data),
+    http.put<{ granted: number; revoked: number }>(`/platform/roles/${id}/permissions`, { grant, revoke }, { silentNetwork: true } as any).then((r) => r.data),
   /** 与默认权限清单对比：要新增/撤销哪些 */
   defaultsPreview: (id: string) =>
     http

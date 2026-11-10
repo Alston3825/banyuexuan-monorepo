@@ -69,7 +69,7 @@ http.interceptors.response.use(
       showMessage(() => message.error(msg ?? '请求参数有误'))
     } else if (status && status >= 500) {
       showMessage(() => message.error('服务器错误，请稍后重试'))
-    } else if (!response) {
+    } else if (!response && !(config as any)?.silentNetwork) {
       showMessage(() => message.error('网络请求失败，请检查连接'))
     }
     return Promise.reject(error)
