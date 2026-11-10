@@ -79,6 +79,10 @@ export class IntegrationAdminService {
     if (!room) throw new NotFoundException('房间不存在');
     const deviceCode = dto.deviceCode.trim();
     if (!deviceCode) throw new BadRequestException('设备编号不能为空');
+    // 信标编号必须与手表上报的格式一致：大号-小号，如 1601-1，否则定位对不上
+    if (dto.kind === 'BEACON' && !/^\d+-\d+$/.test(deviceCode)) {
+      throw new BadRequestException('信标编号格式必须是「大号-小号」，例如 1601-1（只含数字和中间一个短横线）');
+    }
     const dup = await this.prisma.roomDeviceBinding.findFirst({ where: { tenantId: this.tenantId, storeId: room.storeId, kind: dto.kind, deviceCode }, include: { room: true } });
     if (dup) throw new ConflictException(`该设备编号已绑定在 ${dup.room.roomNo} 房`);
     if (dto.kind === 'TABLET') {

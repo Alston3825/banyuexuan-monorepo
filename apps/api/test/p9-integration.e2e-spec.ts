@@ -54,14 +54,16 @@ describe('P9 系统集成（呼叫定位系统） (e2e)', () => {
     await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'TABLET', deviceCode: `PAD-${tag}` }).expect(201);
     await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'TABLET', deviceCode: `PAD2-${tag}` }).expect(409);
     await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room2.id, kind: 'TABLET', deviceCode: `PAD-${tag}` }).expect(409);
-    await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'BEACON', deviceCode: `B1-${tag}` }).expect(201);
-    await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'BEACON', deviceCode: `B2-${tag}` }).expect(201);
+    const bn = String(Date.now()).slice(-6);
+    await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'BEACON', deviceCode: `B1-${tag}` }).expect(400); // 格式不对要拒绝
+    await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'BEACON', deviceCode: `${bn}-1` }).expect(201);
+    await request(server).post('/api/v1/integration/room-bindings').set(authed()).send({ roomId: room.id, kind: 'BEACON', deviceCode: `${bn}-2` }).expect(201);
 
     const since = new Date(Date.now() - 60_000).toISOString();
     const rooms = (await request(server).get(`/api/v1/integration/v1/rooms?storeId=${store.id}&updatedSince=${encodeURIComponent(since)}`).set(key).expect(200)).body as Json;
     const r = rooms.items.find((x: Json) => x.room_id === room.id);
     expect(r).toMatchObject({ store_id: store.id, floor: '8F', room_no: `IG${tag}`, tablet_device_id: `PAD-${tag}`, status: 'FREE' });
-    expect(r.beacon_ids.sort()).toEqual([`B1-${tag}`, `B2-${tag}`]);
+    expect(r.beacon_ids.sort()).toEqual([`${bn}-1`, `${bn}-2`]);
     expect(rooms.nextSince).toBeTruthy();
 
     // 员工：手表/当班/楼层

@@ -187,7 +187,7 @@ onMounted(async () => {
         <n-form label-placement="top">
           <n-form-item label="房间"><n-select v-model:value="bindModel.roomId" :options="roomOptions" filterable placeholder="输入房号搜索" /></n-form-item>
           <n-form-item label="设备类型"><n-select v-model:value="bindModel.kind" :options="[{ label: '房间平板（每间房 1 台）', value: 'TABLET' }, { label: '蓝牙信标（每间房可多个）', value: 'BEACON' }]" /></n-form-item>
-          <n-form-item label="设备编号（与呼叫系统里一致）"><n-input v-model:value="bindModel.deviceCode" /></n-form-item>
+          <n-form-item :label="bindModel.kind === 'BEACON' ? '信标编号（格式：大号-小号，如 1601-1）' : '设备编号（与呼叫系统里一致）'"><n-input v-model:value="bindModel.deviceCode" :placeholder="bindModel.kind === 'BEACON' ? '例如 1601-1' : ''" /></n-form-item>
         </n-form>
         <template #footer><n-space justify="end"><n-button @click="bindForm = false">取消</n-button><n-button type="primary" @click="addBinding">绑定</n-button></n-space></template>
       </n-card>
