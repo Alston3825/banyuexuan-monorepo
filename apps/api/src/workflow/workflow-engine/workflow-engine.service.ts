@@ -331,7 +331,7 @@ export class WorkflowEngineService {
 
   /**
    * 找审批人 = 所有指定角色的成员 + 所有指定的员工（去重，只取在职）。
-   * 按角色找时：优先取“角色范围覆盖这家门店”的人（全局 / 本店 / 本区域），一个都没有才退回取所有持有该角色的人。
+   * 按角色找时：单据属于哪家店就优先找哪家店的人（所属门店=该店，或角色范围指定该店）；本店没有才找全局/本区域范围的总部人员，再没有才找无门店的总部账号，最后兜底所有持有者。
    */
   private async resolveApprovers(roleIds: string[], approverAccountIds: string[], storeId?: string | null): Promise<string[]> {
     const out = new Set<string>();
@@ -339,18 +339,21 @@ export class WorkflowEngineService {
       const accs = await this.prisma.account.findMany({ where: { id: { in: approverAccountIds }, status: 'ACTIVE' }, select: { id: true } });
       accs.forEach((a) => out.add(a.id));
     }
+    const store = storeId ? await this.prisma.store.findUnique({ where: { id: storeId }, select: { regionId: true } }) : null;
     for (const roleId of roleIds) {
       const assignments = await this.prisma.accountRoleAssignment.findMany({
         where: { roleId, revokedAt: null, account: { status: 'ACTIVE' } },
-        select: { accountId: true, scopeType: true, scopeId: true },
+        select: { accountId: true, scopeType: true, scopeId: true, account: { select: { storeId: true } } },
       });
       let matched = assignments;
       if (storeId) {
-        const store = await this.prisma.store.findUnique({ where: { id: storeId }, select: { regionId: true } });
-        const covering = assignments.filter(
-          (a) => a.scopeType === 'TENANT' || (a.scopeType === 'STORE' && a.scopeId === storeId) || (a.scopeType === 'REGION' && !!store && a.scopeId === store.regionId),
-        );
-        if (covering.length > 0) matched = covering;
+        // 1) 本店的人：所属门店就是这家店，或角色范围明确指定了这家店 —— 单据属于哪家店，就走哪家店的审批人
+        const local = assignments.filter((a) => a.account.storeId === storeId || (a.scopeType === 'STORE' && a.scopeId === storeId));
+        // 2) 没有本店的人：取范围覆盖这家店的总部/区域级人员（全局、本区域）
+        const covering = assignments.filter((a) => a.scopeType === 'TENANT' || (a.scopeType === 'REGION' && !!store && a.scopeId === store.regionId));
+        // 3) 再没有：不属于任何门店的人（总部账号）；最后才兜底给所有持有该角色的人，避免流程卡死
+        const hq = assignments.filter((a) => !a.account.storeId);
+        matched = local.length > 0 ? local : covering.length > 0 ? covering : hq.length > 0 ? hq : assignments;
       }
       matched.forEach((a) => out.add(a.accountId));
     }
