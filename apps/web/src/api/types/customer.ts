@@ -25,6 +25,8 @@ export interface Customer extends ScopedEntityBase {
   /** 电话销售员 */
   phoneSalesId: string | null
   wechat: string | null
+  /** 宝妈称呼（呼叫系统用） */
+  salutation: string | null
   serviceTypes: CustomerServiceType[] | null
   hospital: string | null
   expectedDueDate: string | null
@@ -53,6 +55,7 @@ export interface Customer extends ScopedEntityBase {
 /** 新建/编辑客户表单里能填的全部内容；编辑时传 null 表示清空该项。 */
 export interface CustomerFormFields {
   wechat?: string | null
+  salutation?: string | null
   serviceTypes?: CustomerServiceType[]
   hospital?: string | null
   expectedDueDate?: string | null

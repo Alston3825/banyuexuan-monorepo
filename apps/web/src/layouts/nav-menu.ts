@@ -286,6 +286,7 @@ const navGroups: NavGroup[] = [
     label: '系统管理',
     key: 'group-system',
     items: [
+      { label: '系统集成（呼叫定位）', to: '/integration', icon: HardwareChipOutline, perm: ['integration.system', 'integration.binding'] },
       { label: '设备台账', to: '/iot/devices', icon: HardwareChipOutline, perm: 'iot.device-registry' },
       { label: '设备事件与模拟', to: '/iot/device-events', icon: HardwareChipOutline, perm: 'iot.device-event' },
       { label: '设备类型', to: '/iot/device-types', icon: HardwareChipOutline, perm: 'iot.device-type' },

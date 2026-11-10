@@ -110,6 +110,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'logistics/vehicle-bookings', name: 'logistics-vehicle-bookings', component: () => import('../views/logistics/VehicleBookingsView.vue'), meta: { title: '用车申请' } },
       { path: 'logistics/utility-expenses', name: 'logistics-utility-expenses', component: () => import('../views/logistics/UtilityExpensesView.vue'), meta: { title: '水电费登记' } },
       { path: 'ai/knowledge-documents', name: 'ai-knowledge-documents', component: () => import('../views/ai/KnowledgeDocumentsView.vue'), meta: { title: '知识库文档' } },
+      { path: 'integration', name: 'integration', component: () => import('../views/integration/IntegrationView.vue'), meta: { title: '系统集成' } },
       { path: 'iot/device-types', name: 'iot-device-types', component: () => import('../views/iot/DeviceTypesView.vue'), meta: { title: '设备类型' } },
       { path: 'iot/devices', name: 'iot-devices', component: () => import('../views/iot/DevicesView.vue'), meta: { title: '设备台账' } },
       { path: 'iot/device-events', name: 'iot-device-events', component: () => import('../views/iot/DeviceEventsView.vue'), meta: { title: '事件与模拟' } },

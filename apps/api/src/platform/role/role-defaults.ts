@@ -310,6 +310,7 @@ function storeManagerCodes(allCodes: string[]): string[] {
           code.startsWith('ai.customer-service-agent') ||
           code.startsWith('ai.care-abnormality-agent') ||
           code.startsWith('ai.suggestion') ||
+          code.startsWith('integration.binding') ||
           code.startsWith('iot.device-type') ||
           code.startsWith('iot.device-registry') ||
           code.startsWith('iot.device-event') ||

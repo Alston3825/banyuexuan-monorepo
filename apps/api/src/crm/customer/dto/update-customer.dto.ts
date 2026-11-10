@@ -19,6 +19,7 @@ export class UpdateCustomerDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() channelId?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() assignedToId?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() phoneSalesId?: string | null;
+  @ApiProperty({ required: false, description: '宝妈称呼，如 小雨妈妈（呼叫系统平板/手表上用）' }) @IsOptional() @IsString() salutation?: string | null;
   @ApiProperty({ required: false }) @IsOptional() @IsString() wechat?: string | null;
   @ApiProperty({ required: false, enum: CUSTOMER_SERVICE_TYPES, isArray: true })
   @IsOptional()

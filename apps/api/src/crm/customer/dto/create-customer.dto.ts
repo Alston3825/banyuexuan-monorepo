@@ -22,6 +22,7 @@ export class CreateCustomerDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() primaryStoreId?: string;
   @ApiProperty({ required: false, description: '门店销售员（归属销售）；不传默认是录入人' }) @IsOptional() @IsString() assignedToId?: string;
   @ApiProperty({ required: false, description: '电话销售员' }) @IsOptional() @IsString() phoneSalesId?: string;
+  @ApiProperty({ required: false, description: '宝妈称呼，如 小雨妈妈' }) @IsOptional() @IsString() salutation?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() wechat?: string;
   @ApiProperty({ required: false, enum: CUSTOMER_SERVICE_TYPES, isArray: true })
   @IsOptional()

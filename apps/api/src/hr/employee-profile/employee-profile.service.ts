@@ -1,3 +1,4 @@
+import { IntegrationEventsService } from '../../integration/integration-events.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EmployeeProfile, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -47,6 +48,7 @@ export class EmployeeProfileService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly integrationEvents: IntegrationEventsService,
   ) {}
 
   /** 列表/详情附带：部门名、职务名、手机（来自账号）、工龄。 */
@@ -228,6 +230,16 @@ export class EmployeeProfileService {
       }
     }
     const idCard = await this.idCardFields(rest.idCardNo, id);
+    // 呼叫定位系统：手表设备号同租户唯一
+    let watchPatch: { watchId?: string | null } = {};
+    if (rest.watchId !== undefined) {
+      const w = rest.watchId.trim();
+      if (w) {
+        const dup = await this.prisma.employeeProfile.findFirst({ where: { tenantId: this.ctx.tenantId, watchId: w, id: { not: id } }, include: { account: { select: { realName: true } } } });
+        if (dup) throw new ConflictException(`手表 ${w} 已绑定给 ${dup.account.realName}，请先解绑`);
+      }
+      watchPatch = { watchId: w || null };
+    }
     const updated = await runVersionedUpdate(() =>
       this.prisma.employeeProfile.update({
         where: { id, version: dto.version },
@@ -242,11 +254,23 @@ export class EmployeeProfileService {
           ...this.texts(rest as unknown as Record<string, unknown>),
           ...idCard,
           ...this.bankAccountField(rest.bankAccountNo),
+          ...watchPatch,
+          ...(rest.dutyStatus !== undefined ? { dutyStatus: rest.dutyStatus } : {}),
+          ...(rest.responsibleFloors !== undefined ? { responsibleFloors: rest.responsibleFloors } : {}),
           version: { increment: 1 },
         },
         include: includeProfile,
       }),
     );
+    if (before.account.storeId && (rest.dutyStatus !== undefined || rest.watchId !== undefined || rest.responsibleFloors !== undefined)) {
+      await this.integrationEvents.emit(this.ctx.tenantId!, before.account.storeId, 'staff.duty_changed', before.accountId, {
+        staff_id: before.accountId,
+        store_id: before.account.storeId,
+        duty_status: updated.dutyStatus,
+        watch_id: updated.watchId,
+        responsible_floors: updated.responsibleFloors ?? [],
+      });
+    }
     await this.auditLogService.record({
       action: 'UPDATE',
       entityType: 'EmployeeProfile',

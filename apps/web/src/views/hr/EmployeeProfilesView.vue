@@ -97,6 +97,9 @@ const blank = () => ({
   emergencyContactPhone: '',
   emergencyContactRelation: '',
   address: '',
+  watchId: '',
+  dutyStatus: 'OFF_DUTY' as 'ON_DUTY' | 'OFF_DUTY' | 'RESTING',
+  floorsText: '',
   remark: '',
 })
 const model = ref(blank())
@@ -133,6 +136,9 @@ function openEdit(row: EmployeeProfile) {
     emergencyContactPhone: row.emergencyContactPhone ?? '',
     emergencyContactRelation: row.emergencyContactRelation ?? '',
     address: row.address ?? '',
+    watchId: row.watchId ?? '',
+    dutyStatus: row.dutyStatus ?? 'OFF_DUTY',
+    floorsText: (row.responsibleFloors ?? []).join('、'),
     remark: row.remark ?? '',
   }
   detailRow.value = null
@@ -163,6 +169,9 @@ async function handleSubmit() {
       emergencyContactPhone: text(m.emergencyContactPhone),
       emergencyContactRelation: text(m.emergencyContactRelation),
       address: text(m.address),
+      watchId: m.watchId.trim(),
+      dutyStatus: m.dutyStatus,
+      responsibleFloors: m.floorsText.split(/[,，、\s]+/).map((x) => x.trim()).filter(Boolean),
       remark: text(m.remark),
     }
     if (editingRow.value) {
@@ -175,7 +184,9 @@ async function handleSubmit() {
       })
       message.success('员工档案已更新')
     } else {
-      await employeeProfileApi.create({ accountId: m.accountId!, ...common })
+      // 手表/当班/负责楼层建档后再在“编辑”里设置
+      const { watchId: _w, dutyStatus: _d, responsibleFloors: _f, ...createFields } = common
+      await employeeProfileApi.create({ accountId: m.accountId!, ...createFields })
       message.success('员工档案已建立')
     }
     formVisible.value = false
@@ -442,6 +453,12 @@ watch(keyword, () => {
             <n-form-item label="工号" :feedback="editingRow && !canChangeNo ? '工号一旦分配，只有管理员才能修改' : undefined"><n-input v-model:value="model.employeeNo" :disabled="!!editingRow && !canChangeNo" /></n-form-item>
             <n-form-item label="身份证号（保存时自动识别性别和出生日期）"><n-input v-model:value="model.idCardNo" maxlength="18" placeholder="18 位身份证号" /></n-form-item>
             <n-form-item label="现住址" class="ep-wide"><n-input v-model:value="model.address" /></n-form-item>
+          </div>
+          <div class="ep-sec">呼叫定位系统（护理师用）</div>
+          <div class="ep-grid">
+            <n-form-item label="手表设备号"><n-input v-model:value="model.watchId" placeholder="与呼叫系统里的手表编号一致" /></n-form-item>
+            <n-form-item label="当班状态"><n-select v-model:value="model.dutyStatus" :options="[{ label: '在岗', value: 'ON_DUTY' }, { label: '离岗', value: 'OFF_DUTY' }, { label: '休息', value: 'RESTING' }]" /></n-form-item>
+            <n-form-item label="负责楼层（用顿号或逗号隔开）" class="ep-wide"><n-input v-model:value="model.floorsText" placeholder="如 2F、3F" /></n-form-item>
           </div>
           <div class="ep-sec">任职、合同与社保</div>
           <div class="ep-grid">

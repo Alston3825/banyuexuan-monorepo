@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { EmployeeContractType, EmployeeProfileStatus, EmploymentType, SocialInsuranceStatus } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { DutyStatus, EmployeeContractType, EmployeeProfileStatus, EmploymentType, SocialInsuranceStatus } from '@prisma/client';
+import { IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /** 字符串字段传空字符串 = 清空；不传 = 不修改。 */
 export class UpdateEmployeeProfileDto {
@@ -24,6 +24,9 @@ export class UpdateEmployeeProfileDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(30) emergencyContactRelation?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() @MaxLength(255) address?: string;
+  @ApiProperty({ required: false, description: '呼叫系统手表设备号，空串=清空' }) @IsOptional() @IsString() @MaxLength(64) watchId?: string;
+  @ApiProperty({ required: false, enum: DutyStatus }) @IsOptional() @IsEnum(DutyStatus) dutyStatus?: DutyStatus;
+  @ApiProperty({ required: false, description: '负责楼层，如 [\"2F\",\"3F\"]' }) @IsOptional() @IsArray() @IsString({ each: true }) responsibleFloors?: string[];
 
   @ApiProperty({ description: '乐观锁版本号' })
   @IsInt()

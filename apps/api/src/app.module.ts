@@ -25,6 +25,7 @@ import { OfficeModule } from './office/office.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { AiModule } from './ai/ai.module';
 import { IotModule } from './iot/iot.module';
+import { IntegrationModule } from './integration/integration.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TrainingModule } from './training/training.module';
 import { RecycleBinModule } from './common/recycle/recycle-bin.module';
@@ -64,6 +65,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     LogisticsModule,
     AiModule,
     IotModule,
+    IntegrationModule,
     AnalyticsModule,
     TrainingModule,
     HealthModule,

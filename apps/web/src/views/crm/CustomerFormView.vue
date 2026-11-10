@@ -37,6 +37,7 @@ const model = reactive({
   allowDuplicatePhone: false,
   phone: '',
   wechat: '',
+  salutation: '',
   channelTypeId: null as string | null, // 渠道类型（客户渠道页里维护，可自定义）
   channelId: null as string | null, // 具体渠道
   serviceTypes: [] as CustomerServiceType[],
@@ -291,6 +292,7 @@ function buildPayload() {
     channelTypeId: model.channelTypeId as string,
     channelId: model.channelId,
     wechat: emptyToNull(model.wechat),
+    salutation: emptyToNull(model.salutation),
     serviceTypes: model.serviceTypes,
     hospital: emptyToNull(model.hospital),
     expectedDueDate: model.expectedDueDate ? new Date(model.expectedDueDate).toISOString() : null,
@@ -366,6 +368,7 @@ async function loadForEdit(id: string) {
   model.name = c.name
   model.phone = c.phone
   model.wechat = c.wechat ?? ''
+  model.salutation = c.salutation ?? ''
   model.channelTypeId = c.channelTypeId
   model.channelId = c.channelId
   model.serviceTypes = c.serviceTypes ?? []
@@ -462,6 +465,13 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
               <b v-else>——已勾选“允许号码重复”，可以继续</b>
             </div>
           </div>
+        </n-form-item>
+
+        <n-form-item label="宝妈称呼：">
+          <n-space align="center" :size="12">
+            <n-input v-model:value="model.salutation" style="width: 250px" placeholder="如 小雨妈妈（选填）" />
+            <span class="cf-hint">（房间平板、护理师手表上用它称呼客户，不填则按“姓+女士”）</span>
+          </n-space>
         </n-form-item>
 
         <n-form-item label="微信：">

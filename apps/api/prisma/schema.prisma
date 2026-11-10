@@ -61,19 +61,19 @@ enum StoreStatus {
 }
 
 model Store {
-  id        String      @id @default(cuid())
-  tenantId  String      @map("tenant_id")
-  regionId  String      @map("region_id")
-  code      String
-  name      String
-  address   String?
+  id               String      @id @default(cuid())
+  tenantId         String      @map("tenant_id")
+  regionId         String      @map("region_id")
+  code             String
+  name             String
+  address          String?
   /// 工号规则：该门店员工工号必须以此开头（如 高新店 1、枣园店 2）；空 = 不限制
-  employeeNoPrefix String? @map("employee_no_prefix")
-  status    StoreStatus @default(PENDING)
-  createdBy String      @map("created_by")
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
-  version   Int         @default(0)
+  employeeNoPrefix String?     @map("employee_no_prefix")
+  status           StoreStatus @default(PENDING)
+  createdBy        String      @map("created_by")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  version          Int         @default(0)
 
   region                  Region                   @relation(fields: [regionId], references: [id])
   departments             Department[]
@@ -726,6 +726,7 @@ model Customer {
   customerNo               String         @map("customer_no")
   name                     String
   phone                    String // 敏感字段，见 FieldMaskInterceptor + SENSITIVE_FIELD_REGISTRY.Customer
+  salutation               String?        @db.VarChar(32) // 宝妈称呼（如“小雨妈妈”），呼叫定位系统平板/手表上用它称呼客户
   source                   CustomerSource @default(WALK_IN)
   primaryStoreId           String?        @map("primary_store_id") // 首次建档门店，仅展示/报表用途
   assignedToId             String?        @map("assigned_to_id") // 当前归属销售，无保护期/锁定机制
@@ -1170,10 +1171,11 @@ model Room {
   updatedAt        DateTime @updatedAt @map("updated_at")
   version          Int      @default(0)
 
-  store       Store           @relation(fields: [storeId], references: [id])
-  roomType    RoomType        @relation(fields: [roomTypeId], references: [id])
-  occupancies RoomOccupancy[]
-  devices     Device[]
+  store          Store               @relation(fields: [storeId], references: [id])
+  roomType       RoomType            @relation(fields: [roomTypeId], references: [id])
+  occupancies    RoomOccupancy[]
+  devices        Device[]
+  deviceBindings RoomDeviceBinding[]
 
   @@unique([tenantId, storeId, roomNo])
   @@index([tenantId, storeId])
@@ -2109,25 +2111,25 @@ model CareDailyBabyRecord {
 
 /// 24 小时宝宝喂养记录单的一行（一次喂养/排泄）。
 model CareFeedingEntry {
-  id            String   @id @default(cuid())
-  tenantId      String   @map("tenant_id")
-  babyDailyId   String   @map("baby_daily_id")
-  sortOrder     Int      @default(0) @map("sort_order")
-  time          String?  @map("time") // 时间
-  directFeedMin Int?     @map("direct_feed_min") // 亲喂(分钟)
-  breastMilkMl  Int?     @map("breast_milk_ml") // 母乳(ml)
-  formulaMl     Int?     @map("formula_ml") // 奶粉(ml)
-  medication    String?  @map("medication") // 药名（药物记录）
-  medicationDose String? @map("medication_dose") // 剂量（药物记录）
-  waterMl       Int?     @map("water_ml") // 喂水(ml)
-  urine         String?  @map("urine") // 小便
-  stool         String?  @map("stool") // 大便
-  stoolColor    String?  @map("stool_color") // 大便颜色
-  stoolAmount   String?  @map("stool_amount") // 大便量
-  stoolTexture  String?  @map("stool_texture") // 大便性状
-  nurseName     String?  @map("nurse_name") // 责护签字
-  remark        String?  @map("remark") // 备注
-  createdAt     DateTime @default(now()) @map("created_at")
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  babyDailyId    String   @map("baby_daily_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+  time           String?  @map("time") // 时间
+  directFeedMin  Int?     @map("direct_feed_min") // 亲喂(分钟)
+  breastMilkMl   Int?     @map("breast_milk_ml") // 母乳(ml)
+  formulaMl      Int?     @map("formula_ml") // 奶粉(ml)
+  medication     String?  @map("medication") // 药名（药物记录）
+  medicationDose String?  @map("medication_dose") // 剂量（药物记录）
+  waterMl        Int?     @map("water_ml") // 喂水(ml)
+  urine          String?  @map("urine") // 小便
+  stool          String?  @map("stool") // 大便
+  stoolColor     String?  @map("stool_color") // 大便颜色
+  stoolAmount    String?  @map("stool_amount") // 大便量
+  stoolTexture   String?  @map("stool_texture") // 大便性状
+  nurseName      String?  @map("nurse_name") // 责护签字
+  remark         String?  @map("remark") // 备注
+  createdAt      DateTime @default(now()) @map("created_at")
 
   babyDaily CareDailyBabyRecord @relation(fields: [babyDailyId], references: [id], onDelete: Cascade)
 
@@ -3212,39 +3214,39 @@ model PurchaseRequestItem {
 /// 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED；
 /// APPROVED 后可据此创建入库单（收货数量与采购数量的对比只做展示，不做强校验，见 schema 顶部范围收窄说明）。
 model PurchaseOrder {
-  id            String             @id @default(cuid())
-  tenantId      String             @map("tenant_id")
-  storeId       String             @map("store_id")
-  warehouseId   String             @map("warehouse_id")
-  supplierId    String             @map("supplier_id")
-  orderNo       String             @map("order_no")
-  status        InventoryDocStatus @default(DRAFT)
-  totalAmount   Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
-  remark        String?            @db.Text
-  cancelReason  String?            @map("cancel_reason") @db.Text
+  id                 String             @id @default(cuid())
+  tenantId           String             @map("tenant_id")
+  storeId            String             @map("store_id")
+  warehouseId        String             @map("warehouse_id")
+  supplierId         String             @map("supplier_id")
+  orderNo            String             @map("order_no")
+  status             InventoryDocStatus @default(DRAFT)
+  totalAmount        Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
+  remark             String?            @db.Text
+  cancelReason       String?            @map("cancel_reason") @db.Text
   /// 采购员点“确认采购”的时间/人、运单号与备注（确认采购会自动生成待收货的入库单）
-  purchasedAt   DateTime?          @map("purchased_at")
-  purchasedById String?            @map("purchased_by_id")
-  expressNo     String?            @map("express_no")
-  purchaseNote  String?            @map("purchase_note") @db.Text
+  purchasedAt        DateTime?          @map("purchased_at")
+  purchasedById      String?            @map("purchased_by_id")
+  expressNo          String?            @map("express_no")
+  purchaseNote       String?            @map("purchase_note") @db.Text
   /// 采购平台（1688/TAOBAO/PDD/OTHER）与平台订单号；物流：快递公司（快递100编码）、收/寄件手机尾号（顺丰需要）、
   /// 快递100 返回的状态码、轨迹（JSON）、最近一次查询时间/出错信息
-  platform         String?   @map("platform") @db.VarChar(20)
-  platformOrderNo  String?   @map("platform_order_no") @db.VarChar(64)
-  expressCompany   String?   @map("express_company") @db.VarChar(40)
-  expressPhoneTail String?   @map("express_phone_tail") @db.VarChar(8)
-  logisticsState   Int?      @map("logistics_state")
-  logisticsTrace   Json?     @map("logistics_trace")
-  logisticsCheckedAt DateTime? @map("logistics_checked_at")
-  logisticsError   String?   @map("logistics_error") @db.VarChar(255)
-  createdBy     String             @map("created_by")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
-  version       Int                @default(0)
+  platform           String?            @map("platform") @db.VarChar(20)
+  platformOrderNo    String?            @map("platform_order_no") @db.VarChar(64)
+  expressCompany     String?            @map("express_company") @db.VarChar(40)
+  expressPhoneTail   String?            @map("express_phone_tail") @db.VarChar(8)
+  logisticsState     Int?               @map("logistics_state")
+  logisticsTrace     Json?              @map("logistics_trace")
+  logisticsCheckedAt DateTime?          @map("logistics_checked_at")
+  logisticsError     String?            @map("logistics_error") @db.VarChar(255)
+  createdBy          String             @map("created_by")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  version            Int                @default(0)
 
-  store            Store               @relation(fields: [storeId], references: [id])
-  warehouse        Warehouse           @relation(fields: [warehouseId], references: [id])
-  supplier         Supplier            @relation(fields: [supplierId], references: [id])
+  store            Store                   @relation(fields: [storeId], references: [id])
+  warehouse        Warehouse               @relation(fields: [warehouseId], references: [id])
+  supplier         Supplier                @relation(fields: [supplierId], references: [id])
   items            PurchaseOrderItem[]
   goodsReceipts    GoodsReceipt[]
   purchaseRequests PurchaseRequest[]
@@ -3257,26 +3259,26 @@ model PurchaseOrder {
 
 /// 采购单下的“平台订单/包裹”：一张采购单常对应 1688 上拆开下的很多笔订单，每笔（每个运单号）单独记平台订单号、卖家、金额和物流轨迹。
 model PurchaseOrderShipment {
-  id              String   @id @default(cuid())
-  tenantId        String   @map("tenant_id")
-  purchaseOrderId String   @map("purchase_order_id")
-  platform        String   @default("1688") @db.VarChar(20)
-  platformOrderNo String   @map("platform_order_no") @db.VarChar(64)
-  sellerName      String?  @map("seller_name") @db.VarChar(120)
-  goodsTitle      String?  @map("goods_title") @db.VarChar(500)
+  id                 String    @id @default(cuid())
+  tenantId           String    @map("tenant_id")
+  purchaseOrderId    String    @map("purchase_order_id")
+  platform           String    @default("1688") @db.VarChar(20)
+  platformOrderNo    String    @map("platform_order_no") @db.VarChar(64)
+  sellerName         String?   @map("seller_name") @db.VarChar(120)
+  goodsTitle         String?   @map("goods_title") @db.VarChar(500)
   /// 实付金额（分）
-  amount          Int      @default(0)
-  orderStatus     String?  @map("order_status") @db.VarChar(40)
-  expressCompany  String?  @map("express_company") @db.VarChar(40)
+  amount             Int       @default(0)
+  orderStatus        String?   @map("order_status") @db.VarChar(40)
+  expressCompany     String?   @map("express_company") @db.VarChar(40)
   /// 运单号；还没发货时为空字符串（唯一键不能含 NULL）
-  expressNo       String   @default("") @map("express_no") @db.VarChar(100)
-  logisticsState  Int?     @map("logistics_state")
-  logisticsTrace  Json?    @map("logistics_trace")
+  expressNo          String    @default("") @map("express_no") @db.VarChar(100)
+  logisticsState     Int?      @map("logistics_state")
+  logisticsTrace     Json?     @map("logistics_trace")
   logisticsCheckedAt DateTime? @map("logistics_checked_at")
-  logisticsError  String?  @map("logistics_error") @db.VarChar(255)
-  createdBy       String   @map("created_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  logisticsError     String?   @map("logistics_error") @db.VarChar(255)
+  createdBy          String    @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 
@@ -3579,6 +3581,12 @@ model EmployeeProfile {
   emergencyContactPhone    String?                @map("emergency_contact_phone")
   emergencyContactRelation String?                @map("emergency_contact_relation") // 与员工关系
   address                  String?                @db.VarChar(255) // 现住址
+  /// 呼叫定位系统：护理师手表设备号（watch_id），同租户内唯一
+  watchId                  String?                @map("watch_id") @db.VarChar(64)
+  /// 呼叫定位系统：当班状态（在岗/离岗/休息），派单只派给在岗的人
+  dutyStatus               DutyStatus             @default(OFF_DUTY) @map("duty_status")
+  /// 呼叫定位系统：负责的楼层列表，如 ["2F","3F"]
+  responsibleFloors        Json?                  @map("responsible_floors")
   remark                   String?                @db.Text
   createdBy                String                 @map("created_by")
   createdAt                DateTime               @default(now()) @map("created_at")
@@ -4251,18 +4259,18 @@ model ExamAnswer {
 
 /// 回收站：删除客户/母婴档案时，把它和名下所有数据存成一份快照（保留30天），期内可原样还原；到期自动清除
 model RecycleBinItem {
-  id         String    @id @default(cuid())
-  tenantId   String    @map("tenant_id")
-  entityType String    @map("entity_type") // CUSTOMER / MOTHER_PROFILE
-  entityId   String    @map("entity_id")
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  entityType String   @map("entity_type") // CUSTOMER / MOTHER_PROFILE
+  entityId   String   @map("entity_id")
   title      String // 显示名，如客户姓名
-  summary    String?   @db.Text // 一并删除了什么，如“2 份合同、1 笔收款”
-  payload    String    @db.LongText // 快照（JSON 文本）：各表被删除的行 + 被置空的关联
-  fileDocIds Json?     @map("file_doc_ids") // 到期清除时要一并删掉磁盘文件的资料 id
+  summary    String?  @db.Text // 一并删除了什么，如“2 份合同、1 笔收款”
+  payload    String   @db.LongText // 快照（JSON 文本）：各表被删除的行 + 被置空的关联
+  fileDocIds Json?    @map("file_doc_ids") // 到期清除时要一并删掉磁盘文件的资料 id
   reason     String? // 删除原因 / 来源（如 合并客户）
-  deletedBy  String    @map("deleted_by")
-  deletedAt  DateTime  @default(now()) @map("deleted_at")
-  expiresAt  DateTime  @map("expires_at")
+  deletedBy  String   @map("deleted_by")
+  deletedAt  DateTime @default(now()) @map("deleted_at")
+  expiresAt  DateTime @map("expires_at")
 
   @@index([tenantId, entityType, expiresAt])
   @@map("recycle_bin_items")
@@ -4277,7 +4285,7 @@ model BabyGrowthRecord {
   motherProfileId String   @map("mother_profile_id")
   babyProfileId   String   @map("baby_profile_id")
   measuredAt      DateTime @map("measured_at") @db.Date
-  weightG         Int?     @map("weight_g")  // 体重（克）
+  weightG         Int?     @map("weight_g") // 体重（克）
   lengthCm        Float?   @map("length_cm")
   headCm          Float?   @map("head_cm")
   measuredByName  String?  @map("measured_by_name")
@@ -4310,38 +4318,37 @@ model BabyGrowthShare {
   @@map("baby_growth_shares")
 }
 
-
 // ==================== 满意度调查 ====================
 /// 客户满意度调查（纸质表《客户满意度调查表 一/二/三》，住满第 5/15/25 天各一张）。客服不定期收回纸质表后拍照上传，
 /// AI 识别出每个评分项的分值（0~12，打勾的格子）和手写意见，人工核对确认后才计入统计。
 model SatisfactionSurvey {
-  id             String                @id @default(cuid())
-  tenantId       String                @map("tenant_id")
-  storeId        String?               @map("store_id")
-  formNo         Int                   @map("form_no") // 所用模板的序号（1/2/3 是内置三张表）；统计、筛选以 templateId 为准
-  templateId     String?               @map("template_id") // 满意度模板（SatisfactionTemplate）
-  customerId     String?               @map("customer_id") // 对上的客户（姓名匹配或人工选择）
-  customerName   String?               @map("customer_name") // 纸上手写的姓名（客户没对上时也保留）
-  roomNo         String?               @map("room_no")
-  stewardName    String?               @map("steward_name") // 管家姓名
-  nurseName      String?               @map("nurse_name") // 责任护士
-  phone          String?
-  surveyDate     DateTime?             @map("survey_date") @db.Date
-  scores         Json?                 // { 评分项key: 0~12 }，没打勾的项不出现
-  suggestion     String?               @db.Text // 其它意见和建议 / 需要改进的地方
-  praise         String?               @db.Text // 值得表扬的人、事、物
-  status         String                @default("DRAFT") // DRAFT 待核对 / CONFIRMED 已确认（计入统计）
-  extractStatus  ContractExtractStatus @default(NONE) @map("extract_status")
-  extractError   String?               @map("extract_error") @db.Text
-  extractWarnings Json?                @map("extract_warnings")
-  extractModel   String?               @map("extract_model")
-  extractedAt    DateTime?             @map("extracted_at")
-  confirmedBy    String?               @map("confirmed_by")
-  confirmedAt    DateTime?             @map("confirmed_at")
-  createdBy      String                @map("created_by")
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
-  version        Int                   @default(0)
+  id              String                @id @default(cuid())
+  tenantId        String                @map("tenant_id")
+  storeId         String?               @map("store_id")
+  formNo          Int                   @map("form_no") // 所用模板的序号（1/2/3 是内置三张表）；统计、筛选以 templateId 为准
+  templateId      String?               @map("template_id") // 满意度模板（SatisfactionTemplate）
+  customerId      String?               @map("customer_id") // 对上的客户（姓名匹配或人工选择）
+  customerName    String?               @map("customer_name") // 纸上手写的姓名（客户没对上时也保留）
+  roomNo          String?               @map("room_no")
+  stewardName     String?               @map("steward_name") // 管家姓名
+  nurseName       String?               @map("nurse_name") // 责任护士
+  phone           String?
+  surveyDate      DateTime?             @map("survey_date") @db.Date
+  scores          Json? // { 评分项key: 0~12 }，没打勾的项不出现
+  suggestion      String?               @db.Text // 其它意见和建议 / 需要改进的地方
+  praise          String?               @db.Text // 值得表扬的人、事、物
+  status          String                @default("DRAFT") // DRAFT 待核对 / CONFIRMED 已确认（计入统计）
+  extractStatus   ContractExtractStatus @default(NONE) @map("extract_status")
+  extractError    String?               @map("extract_error") @db.Text
+  extractWarnings Json?                 @map("extract_warnings")
+  extractModel    String?               @map("extract_model")
+  extractedAt     DateTime?             @map("extracted_at")
+  confirmedBy     String?               @map("confirmed_by")
+  confirmedAt     DateTime?             @map("confirmed_at")
+  createdBy       String                @map("created_by")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  version         Int                   @default(0)
 
   files SatisfactionSurveyFile[]
 
@@ -4393,4 +4400,123 @@ model SatisfactionTemplate {
 
   @@index([tenantId, status])
   @@map("satisfaction_templates")
+}
+
+// ==================== 外部系统集成（呼叫定位系统等） ====================
+// 规则：管理系统是基础数据的唯一来源；外部系统用 API Key 只读拉取、写回呼叫事件，不碰本库。
+// 全局 ID 规则见 docs/集成规范-呼叫定位系统.md（全部主键为 cuid 字符串，全局唯一、不连号）。
+
+enum DutyStatus {
+  ON_DUTY
+  OFF_DUTY
+  RESTING
+}
+
+enum IntegrationDeviceKind {
+  TABLET
+  BEACON
+}
+
+/// 已接入的外部子系统（呼叫定位系统等）：登记地址、版本、开关；API Key 只存哈希，明文只在创建时显示一次
+model IntegrationSystem {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  code          String    @db.VarChar(64) // 系统代号，如 call-locating
+  name          String
+  baseUrl       String?   @map("base_url")
+  systemVersion String?   @map("system_version") @db.VarChar(32)
+  /// 限定只能访问某家门店；空 = 租户内所有门店
+  storeId       String?   @map("store_id")
+  apiKeyHash    String    @unique @map("api_key_hash") @db.VarChar(64)
+  apiKeyPrefix  String    @map("api_key_prefix") @db.VarChar(16)
+  enabled       Boolean   @default(true)
+  lastSeenAt    DateTime? @map("last_seen_at")
+  remark        String?   @db.Text
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  version       Int       @default(0)
+
+  @@unique([tenantId, code])
+  @@map("integration_systems")
+}
+
+/// 房间-设备绑定：一间房可有 1 台平板 + 多个蓝牙信标；device_code 是外部系统里的设备编号
+model RoomDeviceBinding {
+  id         String                @id @default(cuid())
+  tenantId   String                @map("tenant_id")
+  storeId    String                @map("store_id")
+  roomId     String                @map("room_id")
+  kind       IntegrationDeviceKind
+  deviceCode String                @map("device_code") @db.VarChar(64)
+  remark     String?
+  createdBy  String                @map("created_by")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@unique([tenantId, storeId, kind, deviceCode])
+  @@index([tenantId, roomId])
+  @@map("room_device_bindings")
+}
+
+/// 服务项字典：呼叫按钮/服务类型的统一代号（service_code）
+model ServiceCatalogItem {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  serviceCode String       @map("service_code") @db.VarChar(64)
+  name        String
+  category    String       @default("CALL") @db.VarChar(32)
+  sortNo      Int          @default(1) @map("sort_no")
+  status      CommonStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([tenantId, serviceCode])
+  @@map("service_catalog_items")
+}
+
+/// 外部呼叫记录：呼叫系统写回的每次呼叫，按 (来源系统, call_id) 幂等
+model ExternalCallRecord {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  storeId        String    @map("store_id")
+  source         String    @db.VarChar(64) // 来源系统代号
+  callId         String    @map("call_id") @db.VarChar(64)
+  roomId         String?   @map("room_id")
+  stayId         String?   @map("stay_id")
+  requestType    String    @map("request_type") @db.VarChar(64)
+  serviceCode    String?   @map("service_code") @db.VarChar(64)
+  status         String    @default("CREATED") @db.VarChar(32)
+  initiatedAt    DateTime  @map("initiated_at")
+  dispatchedAt   DateTime? @map("dispatched_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  completedAt    DateTime? @map("completed_at")
+  handlerStaffId String?   @map("handler_staff_id")
+  feedback       String?   @db.Text
+  payload        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, source, callId])
+  @@index([tenantId, storeId, initiatedAt])
+  @@index([tenantId, stayId])
+  @@index([tenantId, roomId])
+  @@map("external_call_records")
+}
+
+/// 管理系统事件（发件箱）：入住/离店/换房/排班变动时写入，外部系统按游标拉取（也可再转发 MQTT {store_id}/mgmt/{event_type}）
+model IntegrationEvent {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  storeId   String   @map("store_id")
+  eventType String   @map("event_type") @db.VarChar(64)
+  entityId  String?  @map("entity_id")
+  payload   Json
+  seq       BigInt   @unique @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, storeId, seq])
+  @@map("integration_events")
 }

@@ -49,6 +49,9 @@ export interface EmployeeProfile {
   emergencyContactPhone: string | null
   emergencyContactRelation: string | null
   address: string | null
+  watchId: string | null
+  dutyStatus: 'ON_DUTY' | 'OFF_DUTY' | 'RESTING'
+  responsibleFloors: string[] | null
   remark: string | null
   /** 以下由后端附带：来自账号的手机/部门/职务/门店，以及按入职日期算出的工龄（满几年） */
   phone: string | null
@@ -77,6 +80,9 @@ export interface EmployeeProfileDetailFields {
   emergencyContactPhone?: string
   emergencyContactRelation?: string
   address?: string
+  watchId?: string
+  dutyStatus?: 'ON_DUTY' | 'OFF_DUTY' | 'RESTING'
+  responsibleFloors?: string[]
 }
 
 export interface CreateEmployeeProfileDto extends EmployeeProfileDetailFields {

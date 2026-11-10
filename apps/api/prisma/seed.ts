@@ -251,6 +251,10 @@ async function main() {
     { code: 'ai.knowledge-document', name: 'AI助手-知识库文档', type: 'PAGE', parentCode: 'ai' },
     { code: 'ai.business-analytics-agent', name: 'AI助手-经营分析解读', type: 'PAGE', parentCode: 'ai' },
 
+    { code: 'integration', name: '系统集成', type: 'MODULE' },
+    { code: 'integration.system', name: '系统集成-接入系统与服务项', type: 'PAGE', parentCode: 'integration' },
+    { code: 'integration.binding', name: '系统集成-房间设备绑定', type: 'PAGE', parentCode: 'integration' },
+
     { code: 'iot', name: '设备网关', type: 'MODULE' },
     { code: 'iot.device-type', name: '设备网关-设备类型', type: 'PAGE', parentCode: 'iot' },
     { code: 'iot.device-registry', name: '设备网关-设备台账', type: 'PAGE', parentCode: 'iot' },
@@ -522,6 +526,12 @@ async function main() {
     permSpecs.push({ code: `ai.knowledge-document.${action}`, name: `AI助手-知识库文档-${action}`, type: 'BUTTON', parentCode: 'ai.knowledge-document' });
   }
   permSpecs.push({ code: 'ai.business-analytics-agent.analyze', name: 'AI助手-经营分析解读-analyze', type: 'BUTTON', parentCode: 'ai.business-analytics-agent' });
+  for (const action of ['view', 'create', 'update']) {
+    permSpecs.push({ code: `integration.system.${action}`, name: `系统集成-接入系统-${action}`, type: 'BUTTON', parentCode: 'integration.system' });
+  }
+  for (const action of ['view', 'update']) {
+    permSpecs.push({ code: `integration.binding.${action}`, name: `系统集成-房间设备绑定-${action}`, type: 'BUTTON', parentCode: 'integration.binding' });
+  }
   for (const action of ['view', 'create', 'update']) {
     permSpecs.push({ code: `iot.device-type.${action}`, name: `设备网关-设备类型-${action}`, type: 'BUTTON', parentCode: 'iot.device-type' });
   }

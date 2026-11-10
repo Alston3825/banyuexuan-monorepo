@@ -5,6 +5,7 @@ import { AuditLogService } from '../../audit/audit-log.service';
 import { RequestContextService } from '../../common/context/request-context.service';
 import { generateBusinessNo } from '../../common/utils/business-no.util';
 import { runVersionedUpdate } from '../../common/utils/versioned-update.util';
+import { IntegrationEventsService, MgmtEventType } from '../../integration/integration-events.service';
 import { CustomerService } from '../../crm/customer/customer.service';
 import { CheckInRoomOccupancyDto } from './dto/check-in-room-occupancy.dto';
 import { CreateRoomOccupancyDto } from './dto/create-room-occupancy.dto';
@@ -29,6 +30,7 @@ export class RoomOccupancyService {
     private readonly customerService: CustomerService,
     private readonly auditLogService: AuditLogService,
     private readonly ctx: RequestContextService,
+    private readonly integrationEvents: IntegrationEventsService,
   ) {}
 
   async findMany(query: QueryRoomOccupancyDto): Promise<RoomOccupancy[]> {
@@ -136,6 +138,21 @@ export class RoomOccupancyService {
   }
 
   /** 换房：只允许还没入住的预订，目标房间这段时间必须是空的。 */
+  /** 通知外部系统（呼叫定位等）：入住状态/房间变动。失败不影响主流程。 */
+  private emitStay(type: MgmtEventType, o: RoomOccupancy): Promise<void> {
+    return this.integrationEvents.emit(o.tenantId, o.storeId, type, o.id, {
+      stay_id: o.id,
+      store_id: o.storeId,
+      room_id: o.roomId,
+      customer_id: o.customerId,
+      status: o.status,
+      planned_check_in: o.plannedCheckIn.toISOString(),
+      planned_check_out: o.plannedCheckOut.toISOString(),
+      actual_check_in_at: o.actualCheckInAt?.toISOString() ?? null,
+      actual_check_out_at: o.actualCheckOutAt?.toISOString() ?? null,
+    });
+  }
+
   async changeRoom(id: string, roomId: string, expectedVersion: number): Promise<RoomOccupancy> {
     const before = await this.findOneOrThrow(id);
     this.assertVersion(before, expectedVersion);
@@ -154,6 +171,7 @@ export class RoomOccupancyService {
       remark: `换房：${before.roomId} -> ${roomId}`,
       ...this.auditCtx(),
     });
+    await this.emitStay('stay.room_changed', updated);
     return updated;
   }
 
@@ -317,6 +335,8 @@ export class RoomOccupancyService {
       ...this.auditCtx(),
     });
     await this.linkMotherProfile(updated);
+    if (release) await this.emitStay('stay.checked_out', { ...release, status: 'CHECKED_OUT', actualCheckOutAt: release.plannedCheckOut });
+    await this.emitStay('stay.checked_in', updated);
     return { ...updated, conflicts };
   }
 
@@ -348,6 +368,7 @@ export class RoomOccupancyService {
       remark: 'CHECKED_IN -> CHECKED_OUT（房间已标记待清扫）',
       ...this.auditCtx(),
     });
+    await this.emitStay('stay.checked_out', updated);
     return updated;
   }
 
