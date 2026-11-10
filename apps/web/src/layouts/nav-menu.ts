@@ -298,6 +298,11 @@ const navGroups: NavGroup[] = [
   },
 ]
 
+/** 当前账号能进的全部页面（含所属分组、图标），给“我的待办·自定义快捷入口”挑选用 */
+export function listNavLeaves(hasAccess: (perm: string) => boolean): { label: string; to: string; group: string; icon: Component }[] {
+  return navGroups.flatMap((g) => g.items.filter((i) => hasAny(hasAccess, i.perm)).map((i) => ({ label: i.label, to: i.to, group: g.label, icon: i.icon })))
+}
+
 /** 不属于任何分组、直接挂在菜单最外层的单个入口 */
 const standaloneItems: NavLeaf[] = []
 

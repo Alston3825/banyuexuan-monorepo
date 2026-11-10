@@ -4520,3 +4520,121 @@ model IntegrationEvent {
   @@index([tenantId, storeId, seq])
   @@map("integration_events")
 }
+
+// ==================== 我的待办（个人工作台） ====================
+enum TodoQuadrant {
+  Q1 // 紧急且重要
+  Q2 // 重要但不紧急
+  Q3 // 紧急但不重要
+  Q4 // 不紧急且不重要
+}
+
+enum ReminderRepeat {
+  NONE // 只提醒一次（指定日期）
+  DAILY
+  WEEKDAYS // 周一至周五
+  WEEKLY
+  MONTHLY
+}
+
+/// 效率四象限里的个人任务
+model PersonalTask {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  accountId String       @map("account_id")
+  title     String       @db.VarChar(200)
+  note      String?      @db.VarChar(500)
+  quadrant  TodoQuadrant @default(Q2)
+  sortOrder Int          @default(0) @map("sort_order")
+  done      Boolean      @default(false)
+  doneAt    DateTime?    @map("done_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId, accountId, done])
+  @@map("personal_task")
+}
+
+/// 个人重要提醒（按日期/重复规则在当天自动出现）
+model PersonalReminder {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @map("tenant_id")
+  accountId   String                 @map("account_id")
+  title       String                 @db.VarChar(200)
+  note        String?                @db.VarChar(500)
+  repeat      ReminderRepeat         @default(NONE)
+  /// 一次性提醒的日期（YYYY-MM-DD）；重复提醒表示“从这天开始”
+  startDate   String                 @map("start_date") @db.VarChar(10)
+  /// 提醒时刻 HH:mm，空=全天
+  timeOfDay   String?                @map("time_of_day") @db.VarChar(5)
+  /// 每周几(0-6，0=周日)，WEEKLY 用
+  weekday     Int?
+  /// 每月几号，MONTHLY 用
+  monthDay    Int?                   @map("month_day")
+  active      Boolean                @default(true)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  completions PersonalReminderDone[]
+
+  @@index([tenantId, accountId, active])
+  @@map("personal_reminder")
+}
+
+/// 某条提醒在某一天已完成
+model PersonalReminderDone {
+  id         String           @id @default(cuid())
+  reminderId String           @map("reminder_id")
+  date       String           @db.VarChar(10)
+  doneAt     DateTime         @default(now()) @map("done_at")
+  reminder   PersonalReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@unique([reminderId, date])
+  @@map("personal_reminder_done")
+}
+
+/// 正在进行中的持续性工作（带依次推进的节点）
+model OngoingWork {
+  id         String            @id @default(cuid())
+  tenantId   String            @map("tenant_id")
+  accountId  String            @map("account_id")
+  title      String            @db.VarChar(200)
+  note       String?           @db.VarChar(500)
+  finished   Boolean           @default(false)
+  finishedAt DateTime?         @map("finished_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  steps      OngoingWorkStep[]
+
+  @@index([tenantId, accountId, finished])
+  @@map("ongoing_work")
+}
+
+model OngoingWorkStep {
+  id        String      @id @default(cuid())
+  workId    String      @map("work_id")
+  title     String      @db.VarChar(200)
+  /// 完成时填的进展说明（可空）
+  result    String?     @db.VarChar(500)
+  sortOrder Int         @default(0) @map("sort_order")
+  done      Boolean     @default(false)
+  doneAt    DateTime?   @map("done_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+  work      OngoingWork @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@index([workId])
+  @@map("ongoing_work_step")
+}
+
+/// 自定义快捷入口：每人把常用页面链接到“我的待办”
+model QuickLink {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  accountId String   @map("account_id")
+  path      String   @db.VarChar(200)
+  label     String   @db.VarChar(60)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([accountId, path])
+  @@map("quick_link")
+}

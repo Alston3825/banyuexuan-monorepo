@@ -1,119 +1,74 @@
 <script setup lang="ts">
-/** 我的待办：所有需要当前登录人处理的事情放在一处，已超时/快到期的排最前并标红。 */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { NButton, NEmpty, NSpin, NTag } from 'naive-ui'
-import { workspaceApi } from '../../api/modules/workspace.api'
-import type { TodoItem, TodoKind, TodoSummary } from '../../api/types/workflow'
+/**
+ * 我的待办：每天上午打开，一眼理清今天的工作。
+ * 四个栏目左右排开——效率四象限 / 重要提醒 / 正在进行中 / 自定义快捷入口，点栏目名切换。
+ */
+import { onMounted, ref } from 'vue'
+import QuadrantPanel from './QuadrantPanel.vue'
+import ReminderPanel from './ReminderPanel.vue'
+import OngoingPanel from './OngoingPanel.vue'
+import ShortcutsPanel from './ShortcutsPanel.vue'
 
-const router = useRouter()
-const data = ref<TodoSummary | null>(null)
-const loading = ref(false)
-const filter = ref<TodoKind | 'ALL'>('ALL')
-
-const KIND_LABEL: Record<TodoKind, string> = { APPROVAL: '待我审批', REJECTED: '被驳回', EXPIRY: '证件/合同到期', OUTREACH: '回访任务', COLLECT: '待汇总', PURCHASE: '待采购', RECEIVE: '待收货', ROOM_CONFLICT: '预订冲突', SATISFACTION: '满意度调查' }
-const LEVEL_TAG: Record<string, 'error' | 'warning' | 'info'> = { danger: 'error', warning: 'warning', info: 'info' }
-
-async function load() {
-  loading.value = true
+type Tab = 'quadrant' | 'reminder' | 'ongoing' | 'links'
+const TABS: { key: Tab; label: string; short: string }[] = [
+  { key: 'quadrant', label: '效率四象限', short: '四象限' },
+  { key: 'reminder', label: '重要提醒', short: '提醒' },
+  { key: 'ongoing', label: '正在进行中', short: '进行中' },
+  { key: 'links', label: '自定义快捷入口', short: '快捷入口' },
+]
+const tab = ref<Tab>('quadrant')
+const counts = ref<Record<Tab, number>>({ quadrant: 0, reminder: 0, ongoing: 0, links: 0 })
+const KEY = 'myTodoTab'
+onMounted(() => {
   try {
-    data.value = await workspaceApi.todos()
-  } finally {
-    loading.value = false
+    const t = localStorage.getItem(KEY) as Tab | null
+    if (t && TABS.some((x) => x.key === t)) tab.value = t
+  } catch {
+    /* 记不住上次的栏目也没关系 */
+  }
+})
+function pick(t: Tab) {
+  tab.value = t
+  try {
+    localStorage.setItem(KEY, t)
+  } catch {
+    /* ignore */
   }
 }
-let timer: number | undefined
-onMounted(() => {
-  load()
-  timer = window.setInterval(load, 120_000)
-})
-onBeforeUnmount(() => window.clearInterval(timer))
-
-const items = computed<TodoItem[]>(() => (data.value?.items ?? []).filter((i) => filter.value === 'ALL' || i.kind === filter.value))
-const urgent = computed(() => items.value.filter((i) => i.overdue))
-const normal = computed(() => items.value.filter((i) => !i.overdue))
-const dt = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
+const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 </script>
 
 <template>
-  <n-spin :show="loading">
-    <div class="td-chips">
-      <n-tag :type="filter === 'ALL' ? 'primary' : 'default'" round checkable :checked="filter === 'ALL'" @update:checked="filter = 'ALL'">全部 {{ data?.total ?? 0 }}</n-tag>
-      <n-tag v-for="(label, k) in KIND_LABEL" :key="k" round checkable :checked="filter === k" :type="filter === k ? 'primary' : 'default'" @update:checked="filter = k as TodoKind">
-        {{ label }} {{ data?.byKind[k] ?? 0 }}
-      </n-tag>
-      <n-button size="small" quaternary @click="load">刷新</n-button>
-    </div>
-
-    <n-empty v-if="data && items.length === 0" description="目前没有需要你处理的事项 🎉" style="margin-top: 60px" />
-
-    <template v-if="urgent.length">
-      <div class="td-sec td-sec-red">已超时 / 已逾期（{{ urgent.length }}）</div>
-      <div v-for="i in urgent" :key="i.key" class="td-card td-red" @click="router.push(i.link)">
-        <div class="td-title">{{ i.title }}</div>
-        <div class="td-desc">{{ i.desc }}</div>
-        <n-tag size="small" type="error" :bordered="false">{{ KIND_LABEL[i.kind] }}</n-tag>
-      </div>
-    </template>
-    <template v-if="normal.length">
-      <div class="td-sec">待处理（{{ normal.length }}）</div>
-      <div v-for="i in normal" :key="i.key" class="td-card" :class="{ 'td-warn': i.level === 'warning' }" @click="router.push(i.link)">
-        <div class="td-title">{{ i.title }}</div>
-        <div class="td-desc">{{ i.desc }}</div>
-        <n-tag size="small" :type="LEVEL_TAG[i.level]" :bordered="false">{{ KIND_LABEL[i.kind] }}</n-tag>
-        <span v-if="i.dueAt" class="td-due">{{ i.kind === 'APPROVAL' ? '处理期限' : '日期' }} {{ dt(i.dueAt) }}</span>
-      </div>
-    </template>
-  </n-spin>
+  <div class="mt">
+    <div class="mt-hello">今天是 {{ today }}，先把最要紧的事排好 ✨</div>
+    <nav class="mt-tabs">
+      <button v-for="t in TABS" :key="t.key" :class="{ on: tab === t.key }" @click="pick(t.key)">
+        <span class="mt-full">{{ t.label }}</span><span class="mt-short">{{ t.short }}</span>
+        <i v-if="counts[t.key] > 0">{{ counts[t.key] }}</i>
+      </button>
+    </nav>
+    <section class="mt-body">
+      <QuadrantPanel v-show="tab === 'quadrant'" @count="(n: number) => (counts.quadrant = n)" />
+      <ReminderPanel v-show="tab === 'reminder'" @count="(n: number) => (counts.reminder = n)" />
+      <OngoingPanel v-show="tab === 'ongoing'" @count="(n: number) => (counts.ongoing = n)" />
+      <ShortcutsPanel v-show="tab === 'links'" />
+    </section>
+  </div>
 </template>
 
 <style scoped>
-.td-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.td-sec {
-  margin: 14px 0 6px;
-  font-weight: 600;
-  font-size: 13px;
-}
-.td-sec-red {
-  color: #d03050;
-}
-.td-card {
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border: 1px solid #eee;
-  border-left: 4px solid #2080f0;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-}
-.td-card:hover {
-  background: #f8fafc;
-}
-.td-warn {
-  border-left-color: #f0a020;
-}
-.td-red {
-  border-left-color: #d03050;
-  background: #fff8f8;
-}
-.td-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-.td-desc {
-  margin: 4px 0 6px;
-  color: #666;
-  font-size: 12px;
-}
-.td-due {
-  margin-left: 8px;
-  color: #999;
-  font-size: 12px;
+.mt-hello { margin-bottom: 10px; color: #8a7f70; font-size: 13px; }
+.mt-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.mt-tabs button { position: relative; min-height: 46px; padding: 8px 6px; border: 1px solid #e6dccb; border-radius: 12px; background: #f6f1ea; color: #5b5144; font-size: 15px; cursor: pointer; }
+.mt-tabs button.on { background: #5b4a38; color: #fff; border-color: #5b4a38; font-weight: 600; }
+.mt-tabs i { position: absolute; top: -6px; right: -4px; min-width: 20px; padding: 0 5px; height: 20px; line-height: 20px; border-radius: 10px; background: #d03050; color: #fff; font-size: 12px; font-style: normal; }
+.mt-short { display: none; }
+.mt-body { padding: 14px; background: #fbf8f3; border: 1px solid #efe7da; border-radius: 16px; }
+@media (max-width: 767px) {
+  .mt-tabs { gap: 6px; }
+  .mt-tabs button { font-size: 13px; }
+  .mt-full { display: none; }
+  .mt-short { display: inline; }
+  .mt-body { padding: 10px; }
 }
 </style>
