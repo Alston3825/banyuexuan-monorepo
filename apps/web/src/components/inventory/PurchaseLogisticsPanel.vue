@@ -46,8 +46,30 @@ async function load() {
   const stale = !i.checkedAt || Date.now() - new Date(i.checkedAt).getTime() > 10 * 60_000
   if (meta.value.configured && i.expressNo && i.expressCompany && i.logisticsState !== 3 && stale) void refresh(true)
 }
+/** 按单号特征猜快递公司（JD→京东，SF→顺丰，YT→圆通…）；猜不到就让用户自己选 */
+function guessCompany(no: string): string | null {
+  const n = no.trim().toUpperCase()
+  const rules: [RegExp, string][] = [[/^JD[A-Z0-9]{8,}/, 'jd'], [/^SF\d{10,}/, 'shunfeng'], [/^YT\d{10,}/, 'yuantong'], [/^JT[A-Z0-9]{10,}/, 'jtexpress'], [/^(78|75|73|63)\d{10,12}$/, 'zhongtong'], [/^(77|268|462)\d{10,}$/, 'shentong'], [/^(43|46|31|10|11|12)\d{11,}$/, 'yunda'], [/^(E[A-Z]\d{9}[A-Z]{2}|[A-Z]{2}\d{9}CN)$/, 'ems'], [/^DPK\d+/, 'debangwuliu']]
+  const hit = rules.find(([re]) => re.test(n))
+  return hit ? hit[1] : null
+}
+watch(
+  () => form.value.expressNo,
+  (no) => {
+    if (!props.canEdit || form.value.expressCompany || !no.trim()) return
+    const g = guessCompany(no)
+    if (g && companyOptions.value.some((c) => c.value === g)) {
+      form.value.expressCompany = g
+      message.info('已按单号自动识别快递公司，请核对')
+    }
+  },
+)
 watch(() => props.orderId, load)
-onMounted(load)
+onMounted(async () => {
+  await load()
+  const f = form.value
+  if (props.canEdit && !f.expressCompany && f.expressNo) f.expressCompany = guessCompany(f.expressNo)
+})
 
 async function save() {
   saving.value = true
@@ -112,7 +134,7 @@ const fmtTime = (s: string | null) => (s ? s.replace('T', ' ').slice(0, 16) : ''
     </div>
     <n-space style="margin-top: 8px" :wrap="true" align="center">
       <n-button v-if="canEdit" :loading="saving" :disabled="!dirty" @click="save">只保存</n-button>
-      <n-button :loading="refreshing || saving" :disabled="!form.expressCompany || !form.expressNo.trim()" @click="queryNow">查询物流</n-button>
+      <n-button :loading="refreshing || saving" :disabled="!form.expressNo.trim()" @click="queryNow">查询物流</n-button>
       <span v-if="info?.checkedAt" class="pl-sub">最近查询：{{ fmtTime(info.checkedAt) }}</span>
     </n-space>
 
