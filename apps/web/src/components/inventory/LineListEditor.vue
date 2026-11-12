@@ -35,16 +35,16 @@ const remove = (i: number) => emit('update:modelValue', props.modelValue.filter(
 .le-row {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .le-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 </style>

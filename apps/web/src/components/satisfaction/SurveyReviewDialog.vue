@@ -274,7 +274,7 @@ const running = computed(() => survey.value?.extractStatus === 'PENDING' || surv
   margin-bottom: 8px;
 }
 .sv-nophoto {
-  color: #999;
+  color: #86817a;
   padding: 24px 0;
   text-align: center;
 }
@@ -289,7 +289,7 @@ const running = computed(() => survey.value?.extractStatus === 'PENDING' || surv
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #888;
+  color: #86817a;
   margin: 4px 0;
 }
 .sv-gtitle {
@@ -335,25 +335,25 @@ const running = computed(() => survey.value?.extractStatus === 'PENDING' || surv
   cursor: default;
 }
 .sv-btn.on-success {
-  background: #18a058;
-  border-color: #18a058;
+  background: #5f6b49;
+  border-color: #5f6b49;
   color: #fff;
   font-weight: 700;
 }
 .sv-btn.on-warning {
-  background: #f0a020;
-  border-color: #f0a020;
+  background: #c96f4f;
+  border-color: #c96f4f;
   color: #fff;
   font-weight: 700;
 }
 .sv-btn.on-error {
-  background: #d03050;
-  border-color: #d03050;
+  background: #b4533a;
+  border-color: #b4533a;
   color: #fff;
   font-weight: 700;
 }
 .sv-warn {
-  background: rgba(240, 160, 32, 0.16);
+  background: rgba(201, 111, 79, 0.16);
   border-radius: 6px;
 }
 </style>

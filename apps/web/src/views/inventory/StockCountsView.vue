@@ -198,7 +198,7 @@ onMounted(fetchAll)
               <n-space :wrap="true" :size="[8, 4]" align="center" style="width: 100%">
                 <item-select v-model="value.itemId" :items="items" :stock="stockLoaded ? stock : null" style="width: min(360px, 94vw)" />
                 <n-input-number v-model:value="value.countedQuantity" :min="0" placeholder="实际盘点数量" style="width: min(160px, 94vw)" />
-                <span v-if="value.itemId && stockLoaded" style="white-space: nowrap; color: #18a058; font-size: 13px">系统库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}</span>
+                <span v-if="value.itemId && stockLoaded" style="white-space: nowrap; color: #5f6b49; font-size: 13px">系统库存 {{ stockOf(value.itemId) }} {{ unitOf(value.itemId) }}</span>
               </n-space>
             </line-list-editor>
           </n-form-item>

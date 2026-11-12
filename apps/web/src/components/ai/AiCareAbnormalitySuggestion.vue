@@ -69,7 +69,7 @@ onMounted(fetchList)
             <n-tag size="small" :type="s.status === 'ACCEPTED' ? 'success' : s.status === 'DISMISSED' ? 'default' : 'warning'">
               {{ s.status === 'ACCEPTED' ? '已采纳' : s.status === 'DISMISSED' ? '已忽略' : '待确认' }}
             </n-tag>
-            <span style="font-size: 12px; color: var(--n-text-color-3, #999)">{{ new Date(s.createdAt).toLocaleString() }} · {{ s.modelProvider }}</span>
+            <span style="font-size: 12px; color: var(--n-text-color-3, #86817a)">{{ new Date(s.createdAt).toLocaleString() }} · {{ s.modelProvider }}</span>
           </n-space>
         </template>
         <div style="white-space: pre-wrap">{{ s.outputText }}</div>

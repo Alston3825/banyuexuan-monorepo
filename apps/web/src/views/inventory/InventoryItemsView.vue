@@ -310,8 +310,8 @@ onMounted(fetchList)
       <n-card :title="editingRow ? '编辑物品' : '新建物品'" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="formVisible = false" aria-modal="true">
         <n-form ref="formRef" :model="model" label-placement="left" label-width="110">
           <n-form-item label="编码">
-            <span v-if="editingRow" style="color: #666">{{ model.code }}（自动生成，不能修改）</span>
-            <span v-else style="color: #999">保存后自动生成（WP0001 这样的格式），不用填写</span>
+            <span v-if="editingRow" style="color: #6f6a62">{{ model.code }}（自动生成，不能修改）</span>
+            <span v-else style="color: #86817a">保存后自动生成（WP0001 这样的格式），不用填写</span>
           </n-form-item>
           <n-form-item label="名称" path="name" :rule="{ required: true, message: '请输入名称' }">
             <n-input v-model:value="model.name" />
@@ -363,7 +363,7 @@ onMounted(fetchList)
         <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onFileChosen" />
         <n-space align="center" style="margin-bottom: 10px">
           <n-button type="primary" :loading="parsing" @click="fileInput?.click()">{{ preview ? '重新选择文件' : '选择 Excel 文件（.xlsx）' }}</n-button>
-          <span style="color: #888; font-size: 12px">直接用现在在用的采购申购表即可，不用改格式</span>
+          <span style="color: #86817a; font-size: 12px">直接用现在在用的采购申购表即可，不用改格式</span>
         </n-space>
 
         <template v-if="preview">
@@ -396,7 +396,7 @@ onMounted(fetchList)
             :max-height="380"
             size="small"
           />
-          <div style="margin-top: 6px; color: #999; font-size: 12px">同名但规格不同的算两个物品（如垃圾袋 100*120 和 100*80）。缺单位的行请在表格里补上单位。物品编码自动生成。</div>
+          <div style="margin-top: 6px; color: #86817a; font-size: 12px">同名但规格不同的算两个物品（如垃圾袋 100*120 和 100*80）。缺单位的行请在表格里补上单位。物品编码自动生成。</div>
         </template>
         <n-empty v-else description="先选择 Excel 文件，系统会识别并让你核对后再导入" style="padding: 24px 0" />
 

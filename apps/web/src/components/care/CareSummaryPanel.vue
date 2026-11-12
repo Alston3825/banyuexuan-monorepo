@@ -101,7 +101,7 @@ defineExpose({ reload: load })
 
 <style scoped>
 .cs-hint {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .cs-page {
@@ -122,7 +122,7 @@ defineExpose({ reload: load })
 .cs-h {
   margin: 16px 0 6px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-size: 15px;
 }
 .cs-t {
@@ -133,11 +133,11 @@ defineExpose({ reload: load })
 .cs-t th,
 .cs-t td {
   padding: 5px 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #d6d2c8;
   text-align: center;
 }
 .cs-t th {
-  background: #f5f7fa;
+  background: #eef2f5;
 }
 .cs-left {
   text-align: left !important;
@@ -150,12 +150,12 @@ defineExpose({ reload: load })
 }
 .cs-tip {
   padding: 6px 8px;
-  background: #fff7e0;
+  background: #f4ecdf;
   border-radius: 4px;
 }
 .cs-foot {
   margin-top: 24px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 @media (max-width: 720px) {

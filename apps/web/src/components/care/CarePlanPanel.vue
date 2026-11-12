@@ -158,21 +158,21 @@ defineExpose({ reload: load })
 .cp-open {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #f0a020;
+  border: 1px solid #c96f4f;
   border-radius: 8px;
-  background: #fff7e0;
+  background: #f4ecdf;
 }
 .cp-rej {
-  color: #c0392b;
+  color: #b4533a;
   font-size: 13px;
 }
 .cp-meta {
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
   line-height: 1.7;
 }
 .cp-over {
-  color: #c0392b;
+  color: #b4533a;
   font-weight: 600;
 }
 .cp-focus {
@@ -182,7 +182,7 @@ defineExpose({ reload: load })
 }
 .cp-sub {
   margin-top: 4px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
   line-height: 1.6;
 }
@@ -195,13 +195,13 @@ defineExpose({ reload: load })
 .cp-pill {
   padding: 2px 8px;
   border-radius: 12px;
-  background: #eef5fc;
-  color: #2a64b0;
+  background: #eef2f5;
+  color: #5b83aa;
   font-size: 13px;
 }
 .cp-his {
   padding: 8px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed #eeebe3;
   font-size: 13px;
   cursor: pointer;
 }

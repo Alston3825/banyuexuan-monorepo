@@ -435,7 +435,7 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
 
       <div class="cf-head">
         <span class="cf-head-title">{{ pageTitle }}（客户基本信息）</span>
-        <n-button size="small" color="#d9822b" :loading="idChecking" @click="verifyIdCard()">身份证号码验证</n-button>
+        <n-button size="small" color="#c96f4f" :loading="idChecking" @click="verifyIdCard()">身份证号码验证</n-button>
         <n-button size="small" type="info" disabled title="需要连接身份证读卡器硬件，暂不支持">身份证读卡快录</n-button>
       </div>
 
@@ -639,7 +639,7 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
           </template>
           <template v-else>
             <n-button type="info" :loading="submitting" @click="submit('detail')">提交，到客户详情</n-button>
-            <n-button color="#d9822b" :loading="submitting" @click="submit('purchase')">提交，去购买服务</n-button>
+            <n-button color="#c96f4f" :loading="submitting" @click="submit('purchase')">提交，去购买服务</n-button>
           </template>
           <n-tag v-if="!isEdit" size="small" :bordered="false">“去购买服务”会带你到合同管理上传这位客户的合同</n-tag>
         </div>
@@ -658,8 +658,8 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   gap: 12px;
   padding: 8px 0 10px;
   font-size: 13px;
-  color: #666;
-  border-bottom: 1px solid #eee;
+  color: #6f6a62;
+  border-bottom: 1px solid #eeebe3;
   margin-bottom: 12px;
 }
 .cf-head {
@@ -668,22 +668,22 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   gap: 10px;
   margin-bottom: 16px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
 }
 .cf-head-title {
   font-size: 14px;
   font-weight: 600;
-  color: #2a64b0;
+  color: #5b83aa;
   margin-right: 8px;
 }
 .cf-hint {
   font-size: 12px;
-  color: #888;
+  color: #86817a;
 }
 .cf-warn {
   margin-top: 4px;
   font-size: 12px;
-  color: #b25e00;
+  color: #9a4f33;
   line-height: 1.6;
 }
 .cf-tight :deep(.n-form-item-blank) {
@@ -693,7 +693,7 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   margin: 8px 0 12px;
   padding: 12px 8px 4px;
   max-width: 760px;
-  background: #f6f1df;
+  background: #e9d9c3;
   border-radius: 4px;
 }
 .cf-actions {

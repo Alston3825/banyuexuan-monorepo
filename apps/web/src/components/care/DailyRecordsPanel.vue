@@ -50,7 +50,7 @@ onMounted(load)
           <div class="dl-title">今天（{{ data ? label(data.today) : '' }}）</div>
           <div class="dl-sub">
             入住第 {{ todayRow?.stayDay ?? '-' }} 天<span v-if="data?.roomNo"> · 房号 {{ data.roomNo }}</span> ·
-            <span :style="{ color: missing > 0 ? '#b25e00' : '#2a8a3e' }">{{ missing > 0 ? `共 ${missing} 天还没填` : '每天都已填写' }}</span>
+            <span :style="{ color: missing > 0 ? '#9a4f33' : '#5f6b49' }">{{ missing > 0 ? `共 ${missing} 天还没填` : '每天都已填写' }}</span>
           </div>
         </div>
         <n-space v-if="data" :wrap="true">
@@ -102,7 +102,7 @@ onMounted(load)
 }
 .dl-sub {
   margin-top: 2px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .dl-list {
@@ -116,24 +116,24 @@ onMounted(load)
   align-items: center;
   gap: 8px 10px;
   padding: 12px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
 }
 .dl-row:active {
-  background: #f5f8fc;
+  background: #eef2f5;
 }
 .dl-date {
   flex: 1;
 }
 .dl-day {
   margin-left: 8px;
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .dl-go {
-  color: #bbb;
+  color: #a8a39a;
   font-size: 20px;
 }
 </style>

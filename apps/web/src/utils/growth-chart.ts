@@ -5,7 +5,7 @@ import type { GrowthMetric, GrowthReport } from '../api/types/care-growth'
  * 橙红折线 = 这个宝宝的实测。页面展示、下载图片、客户手机页都用这同一份 SVG，样子完全一致。
  */
 const W = 760
-const COLOR = { band: '#e6f0fb', band2: '#c9defa', p50: '#2f6fb5', edge: '#8fb4de', baby: '#e8590c', text: '#333', sub: '#888', grid: '#ececec' }
+const COLOR = { band: '#eef2f5', band2: '#dde7f0', p50: '#5b83aa', edge: '#5b83aa', baby: '#c96f4f', text: '#161615', sub: '#86817a', grid: '#eeebe3' }
 const META: Record<GrowthMetric, { name: string; unit: string; pad: number }> = {
   weight: { name: '体重', unit: 'g', pad: 500 },
   length: { name: '身长', unit: 'cm', pad: 2 },

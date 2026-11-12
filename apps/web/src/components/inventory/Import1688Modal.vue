@@ -151,10 +151,10 @@ async function save() {
 </template>
 
 <style scoped>
-.muted { color: #888; font-size: 13px; }
-.ok { color: #18a058; font-size: 13px; margin-top: 4px; }
-.warn { color: #d08a00; font-size: 13px; }
-.im-card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.muted { color: #86817a; font-size: 13px; }
+.ok { color: #5f6b49; font-size: 13px; margin-top: 4px; }
+.warn { color: #9a4f33; font-size: 13px; }
+.im-card { border: 1px solid #e6e3d9; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
 .im-card.off { opacity: 0.7; }
 .im-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .im-seller { flex: 1 1 auto; min-width: 0; }

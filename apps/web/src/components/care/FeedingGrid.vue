@@ -134,19 +134,19 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 }
 .fg-t th,
 .fg-t td {
-  border: 1px solid #9a9a9a;
+  border: 1px solid #86817a;
   padding: 1px 3px;
   text-align: center;
   vertical-align: middle;
 }
 .fg-t th {
-  background: #f4f4f4;
+  background: #f7f5ef;
   font-weight: 600;
   padding: 4px 2px;
 }
 .fg-t th small {
   margin-left: 2px;
-  color: #999;
+  color: #86817a;
   font-weight: 400;
   font-size: 11px;
 }
@@ -187,69 +187,69 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 }
 .fg-t input:focus,
 .fg-t select:focus {
-  background: #f6fbf8;
+  background: #edf1e9;
 }
 .fg-t select {
   width: 62px;
   margin-left: 0;
-  border: 1px solid #ddd;
+  border: 1px solid #d6d2c8;
   border-radius: 4px;
   font-size: 12px;
 }
 .tick {
   width: 24px;
   height: 22px;
-  border: 1px solid #ccc;
+  border: 1px solid #d6d2c8;
   border-radius: 4px;
   background: #fff;
-  color: #ccc;
+  color: #d6d2c8;
   cursor: pointer;
 }
 .tick.on {
-  border-color: #18a058;
-  background: #e8f6ee;
-  color: #0c7a43;
+  border-color: #5f6b49;
+  background: #edf1e9;
+  color: #5f6b49;
   font-weight: 700;
 }
 .del {
   padding: 1px 8px;
-  border: 1px solid #f0c0c0;
+  border: 1px solid #e8cbc8;
   border-radius: 4px;
   background: #fff;
-  color: #c33;
+  color: #b4533a;
   font-size: 12px;
   cursor: pointer;
 }
 .del:hover {
-  background: #fdeeee;
+  background: #f6e9e6;
 }
 td.bad {
-  background: #fff3dc;
-  outline: 2px solid #f0a020;
+  background: #f4ecdf;
+  outline: 2px solid #c96f4f;
   outline-offset: -2px;
 }
 .sum td {
-  background: #f9f9f9;
+  background: #fbfaf6;
   font-weight: 600;
   padding: 3px;
 }
 .empty {
   padding: 14px;
-  color: #999;
+  color: #86817a;
 }
 .fg-warnall {
   margin-bottom: 6px;
-  color: #b25e00;
+  color: #9a4f33;
   font-size: 12px;
 }
 .add {
   margin-top: 6px;
   width: 100%;
   padding: 5px;
-  border: 1px dashed #18a058;
+  border: 1px dashed #5f6b49;
   border-radius: 6px;
   background: #fff;
-  color: #18a058;
+  color: #5f6b49;
   cursor: pointer;
 }
 </style>

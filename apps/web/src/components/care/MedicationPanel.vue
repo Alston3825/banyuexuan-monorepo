@@ -149,12 +149,12 @@ onMounted(load)
 .mp-card {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
   background: #fff;
 }
 .mp-old {
-  background: #f8f8f8;
+  background: #fbfaf6;
   opacity: 0.9;
 }
 .mp-top {
@@ -165,11 +165,11 @@ onMounted(load)
 }
 .mp-by {
   margin-left: auto;
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .mp-chg {
-  color: #d9822b;
+  color: #c96f4f;
   font-size: 12px;
 }
 .mp-items {
@@ -181,17 +181,17 @@ onMounted(load)
 .mp-pill {
   padding: 2px 8px;
   border-radius: 12px;
-  background: #eef5fc;
-  color: #2a64b0;
+  background: #eef2f5;
+  color: #5b83aa;
   font-size: 13px;
 }
 .mp-note {
   margin-top: 6px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .mp-stop {
-  color: #c0392b;
+  color: #b4533a;
 }
 .mp-photos {
   margin-top: 8px;
@@ -204,7 +204,7 @@ onMounted(load)
 }
 .mp-warn {
   margin-top: 8px;
-  color: #b25e00;
+  color: #9a4f33;
   font-size: 12px;
 }
 </style>

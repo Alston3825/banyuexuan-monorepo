@@ -291,8 +291,8 @@ const close = () => emit('update:show', false)
           <h4 class="md-h">变更说明（必填）</h4>
           <n-input v-model:value="changeNote" type="textarea" :autosize="{ minRows: 2 }" placeholder="相比上一份改了什么、为什么，如：医生调整，AD 改为每天两次" />
         </div>
-        <div v-else-if="auth?.changeNote" style="margin-top: 14px; color: #666; font-size: 13px"><b>变更说明：</b>{{ auth.changeNote }}</div>
-        <div v-if="auth?.status === 'STOPPED'" style="margin-top: 8px; color: #b25e00; font-size: 13px"><b>已停药：</b>{{ auth.stoppedAt?.slice(0, 10) }}，{{ auth.stopNote }}</div>
+        <div v-else-if="auth?.changeNote" style="margin-top: 14px; color: #6f6a62; font-size: 13px"><b>变更说明：</b>{{ auth.changeNote }}</div>
+        <div v-if="auth?.status === 'STOPPED'" style="margin-top: 8px; color: #9a4f33; font-size: 13px"><b>已停药：</b>{{ auth.stoppedAt?.slice(0, 10) }}，{{ auth.stopNote }}</div>
       </div>
 
       <template #footer>
@@ -308,13 +308,13 @@ const close = () => emit('update:show', false)
 <style scoped>
 .md-bar {
   padding-bottom: 8px;
-  border-bottom: 1px dashed #e5e5e5;
+  border-bottom: 1px dashed #e6e3d9;
 }
 .md-baby {
   font-weight: 600;
 }
 .md-tip {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .md-photo {
@@ -323,22 +323,22 @@ const close = () => emit('update:show', false)
 }
 .md-photo summary {
   cursor: pointer;
-  color: #2a64b0;
+  color: #5b83aa;
   margin-bottom: 6px;
 }
 .md-h {
   margin: 14px 0 8px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-size: 14px;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .md-item {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .md-line {
   display: flex;
@@ -352,7 +352,7 @@ const close = () => emit('update:show', false)
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
 }
 .md-grow {
   flex: 1 1 160px;
@@ -364,25 +364,25 @@ const close = () => emit('update:show', false)
   flex: 1 1 140px;
 }
 .md-sep {
-  color: #ccc;
+  color: #d6d2c8;
 }
 .md-name {
   font-weight: 600;
 }
 .md-sub {
   margin-top: 3px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .md-bad {
-  background: #fff7e0;
+  background: #f4ecdf;
   border-radius: 4px;
-  outline: 2px solid #f0a020;
+  outline: 2px solid #c96f4f;
 }
 .md-msg {
   margin-top: 4px;
   font-size: 12px;
-  color: #b25e00;
+  color: #9a4f33;
 }
 :deep(.n-card__content) {
   max-height: 72vh;

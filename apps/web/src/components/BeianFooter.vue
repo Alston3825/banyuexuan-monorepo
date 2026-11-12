@@ -23,7 +23,7 @@
 .beian-footer {
   text-align: center;
   font-size: 12px;
-  color: #999;
+  color: #86817a;
   padding: 12px 0 4px;
 }
 .beian-footer a {
@@ -31,12 +31,12 @@
   text-decoration: none;
 }
 .beian-footer a:hover {
-  color: #666;
+  color: #6f6a62;
   text-decoration: underline;
 }
 .divider {
   margin: 0 8px;
-  color: #ccc;
+  color: #d6d2c8;
 }
 .gongan-link {
   display: inline-flex;

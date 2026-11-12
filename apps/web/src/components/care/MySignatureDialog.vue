@@ -71,14 +71,14 @@ async function save() {
 <style scoped>
 .ms-label {
   margin: 6px 0;
-  color: #555;
+  color: #5c5851;
   font-size: 13px;
 }
 .ms-cur {
   margin-bottom: 10px;
   padding: 8px;
   border-radius: 8px;
-  background: #f6f8fb;
+  background: #eef2f5;
 }
 .ms-img {
   display: block;
@@ -87,7 +87,7 @@ async function save() {
 }
 .ms-tip {
   margin-top: 8px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 </style>

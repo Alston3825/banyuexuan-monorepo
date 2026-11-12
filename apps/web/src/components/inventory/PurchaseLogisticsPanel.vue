@@ -151,13 +151,13 @@ const fmtTime = (s: string | null) => (s ? s.replace('T', ' ').slice(0, 16) : ''
 .pl {
   margin: 12px 0;
   padding: 10px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e6e3d9;
   border-radius: 10px;
 }
 .pl-title {
   margin-bottom: 8px;
   font-weight: 700;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .pl-grid {
   display: grid;
@@ -169,10 +169,10 @@ const fmtTime = (s: string | null) => (s ? s.replace('T', ' ').slice(0, 16) : ''
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
 }
 .pl-sub {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 </style>

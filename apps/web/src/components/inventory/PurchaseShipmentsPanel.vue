@@ -80,13 +80,13 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.ps { margin: 12px 0; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 10px; }
-.ps-title { margin-bottom: 8px; font-weight: 700; color: #2a64b0; }
-.ps-row { padding: 8px 0; border-top: 1px solid #f0f0f0; }
+.ps { margin: 12px 0; padding: 10px 12px; border: 1px solid #e6e3d9; border-radius: 10px; }
+.ps-title { margin-bottom: 8px; font-weight: 700; color: #5b83aa; }
+.ps-row { padding: 8px 0; border-top: 1px solid #eeebe3; }
 .ps-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .ps-seller { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ps-amt { color: #555; }
+.ps-amt { color: #5c5851; }
 .ps-title2 { margin: 2px 0; font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.ps-sub { color: #999; font-size: 12px; word-break: break-all; }
-.ps-err { color: #d03050; font-size: 12px; }
+.ps-sub { color: #86817a; font-size: 12px; word-break: break-all; }
+.ps-err { color: #b4533a; font-size: 12px; }
 </style>

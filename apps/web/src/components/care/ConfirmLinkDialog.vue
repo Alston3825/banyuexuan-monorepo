@@ -117,11 +117,11 @@ const fmt = (iso: string) => {
 }
 .cl-label {
   margin: 8px 0 4px;
-  color: #555;
+  color: #5c5851;
   font-size: 13px;
 }
 .cl-tip {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .cl-list {

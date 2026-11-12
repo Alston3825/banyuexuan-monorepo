@@ -229,12 +229,12 @@ defineExpose({ reload: load })
 .sl-sub {
   display: block;
   margin-top: 4px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .sl-row {
   padding: 8px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed #eeebe3;
 }
 .sl-row:last-child {
   border-bottom: none;
@@ -246,11 +246,11 @@ defineExpose({ reload: load })
   gap: 8px;
 }
 .sl-freq {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .sl-baby {
-  color: #2a64b0;
+  color: #5b83aa;
   font-size: 12px;
 }
 .sl-logs {
@@ -262,14 +262,14 @@ defineExpose({ reload: load })
 .sl-chip {
   padding: 1px 8px;
   border-radius: 10px;
-  background: #eef5fc;
-  color: #2a64b0;
+  background: #eef2f5;
+  color: #5b83aa;
   font-size: 12px;
   cursor: pointer;
 }
 .sl-chip-val {
-  background: #fdf3e6;
-  color: #a85d0c;
+  background: #f4ecdf;
+  color: #9a4f33;
 }
 .sl-time {
   margin-left: 5px;
@@ -279,7 +279,7 @@ defineExpose({ reload: load })
 }
 .sl-last {
   margin-top: 4px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .sl-daytop {
@@ -289,7 +289,7 @@ defineExpose({ reload: load })
 .sl-daylist {
   max-height: 56vh;
   overflow-y: auto;
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
 }
 .sl-dayrow {
@@ -297,13 +297,13 @@ defineExpose({ reload: load })
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-bottom: 1px solid #f2f2f2;
+  border-bottom: 1px solid #f7f5ef;
 }
 .sl-dayrow:last-child {
   border-bottom: none;
 }
 .sl-dayon {
-  background: #f1faf4;
+  background: #edf1e9;
 }
 .sl-daylab {
   flex: 1;
@@ -311,15 +311,15 @@ defineExpose({ reload: load })
   flex-direction: column;
 }
 .sl-sub2 {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .sl-daystate {
   font-size: 13px;
-  color: #999;
+  color: #86817a;
 }
 .sl-dayon .sl-daystate {
-  color: #18a058;
+  color: #5f6b49;
   font-weight: 600;
 }
 .sl-two {
@@ -329,11 +329,11 @@ defineExpose({ reload: load })
 }
 .sl-sign {
   margin-left: 3px;
-  color: #2a8a3e;
+  color: #5f6b49;
 }
 .sl-lab {
   margin-bottom: 3px;
-  color: #666;
+  color: #6f6a62;
   font-size: 12px;
 }
 .sl-sw {

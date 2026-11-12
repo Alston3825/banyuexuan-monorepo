@@ -187,9 +187,9 @@ function readonlyText(f: FieldSpec): string {
 .sf-title {
   margin: 0 0 8px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-size: 14px;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .sf-grid {
   display: grid;
@@ -206,24 +206,24 @@ function readonlyText(f: FieldSpec): string {
 .sf-label {
   margin-bottom: 4px;
   font-size: 13px;
-  color: #444;
+  color: #3b3a37;
 }
 .sf-unit {
-  color: #999;
+  color: #86817a;
 }
 .sf-hint {
   margin-left: 6px;
-  color: #aaa;
+  color: #a8a39a;
   font-size: 12px;
 }
 .sf-readonly {
   min-height: 22px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #222;
+  color: #161615;
 }
 .sf-avg {
-  background: #eef5fc;
+  background: #eef2f5;
   border-radius: 6px;
 }
 .sf-avg-val {
@@ -232,19 +232,19 @@ function readonlyText(f: FieldSpec): string {
   align-items: center;
   font-size: 18px;
   font-weight: 700;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .sf-warn {
-  background: #fff7e0;
-  border-left: 3px solid #f0a020;
+  background: #f4ecdf;
+  border-left: 3px solid #c96f4f;
 }
 .sf-msg {
   margin-top: 3px;
   font-size: 12px;
-  color: #b25e00;
+  color: #9a4f33;
   line-height: 1.5;
 }
 .sf-range {
-  color: #c07010;
+  color: #9a4f33;
 }
 </style>

@@ -261,7 +261,7 @@ onMounted(async () => {
     <n-card title="客户分类 / 客户类型" style="margin-bottom: 16px">
       <n-space vertical :size="16">
         <n-space align="center" :size="12">
-          <span style="width: min(80px, 94vw); color: var(--n-text-color-3, #999)">客户分类</span>
+          <span style="width: min(80px, 94vw); color: var(--n-text-color-3, #86817a)">客户分类</span>
           <n-tag v-if="currentClassificationTagId" type="primary">
             {{ classificationOptions.find((o) => o.id === currentClassificationTagId)?.name }}
           </n-tag>
@@ -276,7 +276,7 @@ onMounted(async () => {
           />
         </n-space>
         <n-space align="center" :size="12">
-          <span style="width: min(80px, 94vw); color: var(--n-text-color-3, #999)">客户类型</span>
+          <span style="width: min(80px, 94vw); color: var(--n-text-color-3, #86817a)">客户类型</span>
           <n-tag v-if="currentTypeTagId" type="primary">
             {{ typeOptions.find((o) => o.id === currentTypeTagId)?.name }}
           </n-tag>

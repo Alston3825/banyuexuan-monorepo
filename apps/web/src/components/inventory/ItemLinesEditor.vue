@@ -149,16 +149,16 @@ const total = computed(() => lines.value.reduce((s, l) => s + (l.unitPrice !== n
   min-width: 240px;
 }
 .il-empty {
-  color: #999;
+  color: #86817a;
   font-size: 13px;
   padding: 10px 0;
 }
 .il-row {
   margin-bottom: 8px;
   padding: 8px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .il-head {
   display: flex;
@@ -170,7 +170,7 @@ const total = computed(() => lines.value.reduce((s, l) => s + (l.unitPrice !== n
   font-weight: 600;
 }
 .il-sub {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .il-del {
@@ -185,7 +185,7 @@ const total = computed(() => lines.value.reduce((s, l) => s + (l.unitPrice !== n
 .il-sum {
   margin-top: 6px;
   padding: 6px 10px;
-  background: #eef5fc;
+  background: #eef2f5;
   border-radius: 6px;
   font-size: 13px;
 }

@@ -433,7 +433,7 @@ function goAssignRoom() {
           AI 识别失败：{{ detail.extractError || '未知原因' }}。你可以点下方“重新识别”重试，或直接手工填写。
         </n-alert>
         <n-alert v-else-if="reviewing && detail.extractStatus === 'DONE'" :type="pendingCount > 0 ? 'warning' : 'success'" style="margin-bottom: 10px">
-          AI 已预填。<template v-if="pendingCount > 0">有 <b>{{ pendingCount }}</b> 项需要你对照左侧原图核对（<b style="color:#854f0b">黄色</b>=请核对，<b style="color:#a32d2d">红色</b>=没识别到/必填未填），改完或确认无误后点“确认并入库”。</template>
+          AI 已预填。<template v-if="pendingCount > 0">有 <b>{{ pendingCount }}</b> 项需要你对照左侧原图核对（<b style="color:#9a4f33">黄色</b>=请核对，<b style="color:#8a3d2a">红色</b>=没识别到/必填未填），改完或确认无误后点“确认并入库”。</template>
           <template v-else>没有需要特别核对的项目，请快速过一遍，确认无误后点“确认并入库”。</template>
         </n-alert>
         <n-alert v-else-if="reviewing && detail.extractStatus === 'NONE'" type="info" style="margin-bottom: 10px">手工录入的合同：请对照纸质合同填写，确认无误后点“确认并入库”。</n-alert>
@@ -591,8 +591,8 @@ function goAssignRoom() {
 .cv-imgbox {
   max-height: calc(100vh - 230px);
   overflow: auto;
-  border: 1px solid #eee;
-  background: #fafafa;
+  border: 1px solid #eeebe3;
+  background: #fbfaf6;
 }
 .cv-imgbox img {
   display: block;
@@ -605,12 +605,12 @@ function goAssignRoom() {
 }
 .cv-zoom-label {
   font-size: 12px;
-  color: #888;
+  color: #86817a;
 }
 .cv-empty {
   padding: 40px 12px;
   text-align: center;
-  color: #999;
+  color: #86817a;
   font-size: 13px;
 }
 .cv-title {
@@ -634,14 +634,14 @@ function goAssignRoom() {
 .cv-hint {
   margin-top: 8px;
   font-size: 12px;
-  color: #888;
+  color: #86817a;
   line-height: 1.6;
 }
 .cv-match {
   margin-top: 12px;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #f5f8ff;
+  background: #eef2f5;
 }
 .cv-match-title {
   font-size: 13px;
@@ -649,7 +649,7 @@ function goAssignRoom() {
 }
 .cv-match-tip {
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
   line-height: 1.6;
   margin: 2px 0;
 }
@@ -667,20 +667,20 @@ function goAssignRoom() {
   border-radius: 6px;
 }
 .cv-item-warn {
-  background: #fff7e6;
-  border-left: 3px solid #ef9f27;
+  background: #f4ecdf;
+  border-left: 3px solid #c96f4f;
 }
 .cv-item-note {
   grid-column: 1 / -1;
   font-size: 12px;
-  color: #854f0b;
+  color: #9a4f33;
 }
 .cv-actions {
   position: sticky;
   bottom: 0;
   padding: 10px 0;
   background: #fff;
-  border-top: 1px solid #eee;
+  border-top: 1px solid #eeebe3;
   margin-top: 8px;
 }
 @media (max-width: 1000px) {

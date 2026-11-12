@@ -34,3 +34,8 @@
     border-radius: 10px;
   }
 }
+a {
+  color: var(--bx-ink);
+  text-decoration-color: var(--bx-clay);
+  text-underline-offset: 3px;
+}

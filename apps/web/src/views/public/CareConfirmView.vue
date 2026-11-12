@@ -303,7 +303,7 @@ function holdEnd(cancel = true) {
   max-width: 560px;
   margin: 0 auto;
   padding: 0 12px 24px;
-  background: #f4f6f9;
+  background: #eef2f5;
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -312,14 +312,14 @@ function holdEnd(cancel = true) {
   text-align: center;
 }
 .cc-brand {
-  color: #4a9d62;
+  color: #7d8b63;
   font-size: 13px;
   letter-spacing: 2px;
 }
 .cc-title {
   font-size: 22px;
   font-weight: 700;
-  color: #1f3a5f;
+  color: #3d5a78;
 }
 .cc-card {
   margin-bottom: 12px;
@@ -331,7 +331,7 @@ function holdEnd(cancel = true) {
 .cc-center {
   text-align: center;
   padding: 30px 14px;
-  color: #666;
+  color: #6f6a62;
 }
 .cc-big {
   font-size: 36px;
@@ -343,20 +343,20 @@ function holdEnd(cancel = true) {
 }
 .cc-err {
   margin-top: 8px;
-  color: #d03050;
+  color: #b4533a;
   font-size: 13px;
 }
 .cc-intro .cc-sub {
   margin-top: 4px;
-  color: #777;
+  color: #6f6a62;
   font-size: 13px;
 }
 .cc-ok {
   margin-top: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #e8f6ec;
-  color: #2a8a3e;
+  background: #edf1e9;
+  color: #5f6b49;
 }
 .cc-done {
   opacity: 0.85;
@@ -373,52 +373,52 @@ function holdEnd(cancel = true) {
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 10px;
-  background: #fff4e0;
-  color: #b25e00;
+  background: #f4ecdf;
+  color: #9a4f33;
 }
 .cc-st-CONFIRMED {
-  background: #e8f6ec;
-  color: #2a8a3e;
+  background: #edf1e9;
+  color: #5f6b49;
 }
 .cc-st-STALE {
-  background: #fdeaea;
-  color: #c0392b;
+  background: #f6e9e6;
+  color: #b4533a;
 }
 .cc-row {
   margin-top: 8px;
   font-size: 13px;
-  color: #444;
+  color: #3b3a37;
 }
 .cc-k {
   display: inline-block;
   margin-right: 8px;
-  color: #888;
+  color: #86817a;
 }
 .cc-chip {
   display: inline-block;
   margin: 2px 4px 2px 0;
   padding: 1px 8px;
   border-radius: 10px;
-  background: #eef5fc;
-  color: #2a64b0;
+  background: #eef2f5;
+  color: #5b83aa;
   font-size: 12px;
 }
 .cc-det {
   margin-top: 10px;
-  border-top: 1px dashed #e5e5e5;
+  border-top: 1px dashed #e6e3d9;
   padding-top: 8px;
 }
 .cc-det summary {
   cursor: pointer;
   font-weight: 600;
-  color: #1f3a5f;
+  color: #3d5a78;
 }
 .cc-grp {
   margin-top: 8px;
 }
 .cc-gt {
   font-size: 12px;
-  color: #d9822b;
+  color: #c96f4f;
   margin-bottom: 2px;
 }
 .cc-item {
@@ -429,7 +429,7 @@ function holdEnd(cancel = true) {
   font-size: 13px;
 }
 .cc-item span {
-  color: #777;
+  color: #6f6a62;
   flex-shrink: 0;
 }
 .cc-item b {
@@ -439,15 +439,15 @@ function holdEnd(cancel = true) {
 }
 .cc-empty {
   margin-top: 6px;
-  color: #aaa;
+  color: #a8a39a;
   font-size: 13px;
 }
 .cc-rate {
   margin-top: 12px;
   padding: 10px;
   border-radius: 10px;
-  background: #fafcff;
-  border: 1px solid #e3e8ef;
+  background: #fbfaf6;
+  border: 1px solid #dde7f0;
 }
 .cc-rate-row {
   display: flex;
@@ -458,11 +458,11 @@ function holdEnd(cancel = true) {
   font-size: 13px;
 }
 .cc-req {
-  color: #d03050;
+  color: #b4533a;
   font-style: normal;
 }
 .cc-confirm {
-  border: 1px solid #cfe3d5;
+  border: 1px solid #d3dccb;
 }
 .cc-ack {
   display: flex;
@@ -478,15 +478,15 @@ function holdEnd(cancel = true) {
 .cc-method button {
   flex: 1;
   padding: 8px 4px;
-  border: 1px solid #ccd;
+  border: 1px solid #dde7f0;
   border-radius: 8px;
   background: #fff;
   font-size: 14px;
 }
 .cc-method button.on {
-  border-color: #4a9d62;
-  background: #e8f6ec;
-  color: #2a7a44;
+  border-color: #7d8b63;
+  background: #edf1e9;
+  color: #5f6b49;
   font-weight: 600;
 }
 .cc-pad-tools {
@@ -497,7 +497,7 @@ function holdEnd(cancel = true) {
   position: relative;
   height: 52px;
   border-radius: 10px;
-  background: #d8efe0;
+  background: #d3dccb;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -505,13 +505,13 @@ function holdEnd(cancel = true) {
   cursor: pointer;
 }
 .cc-hold.disabled {
-  background: #e8e8e8;
+  background: #e6e3d9;
   cursor: not-allowed;
 }
 .cc-hold-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #4a9d62;
+  background: #7d8b63;
 }
 .cc-hold-text {
   position: relative;
@@ -521,13 +521,13 @@ function holdEnd(cancel = true) {
   justify-content: center;
   padding: 0 8px;
   font-weight: 600;
-  color: #1d4a2c;
+  color: #5f6b49;
   text-align: center;
   font-size: 14px;
 }
 .cc-tip {
   margin-top: 8px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 </style>

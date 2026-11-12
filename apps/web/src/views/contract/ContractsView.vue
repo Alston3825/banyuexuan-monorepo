@@ -85,7 +85,7 @@ const columns: DataTableColumns<ContractListItem> = [
     title: '合同编号',
     width: 130,
     render: (row) =>
-      h('a', { style: 'color:#2080f0;cursor:pointer', onClick: () => router.push(`/contract/records/${row.id}`) }, row.paperNo || `（未填）${row.contractNo.slice(-6)}`),
+      h('a', { style: 'color:#5b83aa;cursor:pointer', onClick: () => router.push(`/contract/records/${row.id}`) }, row.paperNo || `（未填）${row.contractNo.slice(-6)}`),
   },
   { key: 'customer', title: '客户', width: 100, render: (row) => row.customer?.name ?? row.clientName ?? '-' },
   { key: 'signedDate', title: '签约日期', width: 105, render: (row) => day(row.signedDate) },
@@ -206,7 +206,7 @@ const emptyHint = computed(() => (tab.value === 'UNASSIGNED' ? '没有待排房�
           <n-upload-dragger>
             <div style="padding: 12px 0">
               <n-text style="font-size: 15px">点击或拖拽文件到这里</n-text>
-              <div style="margin-top: 6px; color: #888; font-size: 12px; line-height: 1.6">
+              <div style="margin-top: 6px; color: #86817a; font-size: 12px; line-height: 1.6">
                 一份合同可以传一个 PDF，或同一份合同的多张照片（按页码顺序选）。<br />
                 手机上点这里可直接拍照。上传后 AI 会自动识别，约 1 分钟。
               </div>

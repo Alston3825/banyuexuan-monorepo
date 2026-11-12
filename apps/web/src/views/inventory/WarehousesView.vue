@@ -138,7 +138,7 @@ onMounted(fetchAll)
           </n-form-item>
           <n-form-item label="需要审批">
             <n-switch v-model:value="model.requiresApproval" />
-            <span style="margin-left: 8px; color: var(--n-text-color-3, #999); font-size: 12px">关闭后该仓库的入库/出库/领用/调拨/盘点单可直接执行，无需审批</span>
+            <span style="margin-left: 8px; color: var(--n-text-color-3, #86817a); font-size: 12px">关闭后该仓库的入库/出库/领用/调拨/盘点单可直接执行，无需审批</span>
           </n-form-item>
           <n-form-item v-if="editingRow" label="状态">
             <n-select

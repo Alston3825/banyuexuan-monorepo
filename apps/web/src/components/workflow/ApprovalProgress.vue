@@ -51,12 +51,12 @@ function span(ms: number): string {
 }
 
 const STATE_META: Record<string, { color: string; text: string }> = {
-  DONE: { color: '#18a058', text: '已通过' },
-  CURRENT: { color: '#f0a020', text: '审批中' },
-  WAITING: { color: '#bbb', text: '等待中' },
-  REJECTED: { color: '#d03050', text: '已驳回' },
-  WITHDRAWN: { color: '#999', text: '已撤回' },
-  SKIPPED: { color: '#bbb', text: '无人审批，已跳过' },
+  DONE: { color: '#5f6b49', text: '已通过' },
+  CURRENT: { color: '#c96f4f', text: '审批中' },
+  WAITING: { color: '#a8a39a', text: '等待中' },
+  REJECTED: { color: '#b4533a', text: '已驳回' },
+  WITHDRAWN: { color: '#86817a', text: '已撤回' },
+  SKIPPED: { color: '#a8a39a', text: '无人审批，已跳过' },
 }
 
 function pendingNote(a: ProgressApprover): string {
@@ -203,11 +203,11 @@ const canAct = computed(() => !!data.value && (data.value.me.canApprove || data.
   margin-bottom: 12px;
 }
 .ap-sub {
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .ap-warn {
-  color: #d9822b;
+  color: #c96f4f;
   font-size: 12px;
 }
 .ap-node {
@@ -223,7 +223,7 @@ const canAct = computed(() => !!data.value && (data.value.me.canApprove || data.
   top: 16px;
   bottom: 0;
   width: 2px;
-  background: #e5e5e5;
+  background: #e6e3d9;
 }
 .ap-dot {
   width: 12px;
@@ -241,7 +241,7 @@ const canAct = computed(() => !!data.value && (data.value.me.canApprove || data.
   font-size: 14px;
 }
 .ap-hint {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
   margin-left: 6px;
 }
@@ -254,10 +254,10 @@ const canAct = computed(() => !!data.value && (data.value.me.canApprove || data.
   gap: 6px;
 }
 .ap-over {
-  color: #d03050;
+  color: #b4533a;
   font-weight: 600;
 }
 .ap-cmt {
-  color: #555;
+  color: #5c5851;
 }
 </style>

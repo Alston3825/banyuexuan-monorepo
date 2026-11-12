@@ -87,12 +87,12 @@ const outOfRange = computed(() => {
   width: 100%;
 }
 .pf-label {
-  color: #333;
+  color: #161615;
   white-space: nowrap;
 }
 .pf-label small {
   margin-left: 2px;
-  color: #999;
+  color: #86817a;
   font-size: 11px;
 }
 .pf-opts {
@@ -102,16 +102,16 @@ const outOfRange = computed(() => {
 }
 .pf-chip {
   padding: 1px 8px;
-  border: 1px solid #dadada;
+  border: 1px solid #d6d2c8;
   border-radius: 10px;
-  background: #fafafa;
-  color: #444;
+  background: #fbfaf6;
+  color: #3b3a37;
   font-size: 13px;
   line-height: 20px;
   cursor: pointer;
 }
 .pf-chip:hover {
-  background: #f0f0f0;
+  background: #eeebe3;
 }
 .pf-part {
   display: flex;
@@ -126,8 +126,8 @@ const outOfRange = computed(() => {
   min-width: 52px;
   max-width: 90px;
   padding: 2px 6px 2px 0;
-  border-right: 3px solid #cfe0f5;
-  color: #2a64b0;
+  border-right: 3px solid #dde7f0;
+  color: #5b83aa;
   font-size: 14px;
   font-weight: 700;
   line-height: 24px;
@@ -137,33 +137,33 @@ const outOfRange = computed(() => {
   gap: 4px 6px;
 }
 .pf-chip.pf-on {
-  border-color: #18a058;
-  background: #e8f6ee;
-  color: #0c7a43;
+  border-color: #5f6b49;
+  background: #edf1e9;
+  color: #5f6b49;
   font-weight: 700;
 }
 .pf-in {
   height: 24px;
   padding: 0 4px;
   border: 0;
-  border-bottom: 1px solid #888;
+  border-bottom: 1px solid #86817a;
   border-radius: 0;
   background: transparent;
   font-size: 13px;
   outline: none;
 }
 .pf-in:focus {
-  border-bottom-color: #18a058;
-  background: #f6fbf8;
+  border-bottom-color: #5f6b49;
+  background: #edf1e9;
 }
 .pf-bad {
-  color: #c07010;
-  background: #fff3dc;
+  color: #9a4f33;
+  background: #f4ecdf;
 }
 .pf-ta {
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #ccc;
+  border: 1px solid #d6d2c8;
   border-radius: 4px;
   font-size: 13px;
   resize: vertical;
@@ -171,14 +171,14 @@ const outOfRange = computed(() => {
   font-family: inherit;
 }
 .pf-ta:focus {
-  border-color: #18a058;
+  border-color: #5f6b49;
 }
 .pf-warn {
-  background: #fff7e0;
-  box-shadow: inset 3px 0 0 #f0a020;
+  background: #f4ecdf;
+  box-shadow: inset 3px 0 0 #c96f4f;
 }
 .pf-msg {
-  color: #d07a00;
+  color: #9a4f33;
   font-size: 12px;
   cursor: help;
 }
@@ -192,7 +192,7 @@ const outOfRange = computed(() => {
   }
   .pf-chip {
     padding: 5px 12px;
-    border-color: #e1e1e1;
+    border-color: #e6e3d9;
     border-radius: 16px;
     font-size: 14px;
     line-height: 20px;
@@ -200,7 +200,7 @@ const outOfRange = computed(() => {
   .pf-in {
     height: 34px;
     padding: 0 8px;
-    border: 1px solid #cfcfcf;
+    border: 1px solid #d6d2c8;
     border-radius: 6px;
     font-size: 16px;
   }

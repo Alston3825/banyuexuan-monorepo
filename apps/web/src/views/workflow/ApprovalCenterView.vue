@@ -48,20 +48,20 @@ const waitText = (r: ApprovalRow) => (r.dueAt ? (r.overdue ? '已超时' : `限 
 const columns = computed<DataTableColumns<ApprovalRow>>(() => {
   const base: DataTableColumns<ApprovalRow> = [
     { key: 'businessLabel', title: '类型', width: 100 },
-    { key: 'title', title: '单据', minWidth: 160, render: (r) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => open(r) }, r.title) },
+    { key: 'title', title: '单据', minWidth: 160, render: (r) => h('a', { style: 'cursor:pointer;color:#5b83aa', onClick: () => open(r) }, r.title) },
   ]
   if (tab.value === 'pending')
     base.push(
       { key: 'initiatorName', title: '提交人', width: 90 },
       { key: 'nodeName', title: '当前环节', width: 110 },
       { key: 'arrivedAt', title: '收到时间', width: 140, render: (r) => dt(r.arrivedAt) },
-      { key: 'due', title: '时效', width: 160, render: (r) => h('span', { style: r.overdue ? 'color:#d03050;font-weight:600' : 'color:#888' }, [waitText(r) || '不限时', r.urgeCount ? `（被催办 ${r.urgeCount} 次）` : '']) },
+      { key: 'due', title: '时效', width: 160, render: (r) => h('span', { style: r.overdue ? 'color:#b4533a;font-weight:600' : 'color:#86817a' }, [waitText(r) || '不限时', r.urgeCount ? `（被催办 ${r.urgeCount} 次）` : '']) },
     )
   else if (tab.value === 'mine')
     base.push(
       { key: 'status', title: '状态', width: 90, render: (r) => renderStatusBadge(r.status, WORKFLOW_INSTANCE_STATUS_MAP) },
       { key: 'waiting', title: '当前在谁手上', minWidth: 160, render: (r) => (r.status === 'IN_REVIEW' ? `${r.nodeName}：${(r.waitingFor ?? []).join('、')}` : '-') },
-      { key: 'due', title: '时效', width: 120, render: (r) => (r.status === 'IN_REVIEW' ? h('span', { style: r.overdue ? 'color:#d03050;font-weight:600' : 'color:#888' }, waitText(r) || '不限时') : '') },
+      { key: 'due', title: '时效', width: 120, render: (r) => (r.status === 'IN_REVIEW' ? h('span', { style: r.overdue ? 'color:#b4533a;font-weight:600' : 'color:#86817a' }, waitText(r) || '不限时') : '') },
       { key: 'submittedAt', title: '提交时间', width: 140, render: (r) => dt(r.submittedAt) },
     )
   else
@@ -114,7 +114,7 @@ const columns = computed<DataTableColumns<ApprovalRow>>(() => {
 .ac-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -128,12 +128,12 @@ const columns = computed<DataTableColumns<ApprovalRow>>(() => {
   margin-left: auto;
 }
 .ac-sub {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .ac-line {
   margin-top: 4px;
-  color: #555;
+  color: #5c5851;
   font-size: 12px;
 }
 </style>

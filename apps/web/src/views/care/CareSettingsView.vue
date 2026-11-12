@@ -36,7 +36,7 @@ watch(active, (name) => {
 
 <template>
   <div>
-    <p style="margin: 0 0 8px; color: #888; font-size: 13px">护理表单和方案的后台配置。日常护理工作请使用左侧的“护理看板”和“母婴档案”。</p>
+    <p style="margin: 0 0 8px; color: #86817a; font-size: 13px">护理表单和方案的后台配置。日常护理工作请使用左侧的“护理看板”和“母婴档案”。</p>
     <n-tabs v-model:value="active" type="line" animated>
       <n-tab-pane v-for="t in tabs" :key="t.name" :name="t.name" :tab="t.label" display-directive="if">
         <CareFieldsView v-if="t.name === 'fields'" />

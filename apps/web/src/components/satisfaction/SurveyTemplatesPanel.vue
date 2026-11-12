@@ -160,7 +160,7 @@ function askDelete(t: SurveyTemplate) {
 }
 
 const columns: DataTableColumns<SurveyTemplate> = [
-  { key: 'name', title: '模板', minWidth: 200, render: (r) => h('div', [h('b', r.name), h('div', { style: 'font-size:12px;color:#888' }, `${r.itemCount} 道题 · ${SOURCE[r.source] ?? r.source}`)]) },
+  { key: 'name', title: '模板', minWidth: 200, render: (r) => h('div', [h('b', r.name), h('div', { style: 'font-size:12px;color:#86817a' }, `${r.itemCount} 道题 · ${SOURCE[r.source] ?? r.source}`)]) },
   { key: 'day', title: '执行时间', width: 120, render: dayText },
   { key: 'surveyCount', title: '已录入', width: 80, render: (r) => `${r.surveyCount} 份` },
   { key: 'status', title: '状态', width: 80, render: (r) => h(NTag, { size: 'small', bordered: false, type: r.status === 'ACTIVE' ? 'success' : 'default' }, { default: () => (r.status === 'ACTIVE' ? '使用中' : '已停用') }) },
@@ -259,7 +259,7 @@ const columns: DataTableColumns<SurveyTemplate> = [
 <style scoped>
 .tp-tip {
   font-size: 12px;
-  color: #888;
+  color: #86817a;
   margin-bottom: 10px;
 }
 .tp-card {
@@ -276,23 +276,23 @@ const columns: DataTableColumns<SurveyTemplate> = [
 }
 .tp-sub {
   font-size: 13px;
-  color: #888;
+  color: #86817a;
   margin-top: 2px;
 }
 .tp-empty {
-  color: #999;
+  color: #86817a;
   text-align: center;
   padding: 30px 0;
 }
 .tp-banner {
-  background: rgba(32, 128, 240, 0.1);
+  background: rgba(110, 151, 191, 0.1);
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 10px;
   font-size: 13px;
 }
 .tp-warn {
-  background: rgba(240, 160, 32, 0.12);
+  background: rgba(201, 111, 79, 0.12);
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 10px;
@@ -323,7 +323,7 @@ const columns: DataTableColumns<SurveyTemplate> = [
   margin-left: 6px;
 }
 .tp-no {
-  color: #999;
+  color: #86817a;
   min-width: 18px;
   text-align: right;
   font-size: 13px;

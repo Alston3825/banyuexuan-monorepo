@@ -76,21 +76,21 @@ async function doMerge() {
   <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
     <n-card title="合并重复客户" style="width: min(560px, 94vw)" :bordered="false" role="dialog" closable @close="emit('update:show', false)" aria-modal="true">
       <p style="margin: 0 0 10px; line-height: 1.7">
-        要合并掉的重复客户：<b style="color: #c0392b">{{ sourceLabel }}</b><br />
+        要合并掉的重复客户：<b style="color: #b4533a">{{ sourceLabel }}</b><br />
         请搜索并选择<b>要保留</b>的那一个客户，重复客户名下的合同、入住、收款、母婴档案、线索、标签、跟进记录会<b>全部转到保留的客户名下</b>，保留客户缺的资料（医院、预产期等）会用重复客户的补上。
       </p>
       <n-space style="margin-bottom: 8px">
         <n-input v-model:value="keyword" placeholder="按姓名/手机号/客户编号搜索要保留的客户" style="width: min(340px, 70vw)" clearable @keyup.enter="search" />
         <n-button :loading="searching" @click="search">搜索</n-button>
       </n-space>
-      <div v-if="results.length > 0 && !target" style="max-height: 200px; overflow: auto; border: 1px solid #eee; border-radius: 6px">
+      <div v-if="results.length > 0 && !target" style="max-height: 200px; overflow: auto; border: 1px solid #eeebe3; border-radius: 6px">
         <div
           v-for="c in results"
           :key="c.id"
-          style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f3f3f3"
+          style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f7f5ef"
           @click="pick(c)"
         >
-          {{ c.name }}　<span style="color: #888">{{ c.customerNo }}　{{ c.phone }}</span>
+          {{ c.name }}　<span style="color: #86817a">{{ c.customerNo }}　{{ c.phone }}</span>
         </div>
       </div>
       <n-spin v-if="previewing" size="small" />
@@ -102,7 +102,7 @@ async function doMerge() {
           </div>
         </n-alert>
         <n-alert v-for="c in preview.conflicts" :key="c" type="error" :bordered="false" style="margin-top: 8px">{{ c }}</n-alert>
-        <p style="color: #888; margin: 8px 0 0; font-size: 12px">合并后“{{ sourceLabel }}”进入回收站（30天内可还原成独立客户，但已转走的数据不会自动回去）。</p>
+        <p style="color: #86817a; margin: 8px 0 0; font-size: 12px">合并后“{{ sourceLabel }}”进入回收站（30天内可还原成独立客户，但已转走的数据不会自动回去）。</p>
       </template>
       <template #footer>
         <n-space justify="end">

@@ -26,7 +26,7 @@ const columns: CrudColumn<Tag>[] = [
 const fields: CrudFormField[] = [
   { key: 'name', label: '名称', component: 'input', showOn: 'both', rules: [{ required: true, message: '请输入名称' }] },
   { key: 'category', label: '分类', component: 'select', options: categoryOptions, showOn: 'both', placeholder: '母婴风险标签选第一项' },
-  { key: 'color', label: '颜色', component: 'input', showOn: 'both', placeholder: '如 #1f3a5f' },
+  { key: 'color', label: '颜色', component: 'input', showOn: 'both', placeholder: '如 #3d5a78' },
 ]
 
 onMounted(crud.fetchList)

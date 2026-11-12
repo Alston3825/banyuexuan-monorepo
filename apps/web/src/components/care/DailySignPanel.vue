@@ -133,19 +133,19 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
 .ds-box {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #cfcfcf;
+  border: 1px solid #d6d2c8;
   border-radius: 12px;
   background: #fff;
 }
 .ds-title {
   margin-bottom: 8px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-weight: 600;
 }
 .ds-tip {
   margin-top: 6px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .ds-sig {
@@ -153,7 +153,7 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
   align-items: center;
   gap: 10px;
   padding: 6px 0;
-  border-bottom: 1px dashed #e6e6e6;
+  border-bottom: 1px dashed #e6e3d9;
 }
 .ds-stale {
   opacity: 0.7;
@@ -163,7 +163,7 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
   max-width: 130px;
   object-fit: contain;
   background: #fff;
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 4px;
 }
 .ds-meta {
@@ -174,7 +174,7 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
   gap: 6px;
 }
 .ds-time {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .ds-conf {
@@ -189,11 +189,11 @@ const dwell = (ms: number) => `${Math.round(ms / 1000)} 秒`
   gap: 8px;
 }
 .ds-comment {
-  color: #555;
+  color: #5c5851;
 }
 .ds-evi {
   margin-top: 4px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 </style>

@@ -83,28 +83,28 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 
 <style scoped>
 .nr-t { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
-.nr-t th, .nr-t td { border: 1px solid #9a9a9a; padding: 1px 3px; text-align: center; vertical-align: middle; }
-.nr-t th { background: #f4f4f4; font-weight: 600; padding: 4px 2px; }
+.nr-t th, .nr-t td { border: 1px solid #86817a; padding: 1px 3px; text-align: center; vertical-align: middle; }
+.nr-t th { background: #f7f5ef; font-weight: 600; padding: 4px 2px; }
 .w-time { width: 92px; }
 .w-other { width: 22%; }
 .w-nurse { width: 90px; }
 .w-x { width: 64px; }
 .nr-t input { width: 100%; height: 26px; padding: 0 3px; border: 0; background: transparent; font-size: 13px; outline: none; text-align: center; }
 .nr-t input[type='time'] { font-weight: 600; }
-.nr-t input:focus { background: #f6fbf8; }
-.tick { width: 24px; height: 22px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: #ccc; cursor: pointer; }
-.tick.on { border-color: #18a058; background: #e8f6ee; color: #0c7a43; font-weight: 700; }
-.del { padding: 1px 8px; border: 1px solid #f0c0c0; border-radius: 4px; background: #fff; color: #c33; font-size: 12px; cursor: pointer; }
-.sum td { background: #f9f9f9; font-weight: 600; padding: 3px; }
-.empty { padding: 14px; color: #999; text-align: center; }
-.add { margin-top: 6px; width: 100%; padding: 5px; border: 1px dashed #18a058; border-radius: 6px; background: #fff; color: #18a058; cursor: pointer; }
-.nr-card { margin-bottom: 10px; padding: 8px 10px; border: 1px solid #e6e6e6; border-radius: 8px; background: #fcfcfc; }
+.nr-t input:focus { background: #edf1e9; }
+.tick { width: 24px; height: 22px; border: 1px solid #d6d2c8; border-radius: 4px; background: #fff; color: #d6d2c8; cursor: pointer; }
+.tick.on { border-color: #5f6b49; background: #edf1e9; color: #5f6b49; font-weight: 700; }
+.del { padding: 1px 8px; border: 1px solid #e8cbc8; border-radius: 4px; background: #fff; color: #b4533a; font-size: 12px; cursor: pointer; }
+.sum td { background: #fbfaf6; font-weight: 600; padding: 3px; }
+.empty { padding: 14px; color: #86817a; text-align: center; }
+.add { margin-top: 6px; width: 100%; padding: 5px; border: 1px dashed #5f6b49; border-radius: 6px; background: #fff; color: #5f6b49; cursor: pointer; }
+.nr-card { margin-bottom: 10px; padding: 8px 10px; border: 1px solid #e6e3d9; border-radius: 8px; background: #fbfaf6; }
 .nr-head { display: flex; align-items: center; gap: 8px; }
-.nr-time { height: 34px; border: 1px solid #ddd; border-radius: 6px; padding: 0 6px; font-size: 15px; font-weight: 600; }
-.nr-no { flex: 1; color: #888; font-size: 12px; }
+.nr-time { height: 34px; border: 1px solid #d6d2c8; border-radius: 6px; padding: 0 6px; font-size: 15px; font-weight: 600; }
+.nr-no { flex: 1; color: #86817a; font-size: 12px; }
 .nr-ticks { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-.nr-chip { padding: 8px 12px; border: 1px solid #ccc; border-radius: 18px; background: #fff; color: #666; font-size: 14px; }
-.nr-chip.on { border-color: #18a058; background: #e8f6ee; color: #0c7a43; font-weight: 700; }
-.nr-nurse { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #666; }
-.nr-nurse input { height: 34px; border: 1px solid #ddd; border-radius: 6px; padding: 0 8px; font-size: 14px; }
+.nr-chip { padding: 8px 12px; border: 1px solid #d6d2c8; border-radius: 18px; background: #fff; color: #6f6a62; font-size: 14px; }
+.nr-chip.on { border-color: #5f6b49; background: #edf1e9; color: #5f6b49; font-weight: 700; }
+.nr-nurse { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #6f6a62; }
+.nr-nurse input { height: 34px; border: 1px solid #d6d2c8; border-radius: 6px; padding: 0 8px; font-size: 14px; }
 </style>

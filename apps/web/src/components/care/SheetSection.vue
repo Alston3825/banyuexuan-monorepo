@@ -22,7 +22,7 @@ defineEmits<{ toggle: [] }>()
 <style scoped>
 .ss {
   margin-bottom: 10px;
-  border: 1px solid #cfcfcf;
+  border: 1px solid #d6d2c8;
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
@@ -32,8 +32,8 @@ defineEmits<{ toggle: [] }>()
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  background: #f6f7f8;
-  border-bottom: 1px solid #e6e6e6;
+  background: #fbfaf6;
+  border-bottom: 1px solid #e6e3d9;
 }
 .ss-closed .ss-h {
   border-bottom: 0;
@@ -46,7 +46,7 @@ defineEmits<{ toggle: [] }>()
   flex: 0 0 auto;
   font-size: 14px;
   font-weight: 700;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .ss-s {
   flex: 1;
@@ -56,16 +56,16 @@ defineEmits<{ toggle: [] }>()
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: #0f7a4d;
+  color: #5f6b49;
 }
 .ss-empty .ss-s {
-  color: #d07a00;
+  color: #9a4f33;
 }
 .ss-empty {
-  border-color: #f0c070;
+  border-color: #c96f4f;
 }
 .ss-arrow {
-  color: #888;
+  color: #86817a;
 }
 .ss-b {
   padding: 8px 10px 10px;

@@ -167,15 +167,15 @@ const close = () => emit('update:show', false)
 <style scoped>
 .pd-meta {
   margin-bottom: 8px;
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .pd-h {
   margin: 14px 0 6px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-size: 14px;
-  color: #2a64b0;
+  color: #5b83aa;
 }
 .pd-text {
   white-space: pre-wrap;
@@ -185,9 +185,9 @@ const close = () => emit('update:show', false)
 .pd-m {
   margin-bottom: 8px;
   padding: 8px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .pd-line {
   display: flex;
@@ -195,7 +195,7 @@ const close = () => emit('update:show', false)
   align-items: center;
 }
 .pd-freq {
-  color: #888;
+  color: #86817a;
 }
 :deep(.n-card__content) {
   max-height: 72vh;

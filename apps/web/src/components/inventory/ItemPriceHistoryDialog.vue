@@ -61,7 +61,7 @@ watch(
   flex-wrap: wrap;
   gap: 6px 18px;
   margin-bottom: 10px;
-  color: #555;
+  color: #5c5851;
 }
 .ph-row {
   display: flex;
@@ -74,15 +74,15 @@ watch(
   min-width: 96px;
   font-size: 18px;
   font-weight: 700;
-  color: #d9822b;
+  color: #c96f4f;
 }
 .ph-price small {
   font-size: 12px;
   font-weight: 400;
-  color: #888;
+  color: #86817a;
 }
 .ph-sub {
   font-size: 12px;
-  color: #888;
+  color: #86817a;
 }
 </style>

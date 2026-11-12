@@ -32,28 +32,28 @@ defineEmits<{ (e: 'goto-page', page: number): void }>()
 .cf-label {
   display: block;
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
   margin-bottom: 3px;
 }
 .cf-req {
-  color: #d03050;
+  color: #b4533a;
   margin-left: 2px;
 }
 .cf-auto {
   margin-left: 6px;
   padding: 0 6px;
   border-radius: 8px;
-  background: #e6f1fb;
-  color: #185fa5;
+  background: #eef2f5;
+  color: #3d5a78;
   font-size: 11px;
 }
 .cf-warn {
-  background: #fff7e6;
-  border-left-color: #ef9f27;
+  background: #f4ecdf;
+  border-left-color: #c96f4f;
 }
 .cf-missing {
-  background: #fdeeee;
-  border-left-color: #e24b4a;
+  background: #f6e9e6;
+  border-left-color: #b4533a;
 }
 .cf-note {
   margin-top: 3px;
@@ -61,14 +61,14 @@ defineEmits<{ (e: 'goto-page', page: number): void }>()
   line-height: 1.5;
 }
 .cf-warn .cf-note {
-  color: #854f0b;
+  color: #9a4f33;
 }
 .cf-missing .cf-note {
-  color: #a32d2d;
+  color: #8a3d2a;
 }
 .cf-page {
   margin-left: 6px;
-  color: #2080f0;
+  color: #5b83aa;
   cursor: pointer;
   text-decoration: underline;
 }

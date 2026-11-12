@@ -326,7 +326,7 @@ function actionButtons(row: GoodsReceipt): VNode[] {
 }
 
 const columns: DataTableColumns<GoodsReceipt> = [
-  { key: 'receiptNo', title: '入库单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => openDetail(r) }, r.receiptNo) },
+  { key: 'receiptNo', title: '入库单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#5b83aa', onClick: () => openDetail(r) }, r.receiptNo) },
   { key: 'warehouse', title: '仓库', width: 120, render: (r) => r.warehouse.name },
   { key: 'purchaseOrder', title: '关联采购单', width: 160, render: (r) => r.purchaseOrder?.orderNo ?? '无(临时入库)' },
   { key: 'status', title: '状态', width: 120, render: (r) => renderStatusBadge(r.status, GOODS_RECEIPT_STATUS_MAP) },
@@ -383,7 +383,7 @@ onMounted(fetchAll)
             <div v-for="l in detailLines" :key="l.id" class="gr-lrow" :class="{ 'gr-done': remaining(l) === 0 }">
               <div class="gr-lname">
                 <b>{{ l.item.name }}</b><span v-if="l.item.spec" class="gr-sub"> {{ l.item.spec }}</span>
-                <div class="gr-sub">单价 {{ (l.unitCost / 100).toFixed(2) }} 元 · 采购 {{ l.quantity }} {{ l.item.unit }} · 已到 {{ l.receivedQuantity }} · <span :style="remaining(l) ? 'color:#d9822b' : 'color:#18a058'">{{ remaining(l) ? `还差 ${remaining(l)}` : '已到齐 ✓' }}</span></div>
+                <div class="gr-sub">单价 {{ (l.unitCost / 100).toFixed(2) }} 元 · 采购 {{ l.quantity }} {{ l.item.unit }} · 已到 {{ l.receivedQuantity }} · <span :style="remaining(l) ? 'color:#c96f4f' : 'color:#5f6b49'">{{ remaining(l) ? `还差 ${remaining(l)}` : '已到齐 ✓' }}</span></div>
               </div>
               <div v-if="isOpenTracked && canReceive && remaining(l) > 0" class="gr-input">
                 <n-input-number v-model:value="recvQty[l.id]" :min="0" :max="remaining(l)" :precision="0" placeholder="这次到货" size="small" style="width: 120px" />
@@ -505,9 +505,9 @@ onMounted(fetchAll)
 .sim-card {
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .sim-title {
   margin-bottom: 6px;
@@ -515,7 +515,7 @@ onMounted(fetchAll)
 .gr-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -528,20 +528,20 @@ onMounted(fetchAll)
 }
 .gr-line {
   margin-top: 4px;
-  color: #555;
+  color: #5c5851;
   font-size: 12px;
 }
 .gr-hint {
   margin: 8px 0;
   padding: 6px 10px;
-  background: #faf6f0;
+  background: #f4ecdf;
   border-radius: 6px;
-  color: #8a5a22;
+  color: #9a4f33;
   font-size: 12px;
   line-height: 1.8;
 }
 .gr-lines {
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
 }
 .gr-lrow {
@@ -551,16 +551,16 @@ onMounted(fetchAll)
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
-  border-bottom: 1px solid #f3f3f3;
+  border-bottom: 1px solid #f7f5ef;
 }
 .gr-lrow:last-child {
   border-bottom: none;
 }
 .gr-done {
-  background: #f6fbf7;
+  background: #edf1e9;
 }
 .gr-sub {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .gr-input {
@@ -571,13 +571,13 @@ onMounted(fetchAll)
 .gr-sec {
   margin-bottom: 6px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-weight: 600;
   font-size: 13px;
 }
 .gr-rec {
   padding: 6px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed #eeebe3;
   font-size: 13px;
 }
 .gr-table {
@@ -588,7 +588,7 @@ onMounted(fetchAll)
 .gr-table th,
 .gr-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #eeebe3;
   text-align: left;
 }
 </style>

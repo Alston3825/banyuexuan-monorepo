@@ -19,9 +19,9 @@ body {
 input,
 textarea,
 select {
-  color: #222;
+  color: #161615;
 }
 input::placeholder,
 textarea::placeholder {
-  color: #aaa;
+  color: #a8a39a;
 }

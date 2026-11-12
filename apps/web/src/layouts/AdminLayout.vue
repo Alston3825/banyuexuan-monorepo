@@ -89,7 +89,7 @@ async function handleUserMenuSelect(key: string) {
     <!-- 桌面端：常驻可收起侧边栏 -->
     <n-layout-sider
       v-if="isDesktop"
-      bordered
+      inverted
       collapse-mode="width"
       :collapsed-width="64"
       :width="220"
@@ -98,8 +98,8 @@ async function handleUserMenuSelect(key: string) {
       @collapse="ui.sidebarCollapsed = true"
       @expand="ui.sidebarCollapsed = false"
     >
-      <div class="brand">{{ ui.sidebarCollapsed ? '伴' : '伴月轩管理后台' }}</div>
-      <n-menu :value="selectedKey" :collapsed="ui.sidebarCollapsed" :collapsed-width="64" :options="navMenuOptions" />
+      <div class="brand bx-serif">{{ ui.sidebarCollapsed ? '伴' : '伴月轩' }}</div>
+      <n-menu inverted :value="selectedKey" :collapsed="ui.sidebarCollapsed" :collapsed-width="64" :options="navMenuOptions" />
     </n-layout-sider>
 
     <!-- 移动/平板端：抽屉式侧边栏，默认收起，靠顶栏汉堡按钮打开 -->
@@ -115,7 +115,7 @@ async function handleUserMenuSelect(key: string) {
           <n-button v-if="!isDesktop" quaternary circle @click="mobileDrawerVisible = true">
             <template #icon><n-icon><MenuIcon /></n-icon></template>
           </n-button>
-          <span class="page-title">{{ route.meta.title }}</span>
+          <span class="page-title bx-serif">{{ route.meta.title }}</span>
         </n-space>
         <n-space align="center" :size="18" :wrap="false">
           <n-badge :value="todoTotal" :max="99" :type="todoOverdue > 0 ? 'error' : 'warning'" :show="todoTotal > 0">
@@ -141,13 +141,14 @@ async function handleUserMenuSelect(key: string) {
 
 <style scoped>
 .brand {
-  height: 48px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  color: #1f3a5f;
-  border-bottom: 1px solid #efeff5;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--bx-paper);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -159,7 +160,8 @@ async function handleUserMenuSelect(key: string) {
   justify-content: space-between;
 }
 .page-title {
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 18px;
 }
 .user-entry {
   cursor: pointer;

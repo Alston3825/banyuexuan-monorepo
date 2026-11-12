@@ -53,7 +53,7 @@ const emit = defineEmits<{ toggle: []; 'update:values': [value: Record<string, u
   margin-bottom: 4px;
   font-size: 13px;
   font-weight: 700;
-  color: #333;
+  color: #161615;
 }
 .sc-sign {
   display: flex;

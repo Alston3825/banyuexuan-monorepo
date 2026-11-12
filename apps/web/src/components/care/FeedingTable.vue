@@ -160,9 +160,9 @@ const summary = computed(() => ({
 .ft-row {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
-  background: #fcfcfc;
+  background: #fbfaf6;
 }
 .ft-line {
   display: flex;
@@ -176,7 +176,7 @@ const summary = computed(() => ({
   align-items: center;
 }
 .ft-no {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
   margin-right: auto;
 }
@@ -184,7 +184,7 @@ const summary = computed(() => ({
   width: 110px;
   height: 34px;
   padding: 0 8px;
-  border: 1px solid #d9d9d9;
+  border: 1px solid #d6d2c8;
   border-radius: 4px;
   font-size: 16px;
   font-weight: 600;
@@ -194,7 +194,7 @@ const summary = computed(() => ({
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
 }
 .ft-nums label {
   width: calc(25% - 6px);
@@ -210,38 +210,38 @@ const summary = computed(() => ({
   align-items: center;
 }
 .ft-medlabel {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .ft-sep {
-  color: #ccc;
+  color: #d6d2c8;
 }
 .ft-bad {
-  background: #fff7e0;
+  background: #f4ecdf;
   border-radius: 4px;
-  outline: 2px solid #f0a020;
+  outline: 2px solid #c96f4f;
 }
 .ft-bad-btn {
-  outline: 2px solid #f0a020;
+  outline: 2px solid #c96f4f;
 }
 .ft-msg,
 .ft-warn-all {
   margin-top: 4px;
   font-size: 12px;
-  color: #b25e00;
+  color: #9a4f33;
 }
 .ft-warn-all {
   margin-bottom: 8px;
 }
 .ft-empty {
   margin: 8px 0;
-  color: #999;
+  color: #86817a;
   font-size: 13px;
 }
 .ft-sum {
   margin-top: 10px;
   padding: 8px 10px;
-  background: #eef5fc;
+  background: #eef2f5;
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.7;

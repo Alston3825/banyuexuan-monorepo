@@ -319,14 +319,14 @@ onMounted(fetchAll)
   min-width: 52px;
   padding: 2px 8px;
   border-radius: 6px;
-  background: #2a64b0;
+  background: #5b83aa;
   color: #fff;
   font-weight: 700;
   text-align: center;
   font-size: 14px;
 }
 .cp-room-none {
-  background: #bbb;
+  background: #a8a39a;
   font-weight: 400;
   font-size: 12px;
 }
@@ -336,16 +336,16 @@ onMounted(fetchAll)
 }
 .cp-baby {
   margin-top: 3px;
-  color: #555;
+  color: #5c5851;
   font-size: 12.5px;
   line-height: 1.5;
 }
 .cp-baby-none {
-  color: #aaa;
+  color: #a8a39a;
 }
 .cp-meta {
   margin-left: auto;
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .cp-cards {
@@ -355,13 +355,13 @@ onMounted(fetchAll)
 }
 .cp-card {
   padding: 10px 12px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
 }
 .cp-card:active {
-  background: #f5f8fc;
+  background: #eef2f5;
 }
 .cp-card-top {
   display: flex;

@@ -226,12 +226,12 @@ onMounted(fetchAll)
 .stock-hint {
   white-space: nowrap;
   font-size: 13px;
-  color: #999;
+  color: #86817a;
 }
 .stock-ok {
-  color: #18a058;
+  color: #5f6b49;
 }
 .stock-bad {
-  color: #d03050;
+  color: #b4533a;
 }
 </style>

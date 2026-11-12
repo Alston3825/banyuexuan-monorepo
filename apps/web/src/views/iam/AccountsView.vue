@@ -464,7 +464,7 @@ onMounted(async () => {
         <n-select v-model:value="filterStore" :options="storeOptions" clearable placeholder="全部门店" style="width: 150px" />
         <n-select v-model:value="filterDept" :options="departmentOptions" clearable filterable placeholder="全部部门" style="width: 140px" />
         <n-select v-model:value="filterStatus" :options="statusFilterOptions" clearable placeholder="全部状态" style="width: 120px" />
-        <span style="color: #888; font-size: 13px">共 {{ shownRows.length }} / {{ rows.length }} 人</span>
+        <span style="color: #86817a; font-size: 13px">共 {{ shownRows.length }} / {{ rows.length }} 人</span>
       </n-space>
       <n-button type="primary" @click="openCreateModal">新建账号</n-button>
     </n-space>
@@ -562,7 +562,7 @@ onMounted(async () => {
             </template>
           </n-list-item>
         </n-list>
-        <p v-else style="color: #999">暂无角色分配</p>
+        <p v-else style="color: #86817a">暂无角色分配</p>
 
         <n-divider>新增分配</n-divider>
         <n-form label-placement="left" label-width="80">
@@ -581,8 +581,8 @@ onMounted(async () => {
           <n-form-item v-if="!['TENANT', 'SELF'].includes(assignModel.scopeType)" label="选择门店">
             <n-select v-model:value="assignModel.scopeIds" :options="scopeIdOptions" multiple filterable clearable placeholder="点选门店，可以多选" />
           </n-form-item>
-          <p v-if="alreadyHas.length" style="color: #d9822b; font-size: 12px; margin: -6px 0 8px 80px">这位员工已经有这个角色的：{{ alreadyHas.join('、') }}（重复的会自动跳过）</p>
-          <p style="color: #999; font-size: 12px; margin: 0 0 8px 80px">分配后，员工需要重新登录（最多 30 分钟内自动刷新）才会生效。</p>
+          <p v-if="alreadyHas.length" style="color: #c96f4f; font-size: 12px; margin: -6px 0 8px 80px">这位员工已经有这个角色的：{{ alreadyHas.join('、') }}（重复的会自动跳过）</p>
+          <p style="color: #86817a; font-size: 12px; margin: 0 0 8px 80px">分配后，员工需要重新登录（最多 30 分钟内自动刷新）才会生效。</p>
           <n-button type="primary" :loading="assignSubmitting" @click="handleAssignRole">添加分配</n-button>
         </n-form>
       </n-drawer-content>
@@ -594,10 +594,10 @@ onMounted(async () => {
 .acc-drop {
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1.5px dashed #d9b38c;
+  border: 1.5px dashed #c96f4f;
   border-radius: 8px;
-  background: #fffaf3;
-  color: #8a5a22;
+  background: #f4ecdf;
+  color: #9a4f33;
   font-size: 13px;
   text-align: center;
   cursor: pointer;
@@ -606,7 +606,7 @@ onMounted(async () => {
   line-height: 1.6;
 }
 .acc-drop-on {
-  background: #ffe9cc;
-  border-color: #d9822b;
+  background: #e9d9c3;
+  border-color: #c96f4f;
 }
 </style>

@@ -111,11 +111,11 @@ async function save() {
 .gr-err {
   padding: 40px 12px;
   text-align: center;
-  color: #888;
+  color: #86817a;
   line-height: 1.8;
 }
 .gr-svg {
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
   overflow: hidden;
 }

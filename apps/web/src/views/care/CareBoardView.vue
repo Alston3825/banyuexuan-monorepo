@@ -20,11 +20,11 @@ const loading = ref(false)
 
 // 沿用房态看板的状态配色，保持全系统视觉一致（不是这个页面自己另起一套颜色）
 const statusColor: Record<ComputedRoomStatus, string> = {
-  VACANT: '#e8f8f0',
-  RESERVED: '#e6f3ff',
-  OCCUPIED: '#fff4e0',
-  PENDING_CLEANING: '#fdeaea',
-  MAINTENANCE: '#efefef',
+  VACANT: '#edf1e9',
+  RESERVED: '#eef2f5',
+  OCCUPIED: '#f4ecdf',
+  PENDING_CLEANING: '#f6e9e6',
+  MAINTENANCE: '#eeebe3',
 }
 const statusLabel: Record<ComputedRoomStatus, string> = {
   VACANT: '空闲',
@@ -34,11 +34,11 @@ const statusLabel: Record<ComputedRoomStatus, string> = {
   MAINTENANCE: '维修中',
 }
 const statusPill: Record<ComputedRoomStatus, { background: string; color: string }> = {
-  VACANT: { background: '#b9e9d0', color: '#085041' },
-  RESERVED: { background: '#bcdcf7', color: '#0c447c' },
-  OCCUPIED: { background: '#f6d9a0', color: '#633806' },
-  PENDING_CLEANING: { background: '#f7c1c1', color: '#791f1f' },
-  MAINTENANCE: { background: '#d3d1c7', color: '#444441' },
+  VACANT: { background: '#d3dccb', color: '#5f6b49' },
+  RESERVED: { background: '#dde7f0', color: '#3d5a78' },
+  OCCUPIED: { background: '#e9d9c3', color: '#9a4f33' },
+  PENDING_CLEANING: { background: '#e8cbc8', color: '#8a3d2a' },
+  MAINTENANCE: { background: '#d6d2c8', color: '#3b3a37' },
 }
 
 const groupedByFloor = computed(() => {
@@ -71,9 +71,9 @@ function stayProgress(entry: CareBoardEntry): string {
 }
 
 const DELIVERY_LABEL: Record<string, string> = { VAGINAL: '顺', CESAREAN: '剖', UNKNOWN: '-' }
-const DELIVERY_COLOR: Record<string, string> = { VAGINAL: '#3ba55c', CESAREAN: '#3a6fb0', UNKNOWN: '#b4b2a9' }
+const DELIVERY_COLOR: Record<string, string> = { VAGINAL: '#7d8b63', CESAREAN: '#5b83aa', UNKNOWN: '#a8a39a' }
 const GENDER_LABEL: Record<string, string> = { FEMALE: '女', MALE: '男', UNKNOWN: '-' }
-const GENDER_COLOR: Record<string, string> = { FEMALE: '#d4537e', MALE: '#3a6fb0', UNKNOWN: '#b4b2a9' }
+const GENDER_COLOR: Record<string, string> = { FEMALE: '#b4533a', MALE: '#5b83aa', UNKNOWN: '#a8a39a' }
 
 /** 生产信息："09-20产（39+2）"——孕周不知道具体天数，天数部分暂不展示（系统目前只存整周数）。 */
 function deliveryText(entry: CareBoardEntry): string {
@@ -209,8 +209,8 @@ onMounted(async () => {
                       {{ GENDER_LABEL[baby.gender] }}
                     </span>
                   </template>
-                  <span v-else class="cb-badge" style="background: #b4b2a9">-</span>
-                  <span class="cb-badge" :style="{ background: entry.care?.hasAllergyTag ? '#e24b4a' : '#b4b2a9' }" :title="entry.care?.hasAllergyTag ? `过敏：${entry.care.allergyNote ?? '有'}` : '无过敏记录'">敏</span>
+                  <span v-else class="cb-badge" style="background: #a8a39a">-</span>
+                  <span class="cb-badge" :style="{ background: entry.care?.hasAllergyTag ? '#b4533a' : '#a8a39a' }" :title="entry.care?.hasAllergyTag ? `过敏：${entry.care.allergyNote ?? '有'}` : '无过敏记录'">敏</span>
                 </span>
               </div>
             </template>
@@ -221,7 +221,7 @@ onMounted(async () => {
     <n-modal :show="!!nurseForm" @update:show="(v) => !v && (nurseForm = null)">
       <n-card v-if="nurseForm" :title="`指派护理师：${nurseForm.entry.room.roomNo} ${nurseForm.entry.customerName ?? ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="nurseForm = null" aria-modal="true">
         <nurse-select v-model="nurseForm.nurseId" :store-id="selectedStoreId ?? undefined" />
-        <div style="margin-top: 8px; color: #999; font-size: 12px">护理师从员工账号里选；换人后以最新指派为准，历史记录里的签字不受影响。</div>
+        <div style="margin-top: 8px; color: #86817a; font-size: 12px">护理师从员工账号里选；换人后以最新指派为准，历史记录里的签字不受影响。</div>
         <template #footer>
           <n-space justify="end"><n-button @click="nurseForm = null">取消</n-button><n-button type="primary" :loading="nurseSaving" @click="saveNurse">保存</n-button></n-space>
         </template>
@@ -239,11 +239,11 @@ onMounted(async () => {
 .cb-no {
   font-size: 17px;
   font-weight: 600;
-  color: #222;
+  color: #161615;
 }
 .cb-type {
   font-size: 12px;
-  color: #666;
+  color: #6f6a62;
 }
 .cb-pill {
   margin-left: auto;
@@ -257,28 +257,28 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 18px;
-  color: #444;
+  color: #3b3a37;
 }
 .cb-label {
-  color: #888;
+  color: #86817a;
 }
 .cb-customer {
-  color: #2080f0;
+  color: #5b83aa;
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
 .cb-nurse {
-  color: #2a64b0;
+  color: #5b83aa;
   font-weight: 600;
   cursor: pointer;
 }
 .cb-allergy {
-  color: #c0392b;
+  color: #b4533a;
   font-weight: 600;
 }
 .cb-over {
-  color: #c0392b;
+  color: #b4533a;
   font-weight: 600;
 }
 .cb-daily {
@@ -286,10 +286,10 @@ onMounted(async () => {
   cursor: pointer;
 }
 .cb-daily-ok {
-  color: #2a8a3e;
+  color: #5f6b49;
 }
 .cb-daily-no {
-  color: #d9822b;
+  color: #c96f4f;
   text-decoration: underline;
 }
 .cb-btns {
@@ -302,15 +302,15 @@ onMounted(async () => {
   flex: 0 0 calc(50% - 3px); /* 只有一个“母婴档案”按钮，宽度取原来整行的一半 */
   border: none;
   border-radius: 6px;
-  background: #d9822b;
-  color: #fff;
+  background: #161615;
+  color: #f7f5ef;
   font-size: 11px;
   line-height: 26px;
   cursor: pointer;
 }
 .cb-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.85;
+  opacity: 0.35;
 }
 .cb-foot {
   display: flex;
@@ -318,7 +318,7 @@ onMounted(async () => {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 11px;
-  color: #666;
+  color: #6f6a62;
 }
 .cb-badges {
   display: flex;

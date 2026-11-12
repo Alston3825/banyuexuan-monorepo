@@ -243,7 +243,7 @@ async function doRestore() {
 const detailRow = ref<EmployeeProfile | null>(null)
 
 const columns: DataTableColumns<EmployeeProfile> = [
-  { key: 'realName', title: '姓名', width: 90, fixed: 'left', render: (row) => h('a', { style: 'cursor:pointer;color:#2080f0', onClick: () => (detailRow.value = row) }, row.account.realName) },
+  { key: 'realName', title: '姓名', width: 90, fixed: 'left', render: (row) => h('a', { style: 'cursor:pointer;color:#5b83aa', onClick: () => (detailRow.value = row) }, row.account.realName) },
   { key: 'employeeNo', title: '工号', width: 70 },
   { key: 'departmentName', title: '部门', width: 90, render: (row) => row.departmentName ?? '-' },
   { key: 'positionName', title: '职务', width: 110, render: (row) => row.positionName ?? '-' },
@@ -499,7 +499,7 @@ watch(keyword, () => {
 .ep-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -513,18 +513,18 @@ watch(keyword, () => {
   margin-left: auto;
 }
 .ep-sub {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
 }
 .ep-line {
   margin-top: 4px;
-  color: #555;
+  color: #5c5851;
   font-size: 12px;
 }
 .ep-sec {
   margin: 14px 0 8px;
   padding-left: 8px;
-  border-left: 3px solid #d9822b;
+  border-left: 3px solid #c96f4f;
   font-weight: 600;
   font-size: 13px;
 }
@@ -545,11 +545,11 @@ watch(keyword, () => {
 .ep-remark {
   white-space: pre-wrap;
   font-size: 13px;
-  color: #444;
+  color: #3b3a37;
 }
 .ep-hint {
   margin-top: 14px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 @media (max-width: 767px) {

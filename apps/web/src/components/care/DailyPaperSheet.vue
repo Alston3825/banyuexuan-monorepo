@@ -268,9 +268,9 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   margin-top: 10px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #eef5fc;
+  background: #eef2f5;
   font-size: 13px;
-  color: #355;
+  color: #5f6b49;
 }
 .ps-row1 {
   display: grid;
@@ -302,7 +302,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-baby + .ps-baby {
   padding-top: 8px;
-  border-top: 2px dashed #ddd;
+  border-top: 2px dashed #d6d2c8;
 }
 .ps-line {
   display: flex;
@@ -320,18 +320,18 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 .ps-jt {
   font-size: 15px;
   font-weight: 700;
-  color: #222;
+  color: #161615;
 }
 .ps-javg {
   margin-left: 4px;
-  color: #185fa5;
+  color: #3d5a78;
   font-size: 13px;
 }
 .ps-javv {
   display: inline-block;
   min-width: 52px;
   height: 24px;
-  border-bottom: 1px solid #888;
+  border-bottom: 1px solid #86817a;
   text-align: center;
   font-size: 15px;
   font-weight: 700;
@@ -341,7 +341,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   font-size: 13px;
 }
 .ps-sub {
-  color: #999;
+  color: #86817a;
   font-size: 11px;
 }
 .ps-signtop {
@@ -352,10 +352,10 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-btn {
   padding: 2px 10px;
-  border: 1px solid #18a058;
+  border: 1px solid #5f6b49;
   border-radius: 6px;
   background: #fff;
-  color: #0c7a43;
+  color: #5f6b49;
   font-size: 13px;
   cursor: pointer;
 }
@@ -376,8 +376,8 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   margin: 8px 0 2px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #eef3fa;
-  color: #2a64b0;
+  background: #eef2f5;
+  color: #5b83aa;
   font-size: 13px;
   font-weight: 700;
 }
@@ -390,7 +390,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   align-items: center;
   gap: 2px 12px;
   padding: 3px 0;
-  border-bottom: 1px dashed #e4e4e4;
+  border-bottom: 1px dashed #e6e3d9;
 }
 .ps-mrow:last-child {
   border-bottom: 0;
@@ -399,7 +399,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   flex: 0 0 34px;
   font-size: 13px;
   font-weight: 700;
-  color: #555;
+  color: #5c5851;
 }
 .ps-grow {
   flex: 1 1 200px;

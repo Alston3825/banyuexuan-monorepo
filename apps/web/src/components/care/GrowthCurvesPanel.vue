@@ -306,22 +306,22 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
   gap: 6px 10px;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed #eeebe3;
   font-size: 14px;
 }
 .gt-head {
-  color: #888;
+  color: #86817a;
   font-size: 12px;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid #e6e3d9;
 }
 .gt-date small,
 .gt-cell small {
   display: block;
-  color: #aaa;
+  color: #a8a39a;
   font-size: 11px;
 }
 .gt-cell small.gt-manual {
-  color: #2a64b0;
+  color: #5b83aa;
   font-weight: 600;
 }
 .gt-op {
@@ -331,7 +331,7 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
   min-width: 96px;
 }
 .gt-editing {
-  background: #f6fbf8;
+  background: #edf1e9;
 }
 @media (max-width: 767px) {
   .gt-head,
@@ -351,17 +351,17 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
 }
 .gc-card {
   padding: 10px 12px;
-  border: 1px solid #e6e6e6;
+  border: 1px solid #e6e3d9;
   border-radius: 8px;
   background: #fff;
 }
 .gc-name {
-  color: #666;
+  color: #6f6a62;
   font-size: 13px;
 }
 .gc-name small {
   margin-left: 6px;
-  color: #aaa;
+  color: #a8a39a;
 }
 .gc-val {
   font-size: 24px;
@@ -372,15 +372,15 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
   margin-left: 3px;
   font-size: 13px;
   font-weight: 400;
-  color: #888;
+  color: #86817a;
 }
 .gc-std {
   margin-top: 6px;
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .gc-chart {
-  border: 1px solid #eee;
+  border: 1px solid #eeebe3;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -395,19 +395,19 @@ const src = (s: string) => (s === 'GROWTH' ? '测量' : s === 'DAILY' ? '日常�
   justify-content: space-between;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px dashed #eee;
+  border-bottom: 1px dashed #eeebe3;
   font-size: 14px;
 }
 .gc-rec:last-child {
   border-bottom: none;
 }
 .gc-sub {
-  color: #999;
+  color: #86817a;
   font-size: 12px;
 }
 .gc-lab {
   margin-bottom: 3px;
-  color: #666;
+  color: #6f6a62;
   font-size: 12px;
 }
 .gc-two {
