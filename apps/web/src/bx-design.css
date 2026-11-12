@@ -39,3 +39,62 @@ a {
   text-decoration-color: var(--bx-clay);
   text-underline-offset: 3px;
 }
+
+/* 房间卡片（房态看板 / 护理看板共用）：白纸卡片 + 顶部一条实色“书脊”表示状态，和米白页面背景拉开层次 */
+.bx-rc.n-card {
+  background: #fffefb;
+  border: 1px solid #d6d2c8;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.15s;
+}
+.bx-rc.n-card:hover {
+  transform: translateY(-2px);
+}
+.bx-rc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: -8px -10px 8px;
+  padding: 7px 10px;
+  color: var(--bx-paper);
+}
+.bx-rc-head .bx-rc-no {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--bx-mono);
+  color: inherit;
+}
+.bx-rc-head .bx-rc-type {
+  font-size: 12px;
+  color: inherit;
+  opacity: 0.85;
+}
+.bx-rc-head .bx-rc-pill {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+  background: var(--bx-paper);
+  color: var(--bx-ink);
+  font-weight: 600;
+}
+.bx-rc--OCCUPIED .bx-rc-head { background: var(--bx-olive); }
+.bx-rc--RESERVED .bx-rc-head { background: var(--bx-oat); color: var(--bx-ink); }
+.bx-rc--PENDING_CLEANING .bx-rc-head { background: var(--bx-clay); }
+.bx-rc--MAINTENANCE .bx-rc-head { background: var(--bx-gray); }
+/* 空闲：没有书脊，虚线框、底色透明，自然退到后面 */
+.bx-rc--VACANT.n-card {
+  background: transparent;
+  border: 1px dashed #bdb8ad;
+}
+.bx-rc--VACANT .bx-rc-head {
+  margin-bottom: -8px;
+  color: var(--bx-gray);
+}
+.bx-rc--VACANT .bx-rc-head .bx-rc-pill {
+  background: var(--bx-paper-3);
+  color: #5c5851;
+}

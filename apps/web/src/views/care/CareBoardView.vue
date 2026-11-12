@@ -19,26 +19,12 @@ const boardEntries = ref<CareBoardEntry[]>([])
 const loading = ref(false)
 
 // 沿用房态看板的状态配色，保持全系统视觉一致（不是这个页面自己另起一套颜色）
-const statusColor: Record<ComputedRoomStatus, string> = {
-  VACANT: '#edf1e9',
-  RESERVED: '#eef2f5',
-  OCCUPIED: '#f4ecdf',
-  PENDING_CLEANING: '#f6e9e6',
-  MAINTENANCE: '#eeebe3',
-}
 const statusLabel: Record<ComputedRoomStatus, string> = {
   VACANT: '空闲',
   RESERVED: '预订中',
   OCCUPIED: '使用中',
   PENDING_CLEANING: '待清扫',
   MAINTENANCE: '维修中',
-}
-const statusPill: Record<ComputedRoomStatus, { background: string; color: string }> = {
-  VACANT: { background: '#d3dccb', color: '#5f6b49' },
-  RESERVED: { background: '#dde7f0', color: '#3d5a78' },
-  OCCUPIED: { background: '#e9d9c3', color: '#9a4f33' },
-  PENDING_CLEANING: { background: '#e8cbc8', color: '#8a3d2a' },
-  MAINTENANCE: { background: '#d6d2c8', color: '#3b3a37' },
 }
 
 const groupedByFloor = computed(() => {
@@ -71,9 +57,9 @@ function stayProgress(entry: CareBoardEntry): string {
 }
 
 const DELIVERY_LABEL: Record<string, string> = { VAGINAL: '顺', CESAREAN: '剖', UNKNOWN: '-' }
-const DELIVERY_COLOR: Record<string, string> = { VAGINAL: '#7d8b63', CESAREAN: '#5b83aa', UNKNOWN: '#a8a39a' }
+const DELIVERY_COLOR: Record<string, string> = { VAGINAL: '#7d8b63', CESAREAN: '#c96f4f', UNKNOWN: '#a8a39a' }
 const GENDER_LABEL: Record<string, string> = { FEMALE: '女', MALE: '男', UNKNOWN: '-' }
-const GENDER_COLOR: Record<string, string> = { FEMALE: '#b4533a', MALE: '#5b83aa', UNKNOWN: '#a8a39a' }
+const GENDER_COLOR: Record<string, string> = { FEMALE: '#b86580', MALE: '#6e97bf', UNKNOWN: '#a8a39a' }
 
 /** 生产信息："09-20产（39+2）"——孕周不知道具体天数，天数部分暂不展示（系统目前只存整周数）。 */
 function deliveryText(entry: CareBoardEntry): string {
@@ -153,14 +139,14 @@ onMounted(async () => {
     <n-empty v-if="!loading && boardEntries.length === 0" description="该门店暂无房间数据" />
 
     <div v-for="[floor, entries] in groupedByFloor" :key="floor" style="margin-bottom: 20px">
-      <h3 style="margin-bottom: 8px">{{ floor }}</h3>
+      <h3 class="bx-serif" style="margin: 0 0 10px; font-size: 18px">{{ floor }}</h3>
       <n-grid :x-gap="12" :y-gap="12" :cols="6" responsive="screen" :item-responsive="true">
         <n-gi v-for="entry in entries" :key="entry.room.id" span="6 m:3 l:2 xl:1">
-          <n-card hoverable :style="{ background: statusColor[entry.status] }" size="small" content-style="padding: 8px 10px">
-            <div class="cb-head">
-              <span class="cb-no">{{ entry.room.roomNo }}</span>
-              <span class="cb-type">{{ entry.room.roomType?.name }}</span>
-              <span class="cb-pill" :style="statusPill[entry.status]">{{ statusLabel[entry.status] }}</span>
+          <n-card :class="['bx-rc', `bx-rc--${entry.status}`]" size="small" content-style="padding: 8px 10px">
+            <div class="bx-rc-head">
+              <span class="bx-rc-no">{{ entry.room.roomNo }}</span>
+              <span class="bx-rc-type">{{ entry.room.roomType?.name }}</span>
+              <span class="bx-rc-pill">{{ statusLabel[entry.status] }}</span>
             </div>
 
             <template v-if="entry.occupancyId">
@@ -263,13 +249,19 @@ onMounted(async () => {
   color: #86817a;
 }
 .cb-customer {
-  color: #5b83aa;
+  color: #161615;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: underline;
+  text-decoration-color: #c96f4f;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 .cb-nurse {
-  color: #5b83aa;
+  color: #161615;
+  text-decoration: underline dotted #86817a;
+  text-underline-offset: 3px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -310,7 +302,9 @@ onMounted(async () => {
 }
 .cb-btn:disabled {
   cursor: not-allowed;
-  opacity: 0.35;
+  background: transparent;
+  color: #a8a39a;
+  box-shadow: inset 0 0 0 1px #d6d2c8;
 }
 .cb-foot {
   display: flex;

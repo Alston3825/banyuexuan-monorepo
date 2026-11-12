@@ -23,13 +23,6 @@ const loading = ref(false)
 const CARE_LEVEL_SHORT: Record<string, string> = { LEVEL1: '一级', LEVEL2: '二级', LEVEL3: '三级' }
 const customerOptions = ref<{ label: string; value: string }[]>([])
 
-const statusColor: Record<ComputedRoomStatus, string> = {
-  VACANT: '#FBFAF6',
-  RESERVED: '#DDE7F0',
-  OCCUPIED: '#DCE7E2',
-  PENDING_CLEANING: '#E8CBC8',
-  MAINTENANCE: '#E6E3D9',
-}
 const statusLabel: Record<ComputedRoomStatus, string> = {
   VACANT: '空闲',
   RESERVED: '预订中',
@@ -38,14 +31,6 @@ const statusLabel: Record<ComputedRoomStatus, string> = {
   MAINTENANCE: '维修中',
 }
 
-// 卡片右上角的状态小标签配色（卡片底色仍按 statusColor，标签用同色系更深一档）
-const statusPill: Record<ComputedRoomStatus, { background: string; color: string }> = {
-  VACANT: { background: '#EEEBE3', color: '#161615' },
-  RESERVED: { background: '#6E97BF', color: '#F7F5EF' },
-  OCCUPIED: { background: '#7D8B63', color: '#F7F5EF' },
-  PENDING_CLEANING: { background: '#C96F4F', color: '#F7F5EF' },
-  MAINTENANCE: { background: '#86817A', color: '#F7F5EF' },
-}
 
 const groupedByFloor = computed(() => {
   const groups = new Map<string, RoomBoardEntry[]>()
@@ -268,17 +253,16 @@ onMounted(async () => {
       <n-grid :x-gap="12" :y-gap="12" :cols="6" responsive="screen" :item-responsive="true">
         <n-gi v-for="entry in entries" :key="entry.room.id" span="6 m:3 l:2 xl:1">
           <n-card
-            :bordered="false"
-            class="occ-card"
-            :style="{ background: statusColor[entry.status], cursor: 'pointer', border: entry.status === 'VACANT' ? '1px solid #E6E3D9' : '1px solid transparent' }"
+            :class="['bx-rc', `bx-rc--${entry.status}`]"
+            style="cursor: pointer"
             size="small"
             content-style="padding: 8px 10px"
             @click="openAction(entry)"
           >
-            <div class="occ-head">
-              <span class="occ-no">{{ entry.room.roomNo }}</span>
-              <span class="occ-type">{{ entry.room.roomType?.name }}</span>
-              <span class="occ-pill" :style="statusPill[entry.status]">{{ statusLabel[entry.status] }}</span>
+            <div class="bx-rc-head">
+              <span class="bx-rc-no">{{ entry.room.roomNo }}</span>
+              <span class="bx-rc-type">{{ entry.room.roomType?.name }}</span>
+              <span class="bx-rc-pill">{{ statusLabel[entry.status] }}</span>
             </div>
             <div v-if="entry.status === 'MAINTENANCE' && entry.room.maintenanceNote" class="occ-row">
               <span class="occ-label">备注：</span>{{ entry.room.maintenanceNote }}
