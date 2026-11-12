@@ -111,21 +111,21 @@ async function onMenu(w: OngoingWork, key: string) {
 
 <style scoped>
 .og-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.og-card { margin-bottom: 10px; background: #fffdf8; border: 1px solid #efe7da; border-radius: 12px; overflow: hidden; }
+.og-card { margin-bottom: 10px; background: #fbfaf6; border: 1px solid var(--bx-paper-3); border-radius: 12px; overflow: hidden; }
 .og-head { display: flex; align-items: center; gap: 10px; padding: 12px; cursor: pointer; }
-.og-arrow { color: #8a7f70; width: 14px; }
+.og-arrow { color: var(--bx-gray); width: 14px; }
 .og-main { flex: 1; min-width: 0; }
 .og-title { font-weight: 600; font-size: 15px; word-break: break-all; }
-.og-sub { font-size: 12px; color: #8a7f70; margin-top: 2px; }
-.og-bar2 { height: 6px; background: #eee6d8; border-radius: 3px; margin-top: 8px; overflow: hidden; }
-.og-bar2 i { display: block; height: 100%; background: #18a058; }
-.og-more { border: 0; background: transparent; font-size: 20px; color: #8a7f70; cursor: pointer; padding: 2px 10px; min-height: 32px; }
+.og-sub { font-size: 12px; color: var(--bx-gray); margin-top: 2px; }
+.og-bar2 { height: 6px; background: var(--bx-paper-3); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.og-bar2 i { display: block; height: 100%; background: var(--bx-ink); }
+.og-more { border: 0; background: transparent; font-size: 20px; color: var(--bx-gray); cursor: pointer; padding: 2px 10px; min-height: 32px; }
 .og-fin { opacity: 0.7; }
-.og-body { padding: 4px 12px 12px 36px; border-top: 1px dashed #efe7da; }
+.og-body { padding: 4px 12px 12px 36px; border-top: 1px dashed var(--bx-paper-3); }
 .og-step { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
-.og-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #b9ad9b; }
-.og-sdone .og-dot { background: #18a058; border-color: #18a058; }
+.og-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bx-ink); }
+.og-sdone .og-dot { background: var(--bx-ink); border-color: var(--bx-ink); }
 .og-stext { flex: 1; min-width: 0; word-break: break-all; }
-.og-sdone .og-stext > div:first-child { color: #888; text-decoration: line-through; }
+.og-sdone .og-stext > div:first-child { color: var(--bx-gray); text-decoration: line-through; }
 .og-add { margin-top: 8px; }
 </style>

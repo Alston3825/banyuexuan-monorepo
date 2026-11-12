@@ -81,26 +81,26 @@ const dt = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
   font-size: 13px;
 }
 .td-sec-red {
-  color: #d03050;
+  color: #b4533a;
 }
 .td-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eee;
-  border-left: 4px solid #2080f0;
+  border: 1px solid var(--bx-paper-3);
+  border-left: 4px solid var(--bx-ink);
   border-radius: 6px;
-  background: #fff;
+  background: #fbfaf6;
   cursor: pointer;
 }
 .td-card:hover {
-  background: #f8fafc;
+  background: var(--bx-paper-2);
 }
 .td-warn {
-  border-left-color: #f0a020;
+  border-left-color: var(--bx-oat);
 }
 .td-red {
-  border-left-color: #d03050;
-  background: #fff8f8;
+  border-left-color: var(--bx-clay);
+  background: #fbfaf6;
 }
 .td-title {
   font-weight: 600;
@@ -108,12 +108,12 @@ const dt = (iso: string | null) => (iso ? iso.slice(0, 10) : '')
 }
 .td-desc {
   margin: 4px 0 6px;
-  color: #666;
+  color: var(--bx-gray);
   font-size: 12px;
 }
 .td-due {
   margin-left: 8px;
-  color: #999;
+  color: var(--bx-gray);
   font-size: 12px;
 }
 </style>

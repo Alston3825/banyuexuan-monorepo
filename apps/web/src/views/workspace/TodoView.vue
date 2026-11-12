@@ -8,6 +8,7 @@ import QuadrantPanel from './QuadrantPanel.vue'
 import ReminderPanel from './ReminderPanel.vue'
 import OngoingPanel from './OngoingPanel.vue'
 import ShortcutsPanel from './ShortcutsPanel.vue'
+import BxTheme from '../../components/BxTheme.vue'
 
 type Tab = 'quadrant' | 'reminder' | 'ongoing' | 'links'
 const TABS: { key: Tab; label: string; short: string }[] = [
@@ -39,8 +40,10 @@ const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'nume
 </script>
 
 <template>
+  <BxTheme>
   <div class="mt">
-    <div class="mt-hello">今天是 {{ today }}，先把最要紧的事排好 ✨</div>
+    <h2 class="mt-hello bx-serif">{{ today }}</h2>
+    <p class="mt-sub">先把最要紧的事排好。</p>
     <nav class="mt-tabs">
       <button v-for="t in TABS" :key="t.key" :class="{ on: tab === t.key }" @click="pick(t.key)">
         <span class="mt-full">{{ t.label }}</span><span class="mt-short">{{ t.short }}</span>
@@ -54,21 +57,23 @@ const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'nume
       <ShortcutsPanel v-show="tab === 'links'" />
     </section>
   </div>
+  </BxTheme>
 </template>
 
 <style scoped>
-.mt-hello { margin-bottom: 10px; color: #8a7f70; font-size: 13px; }
-.mt-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
-.mt-tabs button { position: relative; min-height: 46px; padding: 8px 6px; border: 1px solid #e6dccb; border-radius: 12px; background: #f6f1ea; color: #5b5144; font-size: 15px; cursor: pointer; }
-.mt-tabs button.on { background: #5b4a38; color: #fff; border-color: #5b4a38; font-weight: 600; }
-.mt-tabs i { position: absolute; top: -6px; right: -4px; min-width: 20px; padding: 0 5px; height: 20px; line-height: 20px; border-radius: 10px; background: #d03050; color: #fff; font-size: 12px; font-style: normal; }
+.mt-hello { margin: 0; font-size: 24px; font-weight: 700; }
+.mt-sub { margin: 4px 0 18px; color: var(--bx-gray); font-size: 14px; }
+.mt-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+.mt-tabs button { position: relative; min-height: 46px; padding: 8px 6px; border: 1px solid var(--bx-paper-3); border-radius: 10px; background: var(--bx-paper-2); color: var(--bx-ink); font-size: 15px; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+.mt-tabs button:hover { background: var(--bx-paper-3); }
+.mt-tabs button.on { background: var(--bx-ink); color: var(--bx-paper); border-color: var(--bx-ink); font-weight: 600; }
+.mt-tabs i { position: absolute; top: -6px; right: -4px; min-width: 20px; padding: 0 5px; height: 20px; line-height: 20px; border-radius: 10px; background: var(--bx-clay); color: var(--bx-paper); font-size: 12px; font-style: normal; font-family: var(--bx-mono); }
 .mt-short { display: none; }
-.mt-body { padding: 14px; background: #fbf8f3; border: 1px solid #efe7da; border-radius: 16px; }
 @media (max-width: 767px) {
+  .mt-hello { font-size: 20px; }
   .mt-tabs { gap: 6px; }
   .mt-tabs button { font-size: 13px; }
   .mt-full { display: none; }
   .mt-short { display: inline; }
-  .mt-body { padding: 10px; }
 }
 </style>

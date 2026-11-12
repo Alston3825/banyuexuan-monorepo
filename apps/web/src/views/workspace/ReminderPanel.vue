@@ -122,11 +122,11 @@ const defDesc = (d: ReminderDef) => `${REPEAT_LABEL[d.repeat]}${d.repeat === 'WE
 
 <style scoped>
 .rm-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.rm-item { display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 8px; background: #fffdf8; border: 1px solid #efe7da; border-radius: 10px; }
-.rm-check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #b9ad9b; background: #fff; color: #fff; cursor: pointer; padding: 0; }
-.rm-done .rm-check { background: #18a058; border-color: #18a058; }
+.rm-item { display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 8px; background: #fbfaf6; border: 1px solid var(--bx-paper-3); border-radius: 10px; }
+.rm-check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--bx-ink); background: #fff; color: #fff; cursor: pointer; padding: 0; }
+.rm-done .rm-check { background: var(--bx-ink); border-color: var(--bx-ink); }
 .rm-text { flex: 1; min-width: 0; }
 .rm-title { font-size: 15px; word-break: break-all; }
-.rm-sub { font-size: 12px; color: #8a7f70; margin-top: 2px; }
-.rm-done .rm-title, .rm-done .rm-sub { text-decoration: line-through; color: #aaa; }
+.rm-sub { font-size: 12px; color: var(--bx-gray); margin-top: 2px; }
+.rm-done .rm-title, .rm-done .rm-sub { text-decoration: line-through; color: var(--bx-gray); }
 </style>

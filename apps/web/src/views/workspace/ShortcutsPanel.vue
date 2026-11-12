@@ -79,12 +79,12 @@ const labelOf = (p: string) => leaves.value.find((l) => l.to === p)?.label ?? p
 <style scoped>
 .sc-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-.sc-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 92px; padding: 12px; background: #fffdf8; border: 1px solid #efe7da; border-radius: 14px; cursor: pointer; font-size: 14px; color: inherit; }
-.sc-tile:hover { background: #fdf6dc; }
-.sc-sub { font-size: 12px; color: #8a7f70; margin-bottom: 4px; }
-.sc-picked { margin-bottom: 10px; padding: 8px; background: #fdf6dc; border-radius: 8px; }
+.sc-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 92px; padding: 12px; background: #fbfaf6; border: 1px solid var(--bx-paper-3); border-radius: 14px; cursor: pointer; font-size: 14px; color: inherit; }
+.sc-tile:hover { background: var(--bx-oat); }
+.sc-sub { font-size: 12px; color: var(--bx-gray); margin-bottom: 4px; }
+.sc-picked { margin-bottom: 10px; padding: 8px; background: var(--bx-oat); border-radius: 8px; }
 .sc-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 14px; }
 .sc-list { max-height: 46vh; overflow-y: auto; }
-.sc-group { margin: 10px 0 6px; font-size: 13px; font-weight: 600; color: #8a7f70; }
+.sc-group { margin: 10px 0 6px; font-size: 13px; font-weight: 600; color: var(--bx-gray); }
 .sc-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 </style>

@@ -5,6 +5,7 @@ import { NSpace, NSelect, NDatePicker, NCard, NGrid, NGi, NModal, NForm, NFormIt
 import { roomApi } from '../../api/modules/room.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import CheckInDialog from '../../components/room/CheckInDialog.vue'
+import BxTheme from '../../components/BxTheme.vue'
 import { customerApi } from '../../api/modules/customer.api'
 import { storeApi } from '../../api/modules/store.api'
 import type { RoomBoardEntry, ComputedRoomStatus } from '../../api/types/room'
@@ -23,11 +24,11 @@ const CARE_LEVEL_SHORT: Record<string, string> = { LEVEL1: '一级', LEVEL2: '�
 const customerOptions = ref<{ label: string; value: string }[]>([])
 
 const statusColor: Record<ComputedRoomStatus, string> = {
-  VACANT: '#e8f8f0',
-  RESERVED: '#e6f3ff',
-  OCCUPIED: '#fff4e0',
-  PENDING_CLEANING: '#fdeaea',
-  MAINTENANCE: '#efefef',
+  VACANT: '#FBFAF6',
+  RESERVED: '#DDE7F0',
+  OCCUPIED: '#DCE7E2',
+  PENDING_CLEANING: '#E8CBC8',
+  MAINTENANCE: '#E6E3D9',
 }
 const statusLabel: Record<ComputedRoomStatus, string> = {
   VACANT: '空闲',
@@ -39,11 +40,11 @@ const statusLabel: Record<ComputedRoomStatus, string> = {
 
 // 卡片右上角的状态小标签配色（卡片底色仍按 statusColor，标签用同色系更深一档）
 const statusPill: Record<ComputedRoomStatus, { background: string; color: string }> = {
-  VACANT: { background: '#b9e9d0', color: '#085041' },
-  RESERVED: { background: '#bcdcf7', color: '#0c447c' },
-  OCCUPIED: { background: '#f6d9a0', color: '#633806' },
-  PENDING_CLEANING: { background: '#f7c1c1', color: '#791f1f' },
-  MAINTENANCE: { background: '#d3d1c7', color: '#444441' },
+  VACANT: { background: '#EEEBE3', color: '#161615' },
+  RESERVED: { background: '#6E97BF', color: '#F7F5EF' },
+  OCCUPIED: { background: '#7D8B63', color: '#F7F5EF' },
+  PENDING_CLEANING: { background: '#C96F4F', color: '#F7F5EF' },
+  MAINTENANCE: { background: '#86817A', color: '#F7F5EF' },
 }
 
 const groupedByFloor = computed(() => {
@@ -254,7 +255,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <BxTheme>
     <n-space style="margin-bottom: 16px">
       <n-select v-model:value="selectedStoreId" :options="storeOptions" style="width: min(200px, 94vw)" @update:value="fetchBoard" />
       <n-date-picker v-model:value="selectedDate" type="date" @update:value="fetchBoard" />
@@ -263,12 +264,13 @@ onMounted(async () => {
     <n-empty v-if="!loading && boardEntries.length === 0" description="该门店暂无房间数据" />
 
     <div v-for="[floor, entries] in groupedByFloor" :key="floor" style="margin-bottom: 20px">
-      <h3 style="margin-bottom: 8px">{{ floor }}</h3>
+      <h3 class="occ-floor bx-serif">{{ floor }}</h3>
       <n-grid :x-gap="12" :y-gap="12" :cols="6" responsive="screen" :item-responsive="true">
         <n-gi v-for="entry in entries" :key="entry.room.id" span="6 m:3 l:2 xl:1">
           <n-card
-            hoverable
-            :style="{ background: statusColor[entry.status], cursor: 'pointer' }"
+            :bordered="false"
+            class="occ-card"
+            :style="{ background: statusColor[entry.status], cursor: 'pointer', border: entry.status === 'VACANT' ? '1px solid #E6E3D9' : '1px solid transparent' }"
             size="small"
             content-style="padding: 8px 10px"
             @click="openAction(entry)"
@@ -385,23 +387,35 @@ onMounted(async () => {
       </n-card>
     </n-modal>
     <CheckInDialog v-model:show="checkInShow" :occupancy-id="checkInId" :customer-name="checkInName" @done="fetchBoard" />
-  </div>
+  </BxTheme>
 </template>
 
 <style scoped>
+.occ-floor {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.occ-card {
+  transition: transform 0.15s;
+}
+.occ-card:hover {
+  transform: translateY(-2px);
+}
 .occ-head {
   display: flex;
   align-items: baseline;
   gap: 6px;
 }
 .occ-no {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
-  color: #222;
+  color: var(--bx-ink);
+  font-family: var(--bx-mono);
 }
 .occ-type {
   font-size: 12px;
-  color: #666;
+  color: #5c5851;
 }
 .occ-pill {
   margin-left: auto;
@@ -413,11 +427,11 @@ onMounted(async () => {
 }
 .occ-row {
   font-size: 12px;
-  line-height: 19px;
-  color: #555;
+  line-height: 20px;
+  color: #3b3a37;
 }
 .occ-label {
-  color: #999;
+  color: #6f6a62;
 }
 .occ-gap {
   margin-left: 8px;
@@ -425,14 +439,14 @@ onMounted(async () => {
 /* 预产期整行加粗；距今不足7天整行（含说明文字）变红 */
 .occ-due {
   font-weight: 600;
-  color: #222;
+  color: var(--bx-ink);
 }
 .occ-due .occ-label {
-  color: #555;
+  color: #3b3a37;
 }
 .occ-due-warn,
 .occ-due-warn .occ-label {
-  color: #d03050;
+  color: #b4533a;
 }
 /* 客户姓名：比其余文字大一号，主题蓝加下划线，提示可点击 */
 .occ-customer {
@@ -440,11 +454,14 @@ onMounted(async () => {
   margin: 3px 0 2px;
   font-size: 15px;
   font-weight: 600;
-  color: #2080f0;
+  color: var(--bx-ink);
   cursor: pointer;
   text-decoration: underline;
+  text-decoration-color: var(--bx-clay);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 .occ-customer:hover {
-  color: #0c62c9;
+  color: #b4533a;
 }
 </style>

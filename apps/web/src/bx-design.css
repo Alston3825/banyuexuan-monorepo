@@ -1,0 +1,36 @@
+/* 伴月轩设计语言（docs/设计语言.md）的颜色与字体变量：暖色、纸张感，不用冷灰/渐变/发光。 */
+:root {
+  --bx-ink: #161615;
+  --bx-paper: #f7f5ef;
+  --bx-paper-2: #eeebe3;
+  --bx-paper-3: #e6e3d9;
+  --bx-gray: #86817a; /* 暖灰：次要文字 */
+  --bx-clay: #c96f4f; /* 陶土橙：唯一强调色 */
+  --bx-olive: #7d8b63;
+  --bx-blue: #6e97bf;
+  --bx-lilac: #c8c6d8;
+  --bx-cactus: #b9cec6;
+  --bx-coral: #e8cbc8;
+  --bx-fig: #b86580;
+  --bx-oat: #e2d9cb;
+  --bx-serif: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC', STSong, Georgia, serif;
+  --bx-sans: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  --bx-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+.bx-page {
+  background: var(--bx-paper);
+  color: var(--bx-ink);
+  font-family: var(--bx-sans);
+  border-radius: 14px;
+  padding: 20px;
+  min-height: calc(100vh - 120px);
+}
+.bx-serif {
+  font-family: var(--bx-serif);
+}
+@media (max-width: 767px) {
+  .bx-page {
+    padding: 12px;
+    border-radius: 10px;
+  }
+}
