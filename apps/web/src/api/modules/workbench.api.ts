@@ -32,6 +32,9 @@ export const workbenchApi = {
   updateStep: (id: string, stepId: string, d: Partial<{ title: string; result: string; done: boolean }>) => http.patch(`${b}/ongoing/${id}/steps/${stepId}`, d).then((r) => r.data),
   deleteStep: (id: string, stepId: string) => http.delete(`${b}/ongoing/${id}/steps/${stepId}`),
 
+  myTheme: () => http.get<{ theme: string | null }>(`${b}/theme`, { silent403: true, silentNetwork: true } as any).then((r) => r.data),
+  saveTheme: (theme: string) => http.put(`${b}/theme`, { theme }, { silentNetwork: true } as any),
+
   links: () => http.get<QuickLinkRow[]>(`${b}/links`).then((r) => r.data),
   saveLinks: (links: QuickLinkRow[]) => http.put<QuickLinkRow[]>(`${b}/links`, { links }).then((r) => r.data),
 }

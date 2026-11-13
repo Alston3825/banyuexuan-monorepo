@@ -68,6 +68,14 @@ describe('P9 我的待办·个人工作台 (e2e)', () => {
     await request(server).delete(`/api/v1/workspace/my/ongoing/${w.id}`).set(authed()).expect(200);
   });
 
+  it('配色方案：按账号保存，登录时带回', async () => {
+    await request(server).put('/api/v1/workspace/my/theme').set(authed()).send({ theme: 'BAD THEME' }).expect(400);
+    await request(server).put('/api/v1/workspace/my/theme').set(authed()).send({ theme: 'cloude' }).expect(200);
+    expect(((await request(server).get('/api/v1/workspace/my/theme').set(authed()).expect(200)).body as Json).theme).toBe('cloude');
+    const login = (await request(server).post('/api/v1/auth/login').send({ username: 'admin', password: 'Passw0rd!23' }).expect(201)).body as Json;
+    expect(login.account.uiTheme).toBe('cloude');
+  });
+
   it('快捷入口：整体保存、去重、过滤非法路径', async () => {
     const out = (await request(server).put('/api/v1/workspace/my/links').set(authed()).send({ links: [{ path: '/crm/customers', label: '客户' }, { path: '/crm/customers', label: '重复' }, { path: 'http://evil', label: '外链' }] }).expect(200)).body as Json[];
     expect(out.map((x) => x.path)).toEqual(['/crm/customers']);

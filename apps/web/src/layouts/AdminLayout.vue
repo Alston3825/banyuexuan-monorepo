@@ -8,6 +8,7 @@ import { useUiStore } from '../stores/ui'
 import { useBreakpoint } from '../composables/useBreakpoint'
 import { buildNavMenu } from './nav-menu'
 import { THEMES, themeOf } from '../themes'
+import { workbenchApi } from '../api/modules/workbench.api'
 import MySignatureDialog from '../components/care/MySignatureDialog.vue'
 import { mySignatureApi } from '../api/modules/care-sign.api'
 import { dialog, message } from '../utils/discrete-api'
@@ -27,8 +28,12 @@ const navMenuOptions = computed(() => buildNavMenu(auth.hasAccess))
 // 移动/平板端抽屉的显隐是纯临时 UI 状态，不持久化、不与桌面端的收起状态混用
 const mobileDrawerVisible = ref(false)
 
-// 登录后切到这个账号自己选的配色方案
+// 配色方案跟着账号走：先用本机缓存立即套上，再向服务器核对一次（换了设备/别处改过时以服务器为准）
 ui.syncTheme(auth.account?.id)
+workbenchApi
+  .myTheme()
+  .then((r) => ui.syncTheme(auth.account?.id, r.theme))
+  .catch(() => undefined)
 const darkSider = computed(() => themeOf(ui.theme).darkSider)
 const userMenuOptions = computed(() => [
   { label: '我的电子签名', key: 'signature', icon: () => h(NIcon, null, { default: () => h(CreateOutline) }) },
@@ -89,9 +94,13 @@ onMounted(async () => {
 
 async function handleUserMenuSelect(key: string) {
   if (key === 'signature') signatureVisible.value = true
-  if (key.startsWith('theme:')) ui.setTheme(key.slice(6), auth.account?.id)
+  if (key.startsWith('theme:')) {
+    ui.setTheme(key.slice(6), auth.account?.id)
+    workbenchApi.saveTheme(ui.theme).catch(() => message.warning('配色已切换，但没能保存到账号上，下次登录可能需要重选'))
+  }
   if (key === 'logout') {
     await auth.logout()
+    ui.syncTheme(null) // 登录页回到系统默认配色
     router.push('/login')
   }
 }

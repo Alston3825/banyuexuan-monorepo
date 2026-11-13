@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD COLUMN `ui_theme` VARCHAR(32) NULL;

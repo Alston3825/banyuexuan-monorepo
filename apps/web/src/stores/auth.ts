@@ -6,6 +6,7 @@ interface AuthAccount {
   id: string
   username: string
   realName: string
+  uiTheme?: string | null
 }
 
 interface AuthState {

@@ -208,6 +208,8 @@ model Account {
   passwordHash       String        @map("password_hash")
   /// 电子签名图（PNG 的 data URL，员工自己在“我的电子签名”里录入一次，护理档案签字时选用）
   signatureData      String?       @map("signature_data") @db.MediumText
+  /// 界面配色方案（每人自选，见前端 themes.ts）；空=用系统默认
+  uiTheme            String?       @map("ui_theme") @db.VarChar(32)
   signatureUpdatedAt DateTime?     @map("signature_updated_at")
   realName           String        @map("real_name")
   status             AccountStatus @default(ACTIVE)

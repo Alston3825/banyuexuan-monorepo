@@ -223,6 +223,18 @@ export class WorkbenchService {
     return { ok: true };
   }
 
+  // ---------- 界面配色方案（跟着账号走，换设备登录也是自己选的） ----------
+  async myTheme() {
+    const a = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId! }, select: { uiTheme: true } });
+    return { theme: a?.uiTheme ?? null };
+  }
+  async saveTheme(dto: { theme?: string }) {
+    const theme = typeof dto.theme === 'string' && /^[a-z0-9_-]{1,32}$/.test(dto.theme) ? dto.theme : null;
+    if (!theme) throw new BadRequestException('配色方案不正确');
+    await this.prisma.account.update({ where: { id: this.ctx.accountId! }, data: { uiTheme: theme } });
+    return { theme };
+  }
+
   // ---------- 快捷入口 ----------
   async links() {
     return this.prisma.quickLink.findMany({ where: this.me, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });

@@ -92,7 +92,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      account: { id: account.id, username: account.username, realName: account.realName },
+      account: { id: account.id, username: account.username, realName: account.realName, uiTheme: account.uiTheme ?? null },
       permissions,
     };
   }

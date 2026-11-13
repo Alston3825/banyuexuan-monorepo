@@ -44,6 +44,9 @@ export class WorkspaceController {
   @Patch('my/ongoing/:id/steps/:stepId') updateStep(@Param('id') id: string, @Param('stepId') sid: string, @Body() b: any) { return this.wb.updateStep(id, sid, b); }
   @Delete('my/ongoing/:id/steps/:stepId') deleteStep(@Param('id') id: string, @Param('stepId') sid: string) { return this.wb.deleteStep(id, sid); }
 
+  @Get('my/theme') myTheme() { return this.wb.myTheme(); }
+  @Put('my/theme') saveTheme(@Body() b: any) { return this.wb.saveTheme(b); }
+
   @Get('my/links') myLinks() { return this.wb.links(); }
   @Put('my/links') saveLinks(@Body() b: any) { return this.wb.saveLinks(b); }
 }
