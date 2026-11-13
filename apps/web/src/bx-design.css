@@ -37,7 +37,7 @@
   --bx-fig: #d4537e;
   --bx-oat: #fdf6dc;
   --bx-card: #ffffff;
-  --bx-line-strong: #e0e0e6;
+  --bx-line-strong: #cfd4dc;
   --bx-brand: #1f3a5f;
   --bx-hero: #8fb4de;
   --bx-serif: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -146,3 +146,12 @@ a {
   background: var(--bx-paper-3);
   color: #5c5851;
 }
+
+/* Sample 配色下页面背景是白色：卡片主体按状态铺一层淡底色、色带加深，和背景拉开 */
+:root[data-theme='sample'] .bx-rc.n-card { box-shadow: 0 1px 3px rgba(31, 34, 37, 0.08); }
+:root[data-theme='sample'] .bx-rc--RESERVED.n-card { background: #fff8e6; border-color: #ecd9a4; }
+:root[data-theme='sample'] .bx-rc--RESERVED .bx-rc-head { background: #f6dc9a; }
+:root[data-theme='sample'] .bx-rc--OCCUPIED.n-card { background: #ecf8f1; border-color: #a9dcc0; }
+:root[data-theme='sample'] .bx-rc--PENDING_CLEANING.n-card { background: #fff1e6; border-color: #f3c79b; }
+:root[data-theme='sample'] .bx-rc--MAINTENANCE.n-card { background: #f1f2f4; border-color: #cfd4dc; }
+:root[data-theme='sample'] .bx-rc--VACANT.n-card { background: #fafbfc; box-shadow: none; }
