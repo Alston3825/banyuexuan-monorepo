@@ -35,7 +35,6 @@ import {
   careRecordApi,
   motherProfileApi,
 } from '../../api/modules/care.api'
-import { tagApi } from '../../api/modules/tag.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
 import type {
   BabyProfile,
@@ -170,7 +169,7 @@ async function fetchAll() {
     mother.value = await motherProfileApi.get(motherProfileId)
     const [riskTags, tags, planTemplates, formTemplates] = await Promise.all([
       motherProfileApi.riskTags(motherProfileId),
-      tagApi.list(),
+      motherProfileApi.formOptions().then((o) => o.riskTags),
       carePlanTemplateApi.list(),
       careFormTemplateApi.list(),
     ])

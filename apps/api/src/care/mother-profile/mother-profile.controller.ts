@@ -22,6 +22,12 @@ export class MotherProfileController {
     return this.motherProfileService.findMany(query);
   }
 
+  @Get('form-options')
+  @RequirePermission('care.profile.view')
+  formOptions() {
+    return this.motherProfileService.formOptions();
+  }
+
   @Get('nurse-options')
   @RequirePermission('care.profile.view')
   nurseOptions(@Query('storeId') storeId?: string) {

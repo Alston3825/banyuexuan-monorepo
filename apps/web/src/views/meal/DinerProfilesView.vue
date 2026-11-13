@@ -37,7 +37,7 @@ async function fetchAll() {
   try {
     const [profiles, customerList, templateList, restrictionList] = await Promise.all([
       dinerProfileApi.list(),
-      customerApi.list(),
+      customerApi.listForOptions(),
       mealPlanTemplateApi.list(),
       dietaryRestrictionApi.list(),
     ])

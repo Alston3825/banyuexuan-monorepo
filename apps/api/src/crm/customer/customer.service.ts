@@ -164,6 +164,18 @@ export class CustomerService {
 
   /** 手机号查重。"待补充"这类占位值不参与；再次入住的妈妈（二胎等）勾选 allow 后放行。 */
   /** 新建预订/合同/母婴档案时用：已归档的客户不能再用，先恢复。 */
+  /** 选客户下拉用的精简列表：姓名 + 打码手机号 + 过敏源，不含其他客户资料 */
+  async options() {
+    const rows = await this.prisma.customer.findMany({
+      where: { tenantId: this.ctx.tenantId!, archivedAt: null },
+      select: { id: true, name: true, phone: true, allergens: true },
+      orderBy: { createdAt: 'desc' },
+      take: 3000,
+    });
+    const mask = (p: string | null) => (p && p.length >= 7 ? `${p.slice(0, 3)}****${p.slice(-4)}` : (p ?? ''));
+    return rows.map((c) => ({ id: c.id, name: c.name, phone: mask(c.phone), allergens: c.allergens ?? null }));
+  }
+
   async assertActive(id: string): Promise<Customer> {
     const customer = await this.findOneOrThrow(id);
     if (customer.archivedAt) throw new ConflictException(`客户「${customer.name}」已归档，不能再新建业务；请先在客户管理里恢复该客户`);

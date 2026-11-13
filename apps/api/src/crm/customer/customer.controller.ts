@@ -37,6 +37,12 @@ export class CustomerController {
   // 注意路由顺序：这个静态路径必须排在下面的 ':id' 前面注册，否则 "tag-catalog" 会被
   // Nest当成 :id 参数匹配到 GET ':id' (findOne)去——两者都是单段路径，Nest路由匹配是
   // 按声明顺序的，先声明的静态/参数路由先命中。
+  /** 各业务页（房态、护理、膳食、收款…）“选客户”下拉用：登录即可取，只给姓名和打码手机号，不要求“客户管理”权限 */
+  @Get('options')
+  options() {
+    return this.customerService.options();
+  }
+
   @Get('tag-catalog')
   @RequirePermission('crm.customer.view')
   tagCatalog(@Query('category') category: string) {

@@ -83,7 +83,7 @@ async function fetchStores() {
 }
 
 async function fetchCustomerOptions() {
-  const customers = await customerApi.list()
+  const customers = await customerApi.listForOptions()
   customerOptions.value = customers.map((c) => ({ label: `${c.name}（${c.phone}）`, value: c.id }))
 }
 

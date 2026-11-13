@@ -128,6 +128,20 @@ export class MotherProfileService {
     await this.auditLogService.record({ action: 'UPDATE', entityType: 'MotherProfile', entityId: id, remark: '恢复已归档的母婴档案', ...this.auditCtx() });
   }
 
+  /**
+   * 建档/编辑表单要用的下拉选项：客户（手机号只露后 4 位）和“母婴风险”标签。
+   * 护理岗位通常没有“客户管理”“标签管理”的权限，所以这里用护理档案自己的权限提供，不依赖那两个管理权限。
+   */
+  async formOptions() {
+    const tenantId = this.ctx.tenantId!;
+    const [customers, riskTags] = await Promise.all([
+      this.prisma.customer.findMany({ where: { tenantId, archivedAt: null }, select: { id: true, name: true, phone: true, allergens: true }, orderBy: { createdAt: 'desc' }, take: 2000 }),
+      this.prisma.tag.findMany({ where: { tenantId, category: 'CARE_RISK' }, orderBy: { name: 'asc' } }),
+    ]);
+    const mask = (p: string | null) => (p && p.length >= 7 ? `${p.slice(0, 3)}****${p.slice(-4)}` : (p ?? ''));
+    return { customers: customers.map((c) => ({ id: c.id, name: c.name, phone: mask(c.phone), allergens: c.allergens ?? null })), riskTags };
+  }
+
   /** 指派护理师时的候选人：本门店（或不限门店）的在职账号；职位/角色/部门里带“护理”的排前面。 */
   async nurseOptions(storeId?: string) {
     const accounts = await this.prisma.account.findMany({

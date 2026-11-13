@@ -76,6 +76,14 @@ describe('P9 我的待办·个人工作台 (e2e)', () => {
     expect(login.account.uiTheme).toBe('cloude');
   });
 
+  it('选客户下拉：登录即可取精简列表（手机号打码）；建档选项不依赖客户/标签管理权限', async () => {
+    const opts = (await request(server).get('/api/v1/crm/customers/options').set(authed()).expect(200)).body as Json[];
+    for (const c of opts.slice(0, 20)) if (c.phone) expect(c.phone).toMatch(/\*{4}|^.{0,6}$/);
+    await request(server).get('/api/v1/crm/customers/options').expect(401);
+    const fo = (await request(server).get('/api/v1/care/mother-profiles/form-options').set(authed()).expect(200)).body as Json;
+    expect(Array.isArray(fo.customers) && Array.isArray(fo.riskTags)).toBe(true);
+  });
+
   it('快捷入口：整体保存、去重、过滤非法路径', async () => {
     const out = (await request(server).put('/api/v1/workspace/my/links').set(authed()).send({ links: [{ path: '/crm/customers', label: '客户' }, { path: '/crm/customers', label: '重复' }, { path: 'http://evil', label: '外链' }] }).expect(200)).body as Json[];
     expect(out.map((x) => x.path)).toEqual(['/crm/customers']);

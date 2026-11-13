@@ -84,7 +84,7 @@ watch(
     images.value = []
     await load(true)
     if (customers.value.length === 0) {
-      const list = await customerApi.list()
+      const list = await customerApi.listForOptions()
       customers.value = list.map((c) => ({ label: `${c.name}（${c.phone ?? ''}）`, value: c.id }))
     }
   },

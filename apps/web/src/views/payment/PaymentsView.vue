@@ -31,7 +31,7 @@ async function fetchList() {
 }
 
 async function fetchPickerOptions() {
-  const [contracts, customers] = await Promise.all([contractApi.list(), customerApi.list()])
+  const [contracts, customers] = await Promise.all([contractApi.list(), customerApi.listForOptions()])
   customerNameById.value = Object.fromEntries(customers.map((c) => [c.id, c.name]))
   contractById.value = Object.fromEntries(contracts.map((c) => [c.id, c]))
   // 只有已确认、已关联客户的合同才能登记收款

@@ -20,11 +20,8 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 import { motherProfileApi } from '../../api/modules/care.api'
-import { customerApi } from '../../api/modules/customer.api'
 import { roomOccupancyApi } from '../../api/modules/room-occupancy.api'
-import { tagApi } from '../../api/modules/tag.api'
 import type { BabyProfileInput, DeliveryMethod, MotherProfile } from '../../api/types/care'
-import type { Customer } from '../../api/types/customer'
 import type { RoomOccupancy } from '../../api/types/room-occupancy'
 import type { Tag } from '../../api/types/tag'
 import { BABY_GENDER_LABEL_MAP, DELIVERY_METHOD_LABEL_MAP } from '../../utils/status-map'
@@ -35,7 +32,7 @@ import RecordRemovalDialog from '../../components/crm/RecordRemovalDialog.vue'
 const router = useRouter()
 
 const rows = ref<MotherProfile[]>([])
-const customers = ref<Customer[]>([])
+const customers = ref<{ id: string; name: string; phone: string; allergens: string | null }[]>([])
 const tags = ref<Tag[]>([])
 const loading = ref(false)
 
@@ -102,10 +99,10 @@ function openRemoval(row: MotherProfile) {
 async function fetchAll() {
   loading.value = true
   try {
-    const [profiles, customerList, tagList] = await Promise.all([motherProfileApi.list(view.value === 'archived' ? { archived: 'only' } : undefined), customerApi.list(), tagApi.list()])
+    const [profiles, opts] = await Promise.all([motherProfileApi.list(view.value === 'archived' ? { archived: 'only' } : undefined), motherProfileApi.formOptions()])
     rows.value = profiles
-    customers.value = customerList
-    tags.value = tagList
+    customers.value = opts.customers
+    tags.value = opts.riskTags
   } finally {
     loading.value = false
   }

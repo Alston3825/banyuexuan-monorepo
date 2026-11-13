@@ -66,7 +66,7 @@ async function fetchList() {
 }
 
 async function fetchPickerOptions() {
-  const [stores, rooms, customers] = await Promise.all([storeApi.list(), roomApi.list(), customerApi.list()])
+  const [stores, rooms, customers] = await Promise.all([storeApi.list(), roomApi.list(), customerApi.listForOptions()])
   storeOptions.value = stores.map((s) => ({ label: s.name, value: s.id }))
   allRooms.value = rooms
   roomNoById.value = Object.fromEntries(rooms.map((r) => [r.id, r.roomNo]))

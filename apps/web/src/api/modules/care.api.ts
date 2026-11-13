@@ -1,5 +1,6 @@
 import { http } from '../client'
 import type { RemovalCheck } from '../types/customer'
+import type { Tag } from '../types/tag'
 import type {
   BabyProfile,
   CareAbnormality,
@@ -75,6 +76,8 @@ export const motherProfileApi = {
   riskTags: (id: string) => http.get<TagBinding[]>(`/care/mother-profiles/${id}/risk-tags`).then((r) => r.data),
   /** 编辑风险标签：整体改成 tagIds（只能是母婴风险分类的标签） */
   setRiskTags: (id: string, tagIds: string[]) => http.put<TagBinding[]>(`/care/mother-profiles/${id}/risk-tags`, { tagIds }).then((r) => r.data),
+  /** 建档表单的下拉选项（客户、母婴风险标签）——只需要护理档案权限 */
+  formOptions: () => http.get<{ customers: { id: string; name: string; phone: string; allergens: string | null }[]; riskTags: Tag[] }>('/care/mother-profiles/form-options').then((r) => r.data),
   nurseOptions: (storeId?: string) =>
     http.get<{ id: string; name: string; roles: string[]; isNurse: boolean }[]>('/care/mother-profiles/nurse-options', { params: { storeId } }).then((r) => r.data),
 }

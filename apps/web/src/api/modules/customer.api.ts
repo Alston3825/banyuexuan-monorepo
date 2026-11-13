@@ -13,6 +13,15 @@ import type {
 } from '../types/customer'
 
 export const customerApi = {
+  /**
+   * 给“选客户”下拉填选项用：有“客户管理”权限时拿完整列表；没有时自动退回只含姓名+打码手机号的精简列表，
+   * 不弹“缺少权限”，也不让所在页面整页加载失败。
+   */
+  listForOptions: (): Promise<Customer[]> =>
+    http
+      .get<Customer[]>('/crm/customers', { silent403: true } as any)
+      .then((r) => r.data)
+      .catch((e) => (e?.response?.status === 403 ? http.get<Customer[]>('/crm/customers/options').then((r) => r.data) : Promise.reject(e))),
   list: (params?: QueryCustomerParams) => http.get<Customer[]>('/crm/customers', { params }).then((r) => r.data),
   get: (id: string) => http.get<Customer>(`/crm/customers/${id}`).then((r) => r.data),
   create: (body: CreateCustomerDto) => http.post<Customer>('/crm/customers', body).then((r) => r.data),

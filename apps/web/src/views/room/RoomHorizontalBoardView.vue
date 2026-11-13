@@ -143,7 +143,7 @@ async function fetchStores() {
 }
 
 async function fetchStaticData() {
-  const [roomTypes, customers] = await Promise.all([roomTypeApi.list(), customerApi.list()])
+  const [roomTypes, customers] = await Promise.all([roomTypeApi.list(), customerApi.listForOptions()])
   roomTypesById.value = Object.fromEntries(roomTypes.map((t) => [t.id, t]))
   customerOptions.value = customers.map((c) => ({ label: `${c.name}（${c.phone}）`, value: c.id }))
   customerNameById.value = Object.fromEntries(customers.map((c) => [c.id, c.name]))

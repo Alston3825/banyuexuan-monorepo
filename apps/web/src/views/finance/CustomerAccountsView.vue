@@ -34,7 +34,7 @@ async function fetchAccount() {
 }
 
 onMounted(async () => {
-  customers.value = await customerApi.list()
+  customers.value = await customerApi.listForOptions()
 })
 watch(customerId, fetchAccount)
 
