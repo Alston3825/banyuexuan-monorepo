@@ -160,9 +160,9 @@ const summary = computed(() => ({
 .ft-row {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #e6e3d9;
+  border: 1px solid var(--c-e6e6e6);
   border-radius: 8px;
-  background: #fbfaf6;
+  background: var(--c-fcfcfc);
 }
 .ft-line {
   display: flex;
@@ -176,7 +176,7 @@ const summary = computed(() => ({
   align-items: center;
 }
 .ft-no {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
   margin-right: auto;
 }
@@ -184,7 +184,7 @@ const summary = computed(() => ({
   width: 110px;
   height: 34px;
   padding: 0 8px;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--c-d9d9d9);
   border-radius: 4px;
   font-size: 16px;
   font-weight: 600;
@@ -194,7 +194,7 @@ const summary = computed(() => ({
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .ft-nums label {
   width: calc(25% - 6px);
@@ -210,38 +210,38 @@ const summary = computed(() => ({
   align-items: center;
 }
 .ft-medlabel {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 .ft-sep {
-  color: #d6d2c8;
+  color: var(--c-cccccc);
 }
 .ft-bad {
-  background: #f4ecdf;
+  background: var(--c-fff7e0);
   border-radius: 4px;
-  outline: 2px solid #c96f4f;
+  outline: 2px solid var(--c-f0a020);
 }
 .ft-bad-btn {
-  outline: 2px solid #c96f4f;
+  outline: 2px solid var(--c-f0a020);
 }
 .ft-msg,
 .ft-warn-all {
   margin-top: 4px;
   font-size: 12px;
-  color: #9a4f33;
+  color: var(--c-b25e00);
 }
 .ft-warn-all {
   margin-bottom: 8px;
 }
 .ft-empty {
   margin: 8px 0;
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 13px;
 }
 .ft-sum {
   margin-top: 10px;
   padding: 8px 10px;
-  background: #eef2f5;
+  background: var(--c-eef5fc);
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.7;

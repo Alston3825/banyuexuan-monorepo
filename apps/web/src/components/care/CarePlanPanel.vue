@@ -158,21 +158,21 @@ defineExpose({ reload: load })
 .cp-open {
   margin-bottom: 10px;
   padding: 8px 10px;
-  border: 1px solid #c96f4f;
+  border: 1px solid var(--c-f0a020);
   border-radius: 8px;
-  background: #f4ecdf;
+  background: var(--c-fff7e0);
 }
 .cp-rej {
-  color: #b4533a;
+  color: var(--c-c0392b);
   font-size: 13px;
 }
 .cp-meta {
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
   line-height: 1.7;
 }
 .cp-over {
-  color: #b4533a;
+  color: var(--c-c0392b);
   font-weight: 600;
 }
 .cp-focus {
@@ -182,7 +182,7 @@ defineExpose({ reload: load })
 }
 .cp-sub {
   margin-top: 4px;
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -195,13 +195,13 @@ defineExpose({ reload: load })
 .cp-pill {
   padding: 2px 8px;
   border-radius: 12px;
-  background: #eef2f5;
-  color: #5b83aa;
+  background: var(--c-eef5fc);
+  color: var(--c-2a64b0);
   font-size: 13px;
 }
 .cp-his {
   padding: 8px 0;
-  border-bottom: 1px dashed #eeebe3;
+  border-bottom: 1px dashed var(--c-eeeeee);
   font-size: 13px;
   cursor: pointer;
 }

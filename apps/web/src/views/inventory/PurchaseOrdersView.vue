@@ -209,7 +209,7 @@ const shipSummary = (r: PurchaseOrder) => {
 }
 const LOGISTICS_LABEL: Record<number, string> = { [-1]: '暂无信息', 0: '运输中', 1: '已揽收', 2: '疑难件', 3: '已签收', 4: '已退签', 5: '派件中', 6: '退回中', 7: '转投中', 8: '清关中', 14: '已拒签' }
 const columns: DataTableColumns<PurchaseOrder> = [
-  { key: 'orderNo', title: '采购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#5b83aa', onClick: () => (detail.value = r) }, r.orderNo) },
+  { key: 'orderNo', title: '采购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:var(--c-2080f0)', onClick: () => (detail.value = r) }, r.orderNo) },
   { key: 'supplier', title: '供应商', width: 140, render: (r) => r.supplier.name },
   { key: 'warehouse', title: '入库仓库', width: 120, render: (r) => r.warehouse.name },
   { key: 'totalAmount', title: '金额（元）', width: 100, render: (r) => yuan(r.totalAmount) },
@@ -264,7 +264,7 @@ onMounted(fetchAll)
           <n-descriptions-item v-if="detail.purchaseNote" label="采购备注" :span="2">{{ detail.purchaseNote }}</n-descriptions-item>
           <n-descriptions-item v-if="detail.remark" label="备注" :span="2">{{ detail.remark }}</n-descriptions-item>
           <n-descriptions-item v-if="detail.cancelReason" label="取消原因" :span="2">{{ detail.cancelReason }}</n-descriptions-item>
-          <n-descriptions-item v-if="receiptOf(detail)" label="入库单" :span="2"><a style="cursor: pointer; color: #5b83aa" @click="router.push('/inventory/goods-receipts')">{{ receiptOf(detail)!.receiptNo }}（去入库单页面收货）</a></n-descriptions-item>
+          <n-descriptions-item v-if="receiptOf(detail)" label="入库单" :span="2"><a style="cursor: pointer; color: var(--c-2080f0)" @click="router.push('/inventory/goods-receipts')">{{ receiptOf(detail)!.receiptNo }}（去入库单页面收货）</a></n-descriptions-item>
         </n-descriptions>
         <PurchaseShipmentsPanel v-if="detail.status !== 'DRAFT' && detail.status !== 'CANCELLED'" :order-id="detail.id" @changed="fetchAll" />
         <PurchaseLogisticsPanel v-if="detail.status !== 'DRAFT' && detail.status !== 'CANCELLED'" :order-id="detail.id" :can-edit="canPurchase" @changed="fetchAll" />
@@ -324,7 +324,7 @@ onMounted(fetchAll)
           <n-form-item label="采购明细">
             <div style="width: 100%">
               <item-lines-editor v-model="model.items" :show-purpose="false" />
-              <div style="margin-top: 6px; color: #86817a; font-size: 12px">没采购过的新物品会自动加入物品库，下次直接搜得到；单价不填按 0 元，之后在采购时再核对。</div>
+              <div style="margin-top: 6px; color: var(--c-888888); font-size: 12px">没采购过的新物品会自动加入物品库，下次直接搜得到；单价不填按 0 元，之后在采购时再核对。</div>
             </div>
           </n-form-item>
         </n-form>
@@ -343,7 +343,7 @@ onMounted(fetchAll)
 .po-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -356,15 +356,15 @@ onMounted(fetchAll)
 }
 .po-line {
   margin-top: 4px;
-  color: #5c5851;
+  color: var(--c-555555);
   font-size: 12px;
 }
 .po-hint {
   margin: 10px 0;
   padding: 6px 10px;
-  background: #f4ecdf;
+  background: var(--c-faf6f0);
   border-radius: 6px;
-  color: #9a4f33;
+  color: var(--c-8a5a22);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -376,11 +376,11 @@ onMounted(fetchAll)
 .po-table th,
 .po-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid #eeebe3;
+  border-bottom: 1px solid var(--c-f0f0f0);
   text-align: left;
 }
 .po-table th {
-  color: #86817a;
+  color: var(--c-888888);
   font-weight: 500;
 }
 </style>

@@ -545,10 +545,10 @@ onMounted(async () => {
       <n-button @click="jumpToday">今天</n-button>
       <n-date-picker :value="locateValue" type="date" clearable placeholder="定位到日期" style="width: min(150px, 94vw)" @update:value="onLocate" />
       <n-space :size="6" style="margin-left: 12px">
-        <n-tag size="small" :bordered="false" style="background: #eef2f5; color: #5b83aa">■ 预订中（虚线，预计）</n-tag>
-        <n-tag size="small" :bordered="false" style="background: #d3dccb; color: #5f6b49">■ 已入住（实心，实际）</n-tag>
-        <n-tag size="small" :bordered="false" style="background: #eeebe3; color: #6f6a62">■ 已离店</n-tag>
-        <n-tag size="small" :bordered="false" style="background: repeating-linear-gradient(45deg,#eeebe3,#eeebe3 4px,#e6e3d9 4px,#e6e3d9 8px); color: #86817a">▦ 维修中</n-tag>
+        <n-tag size="small" :bordered="false" style="background: var(--c-e6f3ff); color: var(--c-1a73c7)">■ 预订中（虚线，预计）</n-tag>
+        <n-tag size="small" :bordered="false" style="background: var(--c-e3f7ea); color: var(--c-1a8f4c)">■ 已入住（实心，实际）</n-tag>
+        <n-tag size="small" :bordered="false" style="background: var(--c-eeeeee); color: var(--c-777777)">■ 已离店</n-tag>
+        <n-tag size="small" :bordered="false" style="background: repeating-linear-gradient(45deg,var(--c-eeeeee),var(--c-eeeeee) 4px,var(--c-e2e2e2) 4px,var(--c-e2e2e2) 8px); color: var(--c-888888)">▦ 维修中</n-tag>
       </n-space>
     </n-space>
 
@@ -585,7 +585,7 @@ onMounted(async () => {
         >
           {{ item.label }}
         </n-tag>
-        <span v-if="outOfWindowList.length > 8" style="color: #86817a; font-size: 12px; align-self: center">
+        <span v-if="outOfWindowList.length > 8" style="color: var(--c-999999); font-size: 12px; align-self: center">
           等共 {{ outOfWindowList.length }} 条
         </span>
       </n-space>
@@ -707,7 +707,7 @@ onMounted(async () => {
             <n-button type="error" quaternary @click="handleCancelClick">取消预订</n-button>
           </n-space>
         </template>
-        <p v-else-if="!['RESERVED', 'CHECKED_IN'].includes(detailOcc.status)" style="color: #86817a; margin: 0">
+        <p v-else-if="!['RESERVED', 'CHECKED_IN'].includes(detailOcc.status)" style="color: var(--c-999999); margin: 0">
           该占用记录已{{ detailOcc.status === 'CHECKED_OUT' ? '离店' : '取消' }}，仅供查看。
         </p>
       </n-card>
@@ -744,7 +744,7 @@ onMounted(async () => {
   /* 房间多时纵向在表格内部滚动，月份条+日期行吸顶不丢 */
   max-height: calc(100vh - 300px);
   min-height: 240px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 6px;
 }
 .board-inner {
@@ -758,11 +758,11 @@ onMounted(async () => {
   position: sticky;
   top: 0;
   z-index: 6;
-  background: #fbfaf6;
-  border-bottom: 1px solid #e6e3d9;
+  background: var(--c-fafafa);
+  border-bottom: 1px solid var(--c-e5e5e5);
 }
 .month-row {
-  border-bottom: 1px solid #eeebe3;
+  border-bottom: 1px solid var(--c-eeeeee);
 }
 .month-corner {
   flex: none;
@@ -771,7 +771,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 0 8px;
-  background: #fbfaf6;
+  background: var(--c-fafafa);
   z-index: 4;
 }
 .month-label {
@@ -785,9 +785,9 @@ onMounted(async () => {
   padding: 4px 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #5b83aa;
-  border-left: 1px solid #e6e3d9;
-  background: #eef2f5;
+  color: var(--c-1a73c7);
+  border-left: 1px solid var(--c-e5e5e5);
+  background: var(--c-f3f8ff);
 }
 .header-cell {
   flex: none;
@@ -796,7 +796,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 8px 6px;
-  background: #fbfaf6;
+  background: var(--c-fafafa);
 }
 .sticky-col {
   position: sticky;
@@ -805,7 +805,7 @@ onMounted(async () => {
   z-index: 4;
   background: #fff;
   box-sizing: border-box;
-  border-right: 1px solid #eeebe3;
+  border-right: 1px solid var(--c-eeeeee);
 }
 .type-col {
   left: 0;
@@ -819,38 +819,38 @@ onMounted(async () => {
   align-items: center;
   padding: 0 8px;
   font-size: 13px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .room-label {
   font-weight: 600;
-  color: #5b83aa;
+  color: var(--c-1a73c7);
   cursor: pointer;
 }
 .day-header {
   flex: none;
   text-align: center;
   padding: 6px 0;
-  border-left: 1px solid #eeebe3;
+  border-left: 1px solid var(--c-f0f0f0);
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .day-header.weekend {
-  background: #f4ecdf;
+  background: var(--c-fff7f0);
 }
 .day-header.today {
-  background: #e9d9c3;
+  background: var(--c-fff1d6);
   font-weight: 700;
-  color: #9a4f33;
+  color: var(--c-b8721a);
 }
 .day-md {
   line-height: 1.3;
 }
 .day-wd {
   font-size: 11px;
-  color: #86817a;
+  color: var(--c-999999);
 }
 .room-row {
-  border-bottom: 1px solid #f7f5ef;
+  border-bottom: 1px solid var(--c-f2f2f2);
   min-height: 40px;
 }
 .track {
@@ -861,14 +861,14 @@ onMounted(async () => {
 .day-cell {
   flex: none;
   height: 40px;
-  border-left: 1px solid #f7f5ef;
+  border-left: 1px solid var(--c-f5f5f5);
   cursor: pointer;
 }
 .day-cell.weekend {
-  background: #f4ecdf;
+  background: var(--c-fffaf5);
 }
 .day-cell.today {
-  background: #f4ecdf;
+  background: var(--c-fff8ea);
 }
 .day-cell.disabled {
   cursor: default;
@@ -878,7 +878,7 @@ onMounted(async () => {
   top: 0;
   left: 0;
   height: 40px;
-  background: repeating-linear-gradient(45deg, #f7f5ef, #f7f5ef 6px, #e6e3d9 6px, #e6e3d9 12px);
+  background: repeating-linear-gradient(45deg, var(--c-f2f2f2), var(--c-f2f2f2) 6px, var(--c-e6e6e6) 6px, var(--c-e6e6e6) 12px);
   z-index: 1;
   pointer-events: none;
 }
@@ -904,21 +904,21 @@ onMounted(async () => {
 }
 .occ-bar.reserved {
   /* 预订=计划：浅蓝底 + 虚线框；办理入住后变成实心绿色（房间/日期以实际入住为准） */
-  background: repeating-linear-gradient(135deg, #5b83aa 0, #5b83aa 8px, #5b83aa 8px, #5b83aa 16px);
-  outline: 2px dashed #3d5a78;
+  background: repeating-linear-gradient(135deg, var(--c-4098fc) 0, var(--c-4098fc) 8px, var(--c-5aa8ff) 8px, var(--c-5aa8ff) 16px);
+  outline: 2px dashed var(--c-1a5fb4);
   outline-offset: -2px;
 }
 .occ-bar.checked_in {
-  background: #7d8b63;
+  background: var(--c-2bb673);
 }
 .occ-bar.checked_out {
-  background: #a8a39a;
+  background: var(--c-b0b0b0);
 }
 /* 预订冲突：两个客户的色条都标红（保持原宽度，不缩窄） */
 .occ-bar.conflict,
 .occ-bar.conflict.reserved,
 .occ-bar.conflict.checked_in {
-  background: #b4533a;
+  background: var(--c-d9364f);
 }
 /* 真正重叠的那几天：深红底 + 白色粗斜线，盖在两条红色色条上 */
 .overlap-mark {
@@ -926,9 +926,9 @@ onMounted(async () => {
   top: 5px;
   height: 30px;
   border-radius: 3px;
-  background: repeating-linear-gradient(45deg, #8a3d2a 0, #8a3d2a 5px, #ffffff 5px, #ffffff 9px);
+  background: repeating-linear-gradient(45deg, var(--c-7a0f22) 0, var(--c-7a0f22) 5px, #ffffff 5px, #ffffff 9px);
   opacity: 0.9;
-  outline: 2px solid #8a3d2a;
+  outline: 2px solid var(--c-7a0f22);
   outline-offset: -1px;
   z-index: 3;
   pointer-events: none;
@@ -945,9 +945,9 @@ onMounted(async () => {
 .pending-panel {
   margin-bottom: 12px;
   padding: 8px 10px;
-  border: 1px solid #dde7f0;
+  border: 1px solid var(--c-d9e8ff);
   border-radius: 8px;
-  background: #eef2f5;
+  background: var(--c-f5f9ff);
 }
 .pending-title {
   font-size: 13px;
@@ -957,7 +957,7 @@ onMounted(async () => {
   margin-left: 8px;
   font-size: 12px;
   font-weight: 400;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .pending-list {
   display: flex;
@@ -969,7 +969,7 @@ onMounted(async () => {
 .pending-card {
   flex: 0 0 auto;
   padding: 4px 10px;
-  border: 1px solid #dde7f0;
+  border: 1px solid var(--c-cfe0f7);
   border-radius: 14px;
   background: #fff;
   font-size: 12px;
@@ -977,12 +977,12 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .pending-card.active {
-  border-color: #5f6b49;
-  background: #edf1e9;
+  border-color: var(--c-18a058);
+  background: var(--c-e8f8f0);
   font-weight: 600;
 }
 .room-match {
-  background: #edf1e9 !important;
-  box-shadow: inset 3px 0 0 #5f6b49;
+  background: var(--c-e8f8f0) !important;
+  box-shadow: inset 3px 0 0 var(--c-18a058);
 }
 </style>

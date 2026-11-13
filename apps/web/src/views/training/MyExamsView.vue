@@ -82,7 +82,7 @@ onMounted(fetchAll)
         <n-empty v-if="!loading && availableExams.length === 0" description="暂无可参加的考试" />
         <n-space vertical :size="12">
           <n-card v-for="exam in availableExams" :key="exam.id" size="small" :title="exam.title">
-            <p v-if="exam.studyMaterial" style="white-space: pre-wrap; color: var(--n-text-color-3, #6f6a62)">{{ exam.studyMaterial }}</p>
+            <p v-if="exam.studyMaterial" style="white-space: pre-wrap; color: var(--n-text-color-3, var(--c-666666))">{{ exam.studyMaterial }}</p>
             <n-space justify="space-between" align="center">
               <span>共 {{ exam.questions.length }} 题{{ exam.passScore ? `，及格线 ${exam.passScore} 分` : '' }}</span>
               <n-button type="primary" size="small" @click="openExam(exam)">开始作答</n-button>

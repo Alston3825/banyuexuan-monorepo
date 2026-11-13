@@ -161,8 +161,8 @@ const close = () => emit('update:show', false)
           ⚠ 纸上的姓名是「{{ preview.header.patientName }}」，和这份档案的客户「{{ preview.header.customerName }}」对不上，请确认拍的是不是这位妈妈的表。
         </n-alert>
         <n-alert type="info" :show-icon="false" style="margin-bottom: 8px">
-          纸上共读到 <b>{{ preview.counts.total }}</b> 条记录：<b style="color: #5f6b49">新写的 {{ preview.counts.new }} 条</b>，
-          系统里已有 {{ preview.counts.exists }} 条（自动跳过）<template v-if="preview.counts.invalid > 0">，<b style="color: #b4533a">{{ preview.counts.invalid }} 条没读全，需要在下面补</b></template><template v-if="preview.counts.planned > 0">；另有 {{ preview.counts.planned }} 个只写了预约日期、还没测的（已忽略）</template>。
+          纸上共读到 <b>{{ preview.counts.total }}</b> 条记录：<b style="color: var(--c-18a058)">新写的 {{ preview.counts.new }} 条</b>，
+          系统里已有 {{ preview.counts.exists }} 条（自动跳过）<template v-if="preview.counts.invalid > 0">，<b style="color: var(--c-d03050)">{{ preview.counts.invalid }} 条没读全，需要在下面补</b></template><template v-if="preview.counts.planned > 0">；另有 {{ preview.counts.planned }} 个只写了预约日期、还没测的（已忽略）</template>。
           带 <n-tag size="tiny" type="warning" :bordered="false">请核对</n-tag> 的是 AI 没把握的，<b>请对照原图检查日期和数值</b>；不对的直接在这里改，或取消勾选。
         </n-alert>
         <n-space v-if="preview.babies.length > 1" align="center" style="margin-bottom: 8px">
@@ -218,29 +218,29 @@ const close = () => emit('update:show', false)
 .si-tip {
   margin: 0 0 12px;
   line-height: 1.8;
-  color: #5c5851;
+  color: var(--c-555555);
 }
 .si-working {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 30px 0;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .si-empty {
   padding: 16px 0;
-  color: #5f6b49;
+  color: var(--c-18a058);
 }
 .si-row {
   margin-bottom: 8px;
   padding: 8px 10px;
-  border: 1px solid #e6e3d9;
+  border: 1px solid var(--c-e6e6e6);
   border-radius: 8px;
-  background: #fbfaf6;
+  background: var(--c-fcfcfc);
 }
 .si-warn {
-  border-color: #c96f4f;
-  background: #f4ecdf;
+  border-color: var(--c-f0a020);
+  background: var(--c-fffaf0);
 }
 .si-head {
   display: flex;
@@ -249,7 +249,7 @@ const close = () => emit('update:show', false)
   flex-wrap: wrap;
 }
 .si-baby {
-  color: #5b83aa;
+  color: var(--c-2a64b0);
   font-size: 12px;
 }
 .si-grid {
@@ -263,20 +263,20 @@ const close = () => emit('update:show', false)
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-777777);
 }
 .si-sw {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  color: #5c5851;
+  color: var(--c-555555);
 }
 .si-exist {
   margin-top: 10px;
   font-size: 13px;
 }
 .si-exist a {
-  color: #5b83aa;
+  color: var(--c-2a64b0);
   cursor: pointer;
 }
 .si-chips {
@@ -288,8 +288,8 @@ const close = () => emit('update:show', false)
 .si-chip {
   padding: 1px 8px;
   border-radius: 10px;
-  background: #eef2f5;
-  color: #5b83aa;
+  background: var(--c-eef5fc);
+  color: var(--c-2a64b0);
   font-size: 12px;
 }
 </style>

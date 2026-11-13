@@ -2,11 +2,12 @@
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NIcon, NLayout, NLayoutSider, NLayoutHeader, NLayoutContent, NMenu, NDropdown, NButton, NDrawer, NDrawerContent, NSpace, NBadge } from 'naive-ui'
-import { Menu as MenuIcon, LogOutOutline, PersonCircleOutline, CreateOutline, NotificationsOutline } from '@vicons/ionicons5'
+import { Menu as MenuIcon, LogOutOutline, PersonCircleOutline, CreateOutline, NotificationsOutline, ColorPaletteOutline } from '@vicons/ionicons5'
 import { useAuthStore } from '../stores/auth'
 import { useUiStore } from '../stores/ui'
 import { useBreakpoint } from '../composables/useBreakpoint'
 import { buildNavMenu } from './nav-menu'
+import { THEMES, themeOf } from '../themes'
 import MySignatureDialog from '../components/care/MySignatureDialog.vue'
 import { mySignatureApi } from '../api/modules/care-sign.api'
 import { dialog, message } from '../utils/discrete-api'
@@ -26,10 +27,21 @@ const navMenuOptions = computed(() => buildNavMenu(auth.hasAccess))
 // 移动/平板端抽屉的显隐是纯临时 UI 状态，不持久化、不与桌面端的收起状态混用
 const mobileDrawerVisible = ref(false)
 
-const userMenuOptions = [
+// 登录后切到这个账号自己选的配色方案
+ui.syncTheme(auth.account?.id)
+const darkSider = computed(() => themeOf(ui.theme).darkSider)
+const userMenuOptions = computed(() => [
   { label: '我的电子签名', key: 'signature', icon: () => h(NIcon, null, { default: () => h(CreateOutline) }) },
+  { type: 'divider', key: 'd1' },
+  // 配色方案直接平铺在菜单里（手机上点一下就能换，不用再展开二级菜单）
+  ...THEMES.map((t) => ({
+    label: `配色：${t.label}（${t.desc}）${ui.theme === t.key ? ' ✓' : ''}`,
+    key: `theme:${t.key}`,
+    icon: () => h(NIcon, null, { default: () => h(ColorPaletteOutline) }),
+  })),
+  { type: 'divider', key: 'd2' },
   { label: '退出登录', key: 'logout', icon: () => h(NIcon, null, { default: () => h(LogOutOutline) }) },
-]
+])
 
 // ---------------- 待办小铃铛：有需要我处理的事就显示数量，超时的变红；每 60 秒刷新一次 ----------------
 const todoTotal = ref(0)
@@ -77,6 +89,7 @@ onMounted(async () => {
 
 async function handleUserMenuSelect(key: string) {
   if (key === 'signature') signatureVisible.value = true
+  if (key.startsWith('theme:')) ui.setTheme(key.slice(6), auth.account?.id)
   if (key === 'logout') {
     await auth.logout()
     router.push('/login')
@@ -89,7 +102,8 @@ async function handleUserMenuSelect(key: string) {
     <!-- 桌面端：常驻可收起侧边栏 -->
     <n-layout-sider
       v-if="isDesktop"
-      inverted
+      :inverted="darkSider"
+      :bordered="!darkSider"
       collapse-mode="width"
       :collapsed-width="64"
       :width="220"
@@ -99,7 +113,7 @@ async function handleUserMenuSelect(key: string) {
       @expand="ui.sidebarCollapsed = false"
     >
       <div class="brand bx-serif">{{ ui.sidebarCollapsed ? '伴' : '伴月轩' }}</div>
-      <n-menu inverted :value="selectedKey" :collapsed="ui.sidebarCollapsed" :collapsed-width="64" :options="navMenuOptions" />
+      <n-menu :inverted="darkSider" :value="selectedKey" :collapsed="ui.sidebarCollapsed" :collapsed-width="64" :options="navMenuOptions" />
     </n-layout-sider>
 
     <!-- 移动/平板端：抽屉式侧边栏，默认收起，靠顶栏汉堡按钮打开 -->
@@ -148,7 +162,7 @@ async function handleUserMenuSelect(key: string) {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 4px;
-  color: var(--bx-paper);
+  color: var(--bx-brand);
   white-space: nowrap;
   overflow: hidden;
 }

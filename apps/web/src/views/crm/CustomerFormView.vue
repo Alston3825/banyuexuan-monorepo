@@ -658,8 +658,8 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   gap: 12px;
   padding: 8px 0 10px;
   font-size: 13px;
-  color: #6f6a62;
-  border-bottom: 1px solid #eeebe3;
+  color: var(--c-666666);
+  border-bottom: 1px solid var(--c-eeeeee);
   margin-bottom: 12px;
 }
 .cf-head {
@@ -668,22 +668,22 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   gap: 10px;
   margin-bottom: 16px;
   padding-left: 8px;
-  border-left: 3px solid #c96f4f;
+  border-left: 3px solid var(--c-d9822b);
 }
 .cf-head-title {
   font-size: 14px;
   font-weight: 600;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
   margin-right: 8px;
 }
 .cf-hint {
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .cf-warn {
   margin-top: 4px;
   font-size: 12px;
-  color: #9a4f33;
+  color: var(--c-b25e00);
   line-height: 1.6;
 }
 .cf-tight :deep(.n-form-item-blank) {
@@ -693,7 +693,7 @@ const pageTitle = computed(() => (isEdit.value ? '编辑客户' : '新添客户'
   margin: 8px 0 12px;
   padding: 12px 8px 4px;
   max-width: 760px;
-  background: #e9d9c3;
+  background: var(--c-f6f1df);
   border-radius: 4px;
 }
 .cf-actions {

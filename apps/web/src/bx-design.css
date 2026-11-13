@@ -13,9 +13,35 @@
   --bx-coral: #e8cbc8;
   --bx-fig: #b86580;
   --bx-oat: #e2d9cb;
+  --bx-card: #fffefb;
+  --bx-line-strong: #d6d2c8;
+  --bx-brand: #f7f5ef; /* 侧边栏品牌字 */
+  --bx-hero: #c96f4f; /* 登录页插画底 */
   --bx-serif: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC', STSong, Georgia, serif;
   --bx-sans: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
   --bx-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+/* Sample：改版前的经典蓝绿配色 */
+:root[data-theme='sample'] {
+  --bx-ink: #1f2225;
+  --bx-paper: #ffffff;
+  --bx-paper-2: #f5f6f8;
+  --bx-paper-3: #e6e8eb;
+  --bx-gray: #888888;
+  --bx-clay: #f0a020;
+  --bx-olive: #18a058;
+  --bx-blue: #2080f0;
+  --bx-lilac: #e8f1f8;
+  --bx-cactus: #eaf1e6;
+  --bx-coral: #fdeee8;
+  --bx-fig: #d4537e;
+  --bx-oat: #fdf6dc;
+  --bx-card: #ffffff;
+  --bx-line-strong: #e0e0e6;
+  --bx-brand: #1f3a5f;
+  --bx-hero: #8fb4de;
+  --bx-serif: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --bx-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 .bx-page {
   background: var(--bx-paper);
@@ -29,7 +55,29 @@
   font-family: var(--bx-serif);
 }
 @media (max-width: 767px) {
-  .bx-page {
+  /* Sample：改版前的经典蓝绿配色 */
+:root[data-theme='sample'] {
+  --bx-ink: #1f2225;
+  --bx-paper: #ffffff;
+  --bx-paper-2: #f5f6f8;
+  --bx-paper-3: #e6e8eb;
+  --bx-gray: #888888;
+  --bx-clay: #f0a020;
+  --bx-olive: #18a058;
+  --bx-blue: #2080f0;
+  --bx-lilac: #e8f1f8;
+  --bx-cactus: #eaf1e6;
+  --bx-coral: #fdeee8;
+  --bx-fig: #d4537e;
+  --bx-oat: #fdf6dc;
+  --bx-card: #ffffff;
+  --bx-line-strong: #e0e0e6;
+  --bx-brand: #1f3a5f;
+  --bx-hero: #8fb4de;
+  --bx-serif: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --bx-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.bx-page {
     padding: 12px;
     border-radius: 10px;
   }
@@ -42,8 +90,8 @@ a {
 
 /* 房间卡片（房态看板 / 护理看板共用）：白纸卡片 + 顶部一条实色“书脊”表示状态，和米白页面背景拉开层次 */
 .bx-rc.n-card {
-  background: #fffefb;
-  border: 1px solid #d6d2c8;
+  background: var(--bx-card);
+  border: 1px solid var(--bx-line-strong);
   border-radius: 10px;
   overflow: hidden;
   transition: transform 0.15s;
@@ -88,7 +136,7 @@ a {
 /* 空闲：没有书脊，虚线框、底色透明，自然退到后面 */
 .bx-rc--VACANT.n-card {
   background: transparent;
-  border: 1px dashed #bdb8ad;
+  border: 1px dashed var(--bx-line-strong);
 }
 .bx-rc--VACANT .bx-rc-head {
   margin-bottom: -8px;

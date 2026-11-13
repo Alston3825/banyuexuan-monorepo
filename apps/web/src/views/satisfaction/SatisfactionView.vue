@@ -263,11 +263,11 @@ const columns: DataTableColumns<Survey> = [
 }
 .sv-sub {
   font-size: 13px;
-  color: #86817a;
+  color: var(--c-888888);
   margin-top: 2px;
 }
 .sv-empty {
-  color: #86817a;
+  color: var(--c-999999);
   text-align: center;
   padding: 30px 0;
 }
@@ -286,12 +286,12 @@ const columns: DataTableColumns<Survey> = [
   padding: 2px 0;
 }
 .up-file a {
-  color: #b4533a;
+  color: var(--c-d03050);
   cursor: pointer;
 }
 .up-tip {
   margin-top: 10px;
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-888888);
 }
 </style>

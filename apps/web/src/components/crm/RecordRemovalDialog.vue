@@ -80,14 +80,14 @@ const doDelete = () =>
 <template>
   <n-modal :mask-closable="false" :show="show" @update:show="(v: boolean) => emit('update:show', v)">
     <n-card :title="`处理${subject}：${label}`" style="width: min(520px, 94vw)" :bordered="false" role="dialog" closable @close="emit('update:show', false)" aria-modal="true">
-      <p v-if="loading || !check" style="color: #86817a">正在检查有没有关联数据…</p>
+      <p v-if="loading || !check" style="color: var(--c-999999)">正在检查有没有关联数据…</p>
       <template v-else>
         <!-- 已归档：只能恢复（或在没有痕迹时删除） -->
         <p v-if="check.archived" style="margin: 0 0 10px; line-height: 1.7">这个{{ subject }}<b>已归档</b>（列表里默认看不到）。恢复后会重新出现在列表里。</p>
 
         <!-- 用过的：不能删 -->
         <div v-if="blocked" style="margin-bottom: 10px; line-height: 1.7">
-          已有 <b style="color: #b4533a">{{ check.blockers.join('、') }}</b>，属于{{ kind === 'customer' ? '财务/医疗' : '医疗' }}痕迹，<b>不能删除</b>。<br />
+          已有 <b style="color: var(--c-c0392b)">{{ check.blockers.join('、') }}</b>，属于{{ kind === 'customer' ? '财务/医疗' : '医疗' }}痕迹，<b>不能删除</b>。<br />
           不再使用的话请<b>归档</b>：列表里默认隐藏，{{ kind === 'customer' ? '不能再新建预订/合同，' : '' }}数据一条不丢，随时可以恢复。
         </div>
 
@@ -97,14 +97,14 @@ const doDelete = () =>
             没有任何关联数据，可以直接<b>删除</b>（会放入回收站保留 30 天，操作会记入审计日志）。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
           </p>
           <div v-else style="margin-bottom: 10px; line-height: 1.7">
-            名下有：<b style="color: #b4533a">{{ everything.join('、') }}</b>。<br />
+            名下有：<b style="color: var(--c-c0392b)">{{ everything.join('、') }}</b>。<br />
             <template v-if="forceMode">这个{{ subject }}已经用过（有合同/入住/收款等），<b>只有超级管理员能强制删除</b>，会把上面这些<b>全部一起删除</b>。</template>
             <template v-else>删除会把它们<b>一起删除</b>（含纸质原件照片）。</template>
             删除后放入<b>回收站</b>，保留 30 天，期内可在“系统管理 → 回收站”还原；操作会记入审计日志。<span v-if="(check.linkedLeads ?? 0) > 0">关联的 {{ check.linkedLeads }} 条线索不会删除，只是解除关联。</span>
             <n-input v-if="canDelete && !careForceMissing" v-model:value="confirm" style="margin-top: 8px" :placeholder="`请输入客户姓名“${check.customerName}”确认删除`" />
           </div>
-          <p v-if="!canDelete" style="color: #c96f4f; margin: 0 0 10px">删除{{ subject }}需要管理员权限；你可以先<b>归档</b>，让管理员来删。</p>
-          <p v-else-if="careForceMissing" style="color: #c96f4f; margin: 0 0 10px">连同母婴档案/评估表一起删除需要“强制删除档案”权限（管理员），你可以先<b>归档</b>。</p>
+          <p v-if="!canDelete" style="color: var(--c-d9822b); margin: 0 0 10px">删除{{ subject }}需要管理员权限；你可以先<b>归档</b>，让管理员来删。</p>
+          <p v-else-if="careForceMissing" style="color: var(--c-d9822b); margin: 0 0 10px">连同母婴档案/评估表一起删除需要“强制删除档案”权限（管理员），你可以先<b>归档</b>。</p>
         </template>
 
         <n-input v-if="kind === 'customer' && !check.archived" v-model:value="reason" placeholder="归档原因（可不填，如：已退订、重复建档、长期无联系）" maxlength="60" style="margin-bottom: 4px" />

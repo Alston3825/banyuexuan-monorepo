@@ -417,15 +417,15 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 <style scoped>
 .dr-bar {
   padding: 10px 12px;
-  border: 1px solid #d3dccb;
+  border: 1px solid var(--c-b7e0c8);
   border-radius: 8px;
-  background: #edf1e9;
+  background: var(--c-eaf6ee);
 }
 .dr-bar .dr-tip {
-  color: #5f6b49;
+  color: var(--c-4a7c5f);
 }
 .dr-tip {
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 12px;
 }
 .dr-photo {
@@ -434,13 +434,13 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 }
 .dr-photo summary {
   cursor: pointer;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
   margin-bottom: 6px;
 }
 .dr-sec {
   margin-top: 14px;
   padding: 10px 12px 14px;
-  border: 1px solid #e6e3d9;
+  border: 1px solid var(--c-e6e6e6);
   border-radius: 8px;
   background: #fff;
   scroll-margin-top: 8px;
@@ -449,12 +449,12 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
   margin: -2px 0 6px;
   font-size: 15px;
   font-weight: 700;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
 }
 .dr-sectitle small {
   margin-left: 8px;
   font-weight: 400;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .dr-nav {
   display: flex;
@@ -474,9 +474,9 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 .dr-h {
   margin: 14px 0 8px;
   padding-left: 8px;
-  border-left: 3px solid #c96f4f;
+  border-left: 3px solid var(--c-d9822b);
   font-size: 14px;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
 }
 :deep(.n-card__content) {
   max-height: 72vh;

@@ -88,7 +88,7 @@ onMounted(load)
 <template>
   <n-spin :show="loading">
     <n-space vertical :size="14">
-      <n-card v-if="drafts.length > 0" size="small" title="有已上传、还没入库的纸质表格" style="border-color: #c96f4f">
+      <n-card v-if="drafts.length > 0" size="small" title="有已上传、还没入库的纸质表格" style="border-color: var(--c-f0a020)">
         <n-space vertical :size="8">
           <div v-for="d in drafts" :key="d.id" class="ap-draft">
             <div class="ap-draft-title">
@@ -108,12 +108,12 @@ onMounted(load)
           <n-tag v-else size="small" round>未录入</n-tag>
         </template>
         <n-space align="center" :wrap="true">
-          <span style="color: #6f6a62">妈妈本人</span>
+          <span style="color: var(--c-666666)">妈妈本人</span>
           <n-button v-if="!motherRecord" type="primary" size="small" @click="open(motherType, motherProfileId, '', null)">去录入（可拍照识别）</n-button>
           <template v-else>
             <n-button size="small" @click="open(motherType, motherProfileId, '', motherRecord)">查看 / 修改</n-button>
-            <span v-if="motherRecord.document" style="color: #86817a; font-size: 12px">已归档原件 {{ motherRecord.document.files.length }} 张</span>
-            <span v-else style="color: #9a4f33; font-size: 12px">未上传纸质原件</span>
+            <span v-if="motherRecord.document" style="color: var(--c-888888); font-size: 12px">已归档原件 {{ motherRecord.document.files.length }} 张</span>
+            <span v-else style="color: var(--c-b25e00); font-size: 12px">未上传纸质原件</span>
           </template>
         </n-space>
       </n-card>
@@ -136,10 +136,10 @@ onMounted(load)
           </n-button>
           <template v-else>
             <n-button size="small" @click="open(babyType, b.baby.id, babyLabel(b.baby), (stage === 'admission' ? b.admission : b.discharge)!)">查看 / 修改</n-button>
-            <span v-if="(stage === 'admission' ? b.admission : b.discharge)!.document" style="color: #86817a; font-size: 12px">
+            <span v-if="(stage === 'admission' ? b.admission : b.discharge)!.document" style="color: var(--c-888888); font-size: 12px">
               已归档原件 {{ (stage === 'admission' ? b.admission : b.discharge)!.document!.files.length }} 张
             </span>
-            <span v-else style="color: #9a4f33; font-size: 12px">未上传纸质原件</span>
+            <span v-else style="color: var(--c-b25e00); font-size: 12px">未上传纸质原件</span>
           </template>
         </n-space>
       </n-card>
@@ -172,7 +172,7 @@ onMounted(load)
 }
 .ap-draft-sub {
   display: block;
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 </style>

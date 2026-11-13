@@ -691,14 +691,14 @@ onMounted(fetchAll)
           <n-space size="small">
             <n-tag v-for="b in motherRiskTags" :key="b.id" size="small" :color="{ color: b.tag.color ?? undefined }">{{ b.tag.name }}</n-tag>
             <span v-if="motherRiskTags.length === 0">-</span>
-            <a style="cursor: pointer; color: #5b83aa; font-size: 12px" @click="openMotherTags">编辑风险标签</a>
+            <a style="cursor: pointer; color: var(--c-2080f0); font-size: 12px" @click="openMotherTags">编辑风险标签</a>
           </n-space>
         </n-descriptions-item>
         <n-descriptions-item label="主责护理师" :span="2">
           <b v-if="mother.primaryNurse">{{ mother.primaryNurse.realName }}</b>
-          <a v-else style="color: #c96f4f; cursor: pointer; text-decoration: underline" @click="openEdit">未指派，去指派</a>
+          <a v-else style="color: var(--c-d9822b); cursor: pointer; text-decoration: underline" @click="openEdit">未指派，去指派</a>
         </n-descriptions-item>
-        <n-descriptions-item label="过敏源" :span="2"><span :style="mother.allergens ? 'color:#b4533a;font-weight:600' : ''">{{ mother.allergens || '-' }}</span></n-descriptions-item>
+        <n-descriptions-item label="过敏源" :span="2"><span :style="mother.allergens ? 'color:var(--c-e24b4a);font-weight:600' : ''">{{ mother.allergens || '-' }}</span></n-descriptions-item>
         <n-descriptions-item label="医嘱" :span="2">{{ mother.careNote ?? '-' }}</n-descriptions-item>
         <n-descriptions-item label="备注" :span="2">{{ mother.remark ?? '-' }}</n-descriptions-item>
       </n-descriptions>
@@ -717,7 +717,7 @@ onMounted(fetchAll)
             <span class="cp-baby-sub">{{ BABY_GENDER_LABEL_MAP[b.gender] }}</span>
           </div>
           <div class="cp-baby-line">出生日期 {{ fmtBirth(b.birthDate) }} · 出生体重 {{ b.birthWeightGrams ?? '-' }} g · Apgar 评分 {{ b.apgarScore ?? '-' }}</div>
-          <div v-if="b.allergens" class="cp-baby-line" style="color: #b4533a">过敏源：{{ b.allergens }}</div>
+          <div v-if="b.allergens" class="cp-baby-line" style="color: var(--c-e24b4a)">过敏源：{{ b.allergens }}</div>
           <n-space v-if="(babyRiskTags[b.id] ?? []).length" :size="4" style="margin-top: 6px">
             <n-tag v-for="t in babyRiskTags[b.id]" :key="t.id" size="small" :color="{ color: t.tag.color ?? undefined }">{{ t.tag.name }}</n-tag>
           </n-space>
@@ -804,7 +804,7 @@ onMounted(fetchAll)
     <!-- 编辑妈妈的风险标签 -->
     <n-modal :mask-closable="false" :show="mrtVisible" @update:show="(v) => (mrtVisible = v)">
       <n-card title="编辑风险标签" style="width: min(460px, 94vw)" :bordered="false" role="dialog" closable @close="mrtVisible = false" aria-modal="true">
-        <p v-if="motherWrongTags.length" style="margin: 0 0 10px; color: #c96f4f; font-size: 13px; line-height: 1.7">
+        <p v-if="motherWrongTags.length" style="margin: 0 0 10px; color: var(--c-d9822b); font-size: 13px; line-height: 1.7">
           这份档案上有不属于风险标签的标签：{{ motherWrongTags.map((b) => b.tag.name).join('、') }}（销售用的客户分类/客户类型，被误选进来了）。点“保存”后会自动清掉。
         </p>
         <n-select v-model:value="mrtIds" multiple :options="tagOptions" placeholder="早产 / 传染病 / 高敏 / 妈咪住院…（可多选，清空则没有风险标签）" />
@@ -821,7 +821,7 @@ onMounted(fetchAll)
     <n-modal :mask-closable="false" :show="!!babyDel" @update:show="(v) => !v && (babyDel = null)">
       <n-card v-if="babyDel" title="删除宝宝档案及名下数据" style="width: min(480px, 94vw)" :bordered="false" role="dialog" closable @close="babyDel = null" aria-modal="true">
         <p style="margin: 0 0 10px; line-height: 1.7">
-          “<b>{{ babyDel.name }}</b>”名下已有：<b style="color: #b4533a">{{ babyDel.attached.join('、') }}</b>。<br />
+          “<b>{{ babyDel.name }}</b>”名下已有：<b style="color: var(--c-c0392b)">{{ babyDel.attached.join('、') }}</b>。<br />
           继续删除会把这个宝宝档案和上面这些数据（含纸质原件照片）<b>一起永久删除</b>，不能恢复，操作会记入审计日志。
         </p>
         <n-input v-model:value="babyDel.confirm" :placeholder="`请输入宝宝名字“${babyDel.name}”确认`" @keyup.enter="confirmForceRemoveBaby" />
@@ -1052,7 +1052,7 @@ onMounted(fetchAll)
 <style scoped>
 .cp-mmenu {
   margin-bottom: 10px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
   background: #fff;
   overflow: hidden;
@@ -1063,33 +1063,33 @@ onMounted(fetchAll)
   align-items: center;
   padding: 12px 14px;
   font-weight: 600;
-  color: #3d5a78;
+  color: var(--c-1f3a5f);
 }
 .cp-hint {
-  color: #5f6b49;
+  color: var(--c-18a058);
   font-size: 14px;
   font-weight: 700;
 }
 .cp-mlist {
-  border-top: 1px solid #eeebe3;
+  border-top: 1px solid var(--c-f0f0f0);
 }
 .cp-mitem {
   padding: 13px 14px;
-  border-bottom: 1px solid #f7f5ef;
+  border-bottom: 1px solid var(--c-f6f6f6);
   font-size: 15px;
 }
 .cp-mitem:last-child {
   border-bottom: none;
 }
 .cp-mon {
-  background: #edf1e9;
-  color: #5f6b49;
+  background: var(--c-eef7f0);
+  color: var(--c-18a058);
   font-weight: 600;
 }
 .cp-baby {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
 }
 .cp-baby-top {
@@ -1098,17 +1098,17 @@ onMounted(fetchAll)
   align-items: center;
 }
 .cp-baby-sub {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 13px;
 }
 .cp-baby-line {
   margin-top: 4px;
-  color: #5c5851;
+  color: var(--c-555555);
   font-size: 13px;
 }
 .cp-baby-empty {
   padding: 12px 0;
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 13px;
 }
 /* 手机上用自己的竖排列表，隐藏 naive 自带的标签栏 */

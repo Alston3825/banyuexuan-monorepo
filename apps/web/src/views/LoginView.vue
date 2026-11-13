@@ -97,7 +97,7 @@ async function handleSubmit() {
 
 <style scoped>
 .lg { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; background: var(--bx-paper); font-family: var(--bx-sans); color: var(--bx-ink); }
-.lg-art { background: var(--bx-clay); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+.lg-art { background: var(--bx-hero); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
 .lg-svg { width: min(360px, 70%); height: auto; }
 .lg-motto { margin-top: 28px; font-size: 20px; letter-spacing: 1px; color: var(--bx-ink); text-align: center; }
 .lg-form { display: flex; flex-direction: column; justify-content: center; padding: 40px clamp(24px, 8vw, 96px); max-width: 560px; width: 100%; margin: 0 auto; box-sizing: border-box; }

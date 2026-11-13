@@ -78,7 +78,7 @@ watch(tab, () => {
 
 const columns = computed<DataTableColumns<PurchaseRequest>>(() => [
   ...(tab.value === 'dept' && canCollect.value ? [{ type: 'selection' as const, disabled: (r: PurchaseRequest) => r.status !== 'SUBMITTED' }] : []),
-  { key: 'requestNo', title: '申购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:#5b83aa', onClick: () => openDetail(r.id) }, r.requestNo) },
+  { key: 'requestNo', title: '申购单号', width: 170, render: (r) => h('a', { style: 'cursor:pointer;color:var(--c-2080f0)', onClick: () => openDetail(r.id) }, r.requestNo) },
   ...(tab.value === 'dept'
     ? [
         { key: 'dept', title: '申请部门', width: 110, render: (r: PurchaseRequest) => r.departmentName ?? '-' },
@@ -587,12 +587,12 @@ onMounted(async () => {
         <input ref="fileInput" type="file" accept=".xlsx" style="display: none" @change="onFileChosen" />
         <n-space align="center" style="margin-bottom: 10px">
           <n-button type="primary" :loading="parsing" @click="fileInput?.click()">{{ preview ? '重新选择文件' : '选择申购表（.xlsx）' }}</n-button>
-          <span style="color: #86817a; font-size: 12px">直接用每月在用的申购表，不用改格式</span>
+          <span style="color: var(--c-888888); font-size: 12px">直接用每月在用的申购表，不用改格式</span>
         </n-space>
 
         <template v-if="preview">
           <n-alert type="info" :show-icon="false" style="margin-bottom: 10px">
-            表头：{{ preview.titleText ?? '（没有标题行）' }}。识别出 <b>{{ importRows.length }}</b> 行物品，已勾选 {{ selected.length }} 行，系统按“数量×单价”核算 <b>{{ money(calcTotal) }}</b> 元<template v-if="preview.sheetTotal !== null">（表里写的合计 {{ money(preview.sheetTotal) }} 元<template v-if="Math.abs(calcTotal - preview.sheetTotal) > 0.005 && selected.length === importRows.length">，<b style="color: #b4533a">与核算不一致，请核对</b></template><template v-else-if="selected.length === importRows.length">，一致 ✓</template>）</template>。
+            表头：{{ preview.titleText ?? '（没有标题行）' }}。识别出 <b>{{ importRows.length }}</b> 行物品，已勾选 {{ selected.length }} 行，系统按“数量×单价”核算 <b>{{ money(calcTotal) }}</b> 元<template v-if="preview.sheetTotal !== null">（表里写的合计 {{ money(preview.sheetTotal) }} 元<template v-if="Math.abs(calcTotal - preview.sheetTotal) > 0.005 && selected.length === importRows.length">，<b style="color: var(--c-d03050)">与核算不一致，请核对</b></template><template v-else-if="selected.length === importRows.length">，一致 ✓</template>）</template>。
             <template v-if="noPriceCount > 0">其中 {{ noPriceCount }} 行没有单价（待询价），金额按 0 计。</template>
           </n-alert>
           <n-space align="center" :size="14" style="margin-bottom: 10px">
@@ -608,7 +608,7 @@ onMounted(async () => {
           <n-space v-if="deptSummary.length" :size="8" style="margin-top: 8px">
             <n-tag v-for="d in deptSummary" :key="d.dept" size="small" round>{{ d.dept }}：{{ money(d.amount) }} 元</n-tag>
           </n-space>
-          <div style="margin-top: 6px; color: #86817a; font-size: 12px">缺数量的行需要先填数量才能导入。单价为空的行导入后显示“待询价”，之后可以补。</div>
+          <div style="margin-top: 6px; color: var(--c-999999); font-size: 12px">缺数量的行需要先填数量才能导入。单价为空的行导入后显示“待询价”，之后可以补。</div>
         </template>
         <n-empty v-else description="先选择申购表，系统会识别并让你核对后再导入" style="padding: 24px 0" />
 
@@ -675,7 +675,7 @@ onMounted(async () => {
           <n-tag v-for="d in detailDeptSummary" :key="d.dept" size="small" round>{{ d.dept }}：{{ money(d.amount) }} 元</n-tag>
         </n-space>
         <n-alert v-if="noPriceLines > 0" type="warning" :show-icon="false" style="margin-bottom: 8px">有 {{ noPriceLines }} 行还没有单价（待询价）。</n-alert>
-        <n-card v-if="!isDept && detail.status !== 'DRAFT'" size="small" title="审批进度" style="margin-bottom: 10px; background: #f4ecdf">
+        <n-card v-if="!isDept && detail.status !== 'DRAFT'" size="small" title="审批进度" style="margin-bottom: 10px; background: var(--c-fcfaf6)">
           <ApprovalProgress :key="detail.id + detail.status" business-type="PURCHASE_REQUEST" :business-id="detail.id" @changed="onApprovalChanged" />
         </n-card>
         <n-alert v-if="detail.canApproverEdit" type="info" :show-icon="false" style="margin-bottom: 8px">你是当前审批人：通过前可以直接修改下面的物品名称、规格型号、数量、单价等，也可以加行、删行，改动会留下记录。改好后在上面的“审批进度”里点通过。</n-alert>
@@ -752,7 +752,7 @@ onMounted(async () => {
 .pr-card {
   padding: 10px 12px;
   margin-bottom: 8px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -764,7 +764,7 @@ onMounted(async () => {
 }
 .pr-line {
   margin-top: 4px;
-  color: #5c5851;
+  color: var(--c-555555);
   font-size: 12px;
 }
 .pr-fix {
@@ -773,34 +773,34 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px dashed #eeebe3;
+  border-bottom: 1px dashed var(--c-eeeeee);
 }
 .pr-fix-name {
   flex: 1 1 200px;
 }
 .pr-sub {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 .pr-flow {
   margin-bottom: 10px;
   padding: 6px 10px;
-  background: #f4ecdf;
+  background: var(--c-faf6f0);
   border-radius: 6px;
-  color: #9a4f33;
+  color: var(--c-8a5a22);
   font-size: 12px;
   line-height: 1.7;
 }
 .pr-tip {
   margin: 0 0 10px;
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
   line-height: 1.7;
 }
 .pr-line-box {
   margin-bottom: 8px;
   padding: 8px 10px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
 }
 .pr-line-head {

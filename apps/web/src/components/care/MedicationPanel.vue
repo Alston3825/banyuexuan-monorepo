@@ -149,12 +149,12 @@ onMounted(load)
 .mp-card {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #e6e3d9;
+  border: 1px solid var(--c-e6e6e6);
   border-radius: 8px;
   background: #fff;
 }
 .mp-old {
-  background: #fbfaf6;
+  background: var(--c-f8f8f8);
   opacity: 0.9;
 }
 .mp-top {
@@ -165,11 +165,11 @@ onMounted(load)
 }
 .mp-by {
   margin-left: auto;
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 .mp-chg {
-  color: #c96f4f;
+  color: var(--c-d9822b);
   font-size: 12px;
 }
 .mp-items {
@@ -181,17 +181,17 @@ onMounted(load)
 .mp-pill {
   padding: 2px 8px;
   border-radius: 12px;
-  background: #eef2f5;
-  color: #5b83aa;
+  background: var(--c-eef5fc);
+  color: var(--c-2a64b0);
   font-size: 13px;
 }
 .mp-note {
   margin-top: 6px;
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
 }
 .mp-stop {
-  color: #b4533a;
+  color: var(--c-c0392b);
 }
 .mp-photos {
   margin-top: 8px;
@@ -204,7 +204,7 @@ onMounted(load)
 }
 .mp-warn {
   margin-top: 8px;
-  color: #9a4f33;
+  color: var(--c-b25e00);
   font-size: 12px;
 }
 </style>

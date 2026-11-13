@@ -235,10 +235,10 @@ function close() {
 <style scoped>
 .ad-bar {
   padding-bottom: 8px;
-  border-bottom: 1px dashed #e6e3d9;
+  border-bottom: 1px dashed var(--c-e5e5e5);
 }
 .ad-tip {
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 12px;
 }
 .ad-body {
@@ -260,7 +260,7 @@ function close() {
 .ad-photos-title {
   margin-bottom: 6px;
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-888888);
 }
 @media (max-width: 900px) {
   .ad-has-doc {

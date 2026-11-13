@@ -205,7 +205,7 @@ onMounted(async () => {
         </n-space>
       </template>
       <template v-else>
-        <span style="color: var(--n-text-color-disabled, #86817a)">请先选择设备</span>
+        <span style="color: var(--n-text-color-disabled, var(--c-999999))">请先选择设备</span>
       </template>
     </n-card>
   </div>

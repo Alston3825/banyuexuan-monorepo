@@ -134,19 +134,19 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 }
 .fg-t th,
 .fg-t td {
-  border: 1px solid #86817a;
+  border: 1px solid var(--c-9a9a9a);
   padding: 1px 3px;
   text-align: center;
   vertical-align: middle;
 }
 .fg-t th {
-  background: #f7f5ef;
+  background: var(--c-f4f4f4);
   font-weight: 600;
   padding: 4px 2px;
 }
 .fg-t th small {
   margin-left: 2px;
-  color: #86817a;
+  color: var(--c-999999);
   font-weight: 400;
   font-size: 11px;
 }
@@ -187,69 +187,69 @@ const count = (k: string) => props.modelValue.filter((r) => r[k] === 'YES').leng
 }
 .fg-t input:focus,
 .fg-t select:focus {
-  background: #edf1e9;
+  background: var(--c-f6fbf8);
 }
 .fg-t select {
   width: 62px;
   margin-left: 0;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--c-dddddd);
   border-radius: 4px;
   font-size: 12px;
 }
 .tick {
   width: 24px;
   height: 22px;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--c-cccccc);
   border-radius: 4px;
   background: #fff;
-  color: #d6d2c8;
+  color: var(--c-cccccc);
   cursor: pointer;
 }
 .tick.on {
-  border-color: #5f6b49;
-  background: #edf1e9;
-  color: #5f6b49;
+  border-color: var(--c-18a058);
+  background: var(--c-e8f6ee);
+  color: var(--c-0c7a43);
   font-weight: 700;
 }
 .del {
   padding: 1px 8px;
-  border: 1px solid #e8cbc8;
+  border: 1px solid var(--c-f0c0c0);
   border-radius: 4px;
   background: #fff;
-  color: #b4533a;
+  color: var(--c-cc3333);
   font-size: 12px;
   cursor: pointer;
 }
 .del:hover {
-  background: #f6e9e6;
+  background: var(--c-fdeeee);
 }
 td.bad {
-  background: #f4ecdf;
-  outline: 2px solid #c96f4f;
+  background: var(--c-fff3dc);
+  outline: 2px solid var(--c-f0a020);
   outline-offset: -2px;
 }
 .sum td {
-  background: #fbfaf6;
+  background: var(--c-f9f9f9);
   font-weight: 600;
   padding: 3px;
 }
 .empty {
   padding: 14px;
-  color: #86817a;
+  color: var(--c-999999);
 }
 .fg-warnall {
   margin-bottom: 6px;
-  color: #9a4f33;
+  color: var(--c-b25e00);
   font-size: 12px;
 }
 .add {
   margin-top: 6px;
   width: 100%;
   padding: 5px;
-  border: 1px dashed #5f6b49;
+  border: 1px dashed var(--c-18a058);
   border-radius: 6px;
   background: #fff;
-  color: #5f6b49;
+  color: var(--c-18a058);
   cursor: pointer;
 }
 </style>

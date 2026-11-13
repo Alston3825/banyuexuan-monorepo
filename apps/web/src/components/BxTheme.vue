@@ -1,14 +1,8 @@
 <script setup lang="ts">
-/** 按 docs/设计语言.md 给一块页面套上“纸张感”主题：近黑主色、米白底、暖灰边线、陶土橙只做强调。 */
-import { NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
-import { bxThemeOverrides } from '../bx-theme'
-
+/** 给一块页面套上“纸张”底（颜色跟随当前配色方案，见 themes.ts）。全站主题已在 App.vue 统一提供。 */
 defineProps<{ bare?: boolean }>()
-const overrides: GlobalThemeOverrides = bxThemeOverrides
 </script>
 
 <template>
-  <n-config-provider :theme-overrides="overrides" abstract>
-    <div :class="bare ? '' : 'bx-page'"><slot /></div>
-  </n-config-provider>
+  <div :class="bare ? '' : 'bx-page'"><slot /></div>
 </template>

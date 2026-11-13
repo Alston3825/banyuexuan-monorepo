@@ -187,9 +187,9 @@ function readonlyText(f: FieldSpec): string {
 .sf-title {
   margin: 0 0 8px;
   padding-left: 8px;
-  border-left: 3px solid #c96f4f;
+  border-left: 3px solid var(--c-d9822b);
   font-size: 14px;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
 }
 .sf-grid {
   display: grid;
@@ -206,24 +206,24 @@ function readonlyText(f: FieldSpec): string {
 .sf-label {
   margin-bottom: 4px;
   font-size: 13px;
-  color: #3b3a37;
+  color: var(--c-444444);
 }
 .sf-unit {
-  color: #86817a;
+  color: var(--c-999999);
 }
 .sf-hint {
   margin-left: 6px;
-  color: #a8a39a;
+  color: var(--c-aaaaaa);
   font-size: 12px;
 }
 .sf-readonly {
   min-height: 22px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #161615;
+  color: var(--c-222222);
 }
 .sf-avg {
-  background: #eef2f5;
+  background: var(--c-eef5fc);
   border-radius: 6px;
 }
 .sf-avg-val {
@@ -232,19 +232,19 @@ function readonlyText(f: FieldSpec): string {
   align-items: center;
   font-size: 18px;
   font-weight: 700;
-  color: #5b83aa;
+  color: var(--c-2a64b0);
 }
 .sf-warn {
-  background: #f4ecdf;
-  border-left: 3px solid #c96f4f;
+  background: var(--c-fff7e0);
+  border-left: 3px solid var(--c-f0a020);
 }
 .sf-msg {
   margin-top: 3px;
   font-size: 12px;
-  color: #9a4f33;
+  color: var(--c-b25e00);
   line-height: 1.5;
 }
 .sf-range {
-  color: #9a4f33;
+  color: var(--c-c07010);
 }
 </style>

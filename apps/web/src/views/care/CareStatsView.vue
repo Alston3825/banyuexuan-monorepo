@@ -84,7 +84,7 @@ const columns: DataTableColumns<StatRow> = [
     key: 'customerName',
     title: '客户',
     width: 120,
-    render: (r) => h('a', { style: 'color:#5b83aa;cursor:pointer;font-weight:600', onClick: () => router.push({ path: `/care/profiles/${r.motherProfileId}`, query: { tab: 'daily' } }) }, r.customerName),
+    render: (r) => h('a', { style: 'color:var(--c-2a64b0);cursor:pointer;font-weight:600', onClick: () => router.push({ path: `/care/profiles/${r.motherProfileId}`, query: { tab: 'daily' } }) }, r.customerName),
   },
   { key: 'babyName', title: '宝宝', width: 120, render: (r) => r.babyName ?? '（妈妈）' },
   { key: 'value', title: () => (current.value ? `${current.value.label.replace(/（.*）/, '')}${current.value.unit ? '（' + current.value.unit + '）' : ''}` : '数值'), width: 140, render: (r) => h(NTag, { type: 'warning', size: 'small' }, { default: () => String(r.value) }) },
@@ -130,12 +130,12 @@ onMounted(async () => {
 <style scoped>
 .st-tip {
   margin: 0 0 12px;
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 13px;
   line-height: 1.6;
 }
 .st-unit {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 13px;
 }
 .st-sum {

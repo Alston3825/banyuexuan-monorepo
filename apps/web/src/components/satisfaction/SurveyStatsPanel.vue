@@ -40,7 +40,7 @@ onMounted(load)
 defineExpose({ reload: load })
 
 const pct = (n: number, total: number) => (total ? (n / total) * 100 : 0)
-const color = (avg: number | null) => (avg === null ? '#a8a39a' : avg >= 10 ? '#5f6b49' : avg <= 6 ? '#b4533a' : '#c96f4f')
+const color = (avg: number | null) => (avg === null ? 'var(--c-bbbbbb)' : avg >= 10 ? 'var(--c-18a058)' : avg <= 6 ? 'var(--c-d03050)' : 'var(--c-f0a020)')
 const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.label ?? ''
 </script>
 
@@ -131,7 +131,7 @@ const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.la
 }
 .st-pending {
   cursor: pointer;
-  border-color: #c96f4f;
+  border-color: var(--c-f0a020);
 }
 .st-num {
   font-size: 26px;
@@ -140,13 +140,13 @@ const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.la
 .st-num small {
   font-size: 13px;
   font-weight: 400;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .st-cap,
 .st-sub,
 .st-note {
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .st-note {
   margin: 8px 0 12px;
@@ -174,7 +174,7 @@ const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.la
   border-bottom: 1px dashed rgba(128, 128, 128, 0.25);
 }
 .st-lbl small {
-  color: #86817a;
+  color: var(--c-888888);
   margin-left: 4px;
 }
 .st-bars {
@@ -211,13 +211,13 @@ const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.la
   overflow: hidden;
 }
 .d-good {
-  background: #5f6b49;
+  background: var(--c-18a058);
 }
 .d-mid {
-  background: #c96f4f;
+  background: var(--c-f0a020);
 }
 .d-bad {
-  background: #b4533a;
+  background: var(--c-d03050);
 }
 .st-low {
   display: flex;
@@ -233,7 +233,7 @@ const nameOf = (id: string) => props.formOptions.find((o) => o.value === id)?.la
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #b4533a;
+  background: var(--c-d03050);
   color: #fff;
   text-align: center;
   font-size: 12px;

@@ -82,8 +82,8 @@ async function submit() {
 const issueTag = (r: ImportPreviewRow) =>
   h(NSpace, { vertical: true, size: 2 }, {
     default: () => [
-      ...r.issues.map((i) => h('span', { style: `font-size:12px;color:${i.level === 'error' ? '#b4533a' : '#9a4f33'}` }, `${i.level === 'error' ? '✗ ' : '⚠ '}${i.text}`)),
-      ...(r.issues.length === 0 ? [h('span', { style: 'font-size:12px;color:#5f6b49' }, '✓ 可以开通')] : []),
+      ...r.issues.map((i) => h('span', { style: `font-size:12px;color:${i.level === 'error' ? 'var(--c-d03050)' : 'var(--c-b7791f)'}` }, `${i.level === 'error' ? '✗ ' : '⚠ '}${i.text}`)),
+      ...(r.issues.length === 0 ? [h('span', { style: 'font-size:12px;color:var(--c-18a058)' }, '✓ 可以开通')] : []),
     ],
   })
 
@@ -115,19 +115,19 @@ const close = () => emit('update:show', false)
         <!-- 开通结果 -->
         <template v-if="result">
           <p style="font-size: 15px">
-            新开通 <b style="color: #5f6b49">{{ result.created }}</b> 个账号<span v-if="result.renumbered">，改了 <b style="color: #5f6b49">{{ result.renumbered }}</b> 位已有员工的工号</span><span v-if="result.skipped">，<b>{{ result.skipped }}</b> 位已有账号未改动</span><span v-if="result.failed.length">，<b style="color: #b4533a">{{ result.failed.length }}</b> 个没有开通</span>。
+            新开通 <b style="color: var(--c-18a058)">{{ result.created }}</b> 个账号<span v-if="result.renumbered">，改了 <b style="color: var(--c-18a058)">{{ result.renumbered }}</b> 位已有员工的工号</span><span v-if="result.skipped">，<b>{{ result.skipped }}</b> 位已有账号未改动</span><span v-if="result.failed.length">，<b style="color: var(--c-d03050)">{{ result.failed.length }}</b> 个没有开通</span>。
           </p>
-          <p style="color: #6f6a62; font-size: 13px">登录方式：用户名 = 手机号，初始密码 <b>{{ DEFAULT_PASSWORD }}</b>。</p>
+          <p style="color: var(--c-666666); font-size: 13px">登录方式：用户名 = 手机号，初始密码 <b>{{ DEFAULT_PASSWORD }}</b>。</p>
           <div v-if="result.failed.length" style="margin-top: 8px">
-            <div v-for="f in result.failed" :key="f.rowNo" style="color: #b4533a; font-size: 13px; margin-bottom: 4px">表中第 {{ f.rowNo }} 行 {{ f.name }}：{{ f.error }}</div>
+            <div v-for="f in result.failed" :key="f.rowNo" style="color: var(--c-d03050); font-size: 13px; margin-bottom: 4px">表中第 {{ f.rowNo }} 行 {{ f.name }}：{{ f.error }}</div>
           </div>
         </template>
 
         <template v-else-if="preview">
           <div class="ai-sum">
             读到 <b>{{ preview.rows.length }}</b> 位员工（工作表「{{ preview.sheetName }}」第 {{ preview.headerRow }} 行为表头）：
-            <b style="color: #5f6b49">{{ okRows.length }}</b> 位可以开通<span v-if="errorCount">，<b style="color: #b4533a">{{ errorCount }}</b> 位有问题（请先在表里改好）</span>。
-            <span v-if="preview.ignoredColumns.length" style="color: #86817a">没有读取的列：{{ preview.ignoredColumns.join('、') }}。</span>
+            <b style="color: var(--c-18a058)">{{ okRows.length }}</b> 位可以开通<span v-if="errorCount">，<b style="color: var(--c-d03050)">{{ errorCount }}</b> 位有问题（请先在表里改好）</span>。
+            <span v-if="preview.ignoredColumns.length" style="color: var(--c-999999)">没有读取的列：{{ preview.ignoredColumns.join('、') }}。</span>
           </div>
 
           <div class="ai-opts">
@@ -140,7 +140,7 @@ const close = () => emit('update:show', false)
           <template v-if="isMobile">
             <div v-for="r in preview.rows" :key="r.rowNo" class="ai-card" :class="{ 'ai-card-err': hasError(r) }">
               <n-checkbox :checked="checked.includes(r.rowNo)" :disabled="hasError(r)" @update:checked="(v: boolean) => toggle(r.rowNo, v)">
-                <b>{{ r.name }}</b> <span style="color: #86817a; font-size: 12px">第 {{ r.rowNo }} 行 · {{ r.phone ?? '无手机号' }}</span>
+                <b>{{ r.name }}</b> <span style="color: var(--c-888888); font-size: 12px">第 {{ r.rowNo }} 行 · {{ r.phone ?? '无手机号' }}</span>
               </n-checkbox>
               <div class="ai-line">工号 {{ r.employeeNo ?? '-' }}{{ r.employeeNoSuggested ? '（自动）' : '' }} · {{ r.departmentName ?? '-' }}{{ r.newDepartment ? '（新建）' : '' }} · {{ r.positionName ?? '-' }}{{ r.newPosition ? '（新建）' : '' }}</div>
               <component :is="() => issueTag(r)" />
@@ -176,7 +176,7 @@ const close = () => emit('update:show', false)
   align-items: center;
   margin-bottom: 10px;
   padding: 8px 10px;
-  background: #f4ecdf;
+  background: var(--c-faf6f0);
   border-radius: 6px;
   font-size: 13px;
 }
@@ -188,15 +188,15 @@ const close = () => emit('update:show', false)
 .ai-card {
   padding: 8px 10px;
   margin-bottom: 8px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
 }
 .ai-card-err {
-  background: #f6e9e6;
+  background: var(--c-fff7f7);
 }
 .ai-line {
   margin: 4px 0;
   font-size: 12px;
-  color: #5c5851;
+  color: var(--c-555555);
 }
 </style>

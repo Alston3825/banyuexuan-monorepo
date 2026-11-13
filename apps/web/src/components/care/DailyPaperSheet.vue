@@ -268,9 +268,9 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   margin-top: 10px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #eef2f5;
+  background: var(--c-eef5fc);
   font-size: 13px;
-  color: #5f6b49;
+  color: var(--c-335555);
 }
 .ps-row1 {
   display: grid;
@@ -302,7 +302,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-baby + .ps-baby {
   padding-top: 8px;
-  border-top: 2px dashed #d6d2c8;
+  border-top: 2px dashed var(--c-dddddd);
 }
 .ps-line {
   display: flex;
@@ -320,18 +320,18 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 .ps-jt {
   font-size: 15px;
   font-weight: 700;
-  color: #161615;
+  color: var(--c-222222);
 }
 .ps-javg {
   margin-left: 4px;
-  color: #3d5a78;
+  color: var(--c-185fa5);
   font-size: 13px;
 }
 .ps-javv {
   display: inline-block;
   min-width: 52px;
   height: 24px;
-  border-bottom: 1px solid #86817a;
+  border-bottom: 1px solid var(--c-888888);
   text-align: center;
   font-size: 15px;
   font-weight: 700;
@@ -341,7 +341,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   font-size: 13px;
 }
 .ps-sub {
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 11px;
 }
 .ps-signtop {
@@ -352,10 +352,10 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
 }
 .ps-btn {
   padding: 2px 10px;
-  border: 1px solid #5f6b49;
+  border: 1px solid var(--c-18a058);
   border-radius: 6px;
   background: #fff;
-  color: #5f6b49;
+  color: var(--c-0c7a43);
   font-size: 13px;
   cursor: pointer;
 }
@@ -376,8 +376,8 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   margin: 8px 0 2px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #eef2f5;
-  color: #5b83aa;
+  background: var(--c-eef3fa);
+  color: var(--c-2a64b0);
   font-size: 13px;
   font-weight: 700;
 }
@@ -390,7 +390,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   align-items: center;
   gap: 2px 12px;
   padding: 3px 0;
-  border-bottom: 1px dashed #e6e3d9;
+  border-bottom: 1px dashed var(--c-e4e4e4);
 }
 .ps-mrow:last-child {
   border-bottom: 0;
@@ -399,7 +399,7 @@ const stay = computed(() => props.day.record?.stayDay ?? props.day.defaults.stay
   flex: 0 0 34px;
   font-size: 13px;
   font-weight: 700;
-  color: #5c5851;
+  color: var(--c-555555);
 }
 .ps-grow {
   flex: 1 1 200px;

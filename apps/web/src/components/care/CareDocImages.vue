@@ -39,13 +39,13 @@ onBeforeUnmount(revokeAll)
 
 <template>
   <div>
-    <div v-if="failed" style="color: #b4533a; font-size: 13px">照片加载失败，请刷新页面重试</div>
+    <div v-if="failed" style="color: var(--c-c0392b); font-size: 13px">照片加载失败，请刷新页面重试</div>
     <n-image-group>
       <n-space vertical :size="8">
         <template v-for="f in files" :key="f.id">
           <a v-if="f.mimeType === 'application/pdf'" href="javascript:void(0)" @click="openPdf(f)">📄 {{ f.fileName }}（点击打开 PDF）</a>
           <n-image v-else-if="urls[f.id]" :src="urls[f.id]" :width="width ?? 360" :alt="f.fileName" object-fit="contain" />
-          <div v-else style="color: #86817a; font-size: 12px">加载中…</div>
+          <div v-else style="color: var(--c-999999); font-size: 12px">加载中…</div>
         </template>
       </n-space>
     </n-image-group>

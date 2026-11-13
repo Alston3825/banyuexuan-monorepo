@@ -155,7 +155,7 @@ async function save() {
 <style scoped>
 .ws-tip {
   margin: 0 0 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -174,29 +174,29 @@ async function save() {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .ws-flow {
   margin-top: 8px;
   font-size: 13px;
-  color: #161615;
+  color: var(--c-333333);
 }
 .ws-hint {
   margin-top: 4px;
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-999999);
 }
 .ws-flowline {
   margin: 4px 0 10px;
   padding: 6px 10px;
-  background: #f4ecdf;
+  background: var(--c-faf6f0);
   border-radius: 6px;
   font-size: 12px;
 }
 .ws-node {
   margin-bottom: 10px;
   padding: 8px 12px 0;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
 }
 .ws-node-h {

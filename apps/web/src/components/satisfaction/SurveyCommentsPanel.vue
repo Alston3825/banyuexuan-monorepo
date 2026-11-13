@@ -86,7 +86,7 @@ const tplName = (id: string | null) => props.formOptions.find((o) => o.value ===
 }
 .cm-meta {
   font-size: 12px;
-  color: #86817a;
+  color: var(--c-888888);
   margin-bottom: 4px;
 }
 .cm-row {
@@ -102,13 +102,13 @@ const tplName = (id: string | null) => props.formOptions.find((o) => o.value ===
   margin-right: 6px;
 }
 .cm-sug {
-  background: #c96f4f;
+  background: var(--c-f0a020);
 }
 .cm-pra {
-  background: #5f6b49;
+  background: var(--c-18a058);
 }
 .cm-sum {
-  border: 1px solid #5b83aa;
+  border: 1px solid var(--c-2080f0);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 14px;
@@ -119,7 +119,7 @@ const tplName = (id: string | null) => props.formOptions.find((o) => o.value ===
 }
 .cm-sum-h small {
   font-weight: 400;
-  color: #86817a;
+  color: var(--c-888888);
 }
 .cm-sum-body {
   white-space: pre-wrap;

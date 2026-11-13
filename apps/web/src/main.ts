@@ -3,13 +3,19 @@ import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import './style.css'
 import './bx-design.css'
+import './theme-colors.css'
 import App from './App.vue'
 import { router } from './router'
+import { useUiStore } from './stores/ui'
+import { useAuthStore } from './stores/auth'
 
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 
-createApp(App).use(pinia).use(router).mount('#app')
+const app = createApp(App).use(pinia)
+// 挂载前先套上配色方案，避免先闪一下默认配色
+useUiStore(pinia).syncTheme(useAuthStore(pinia).account?.id)
+app.use(router).mount('#app')
 
 // 发布新版本后，浏览器里的离线缓存（Service Worker）会在后台换成新版，但已经打开的页面还是旧的，
 // 以前要手动刷新两次才看到新功能。新版接管页面时自动刷新一次；

@@ -167,7 +167,7 @@ onMounted(fetchAll)
     <n-tabs v-model:value="tab" type="line" animated>
       <n-tab-pane name="types" tab="渠道类型">
         <n-space justify="space-between" style="margin-bottom: 12px" :wrap="true">
-          <span style="color: #86817a; font-size: 13px">新建客户时第一步选的“渠道类型”。可以改名、停用，也可以加自己的类型。</span>
+          <span style="color: var(--c-888888); font-size: 13px">新建客户时第一步选的“渠道类型”。可以改名、停用，也可以加自己的类型。</span>
           <n-button v-if="canCreate" type="primary" @click="openCreate('type')">新增渠道类型</n-button>
         </n-space>
         <n-data-table :columns="typeColumns" :data="types" :loading="loading" :row-key="(r: CustomerChannelType) => r.id" :scroll-x="640" />

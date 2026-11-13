@@ -87,12 +87,12 @@ const outOfRange = computed(() => {
   width: 100%;
 }
 .pf-label {
-  color: #161615;
+  color: var(--c-333333);
   white-space: nowrap;
 }
 .pf-label small {
   margin-left: 2px;
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 11px;
 }
 .pf-opts {
@@ -102,16 +102,16 @@ const outOfRange = computed(() => {
 }
 .pf-chip {
   padding: 1px 8px;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--c-dadada);
   border-radius: 10px;
-  background: #fbfaf6;
-  color: #3b3a37;
+  background: var(--c-fafafa);
+  color: var(--c-444444);
   font-size: 13px;
   line-height: 20px;
   cursor: pointer;
 }
 .pf-chip:hover {
-  background: #eeebe3;
+  background: var(--c-f0f0f0);
 }
 .pf-part {
   display: flex;
@@ -126,8 +126,8 @@ const outOfRange = computed(() => {
   min-width: 52px;
   max-width: 90px;
   padding: 2px 6px 2px 0;
-  border-right: 3px solid #dde7f0;
-  color: #5b83aa;
+  border-right: 3px solid var(--c-cfe0f5);
+  color: var(--c-2a64b0);
   font-size: 14px;
   font-weight: 700;
   line-height: 24px;
@@ -137,33 +137,33 @@ const outOfRange = computed(() => {
   gap: 4px 6px;
 }
 .pf-chip.pf-on {
-  border-color: #5f6b49;
-  background: #edf1e9;
-  color: #5f6b49;
+  border-color: var(--c-18a058);
+  background: var(--c-e8f6ee);
+  color: var(--c-0c7a43);
   font-weight: 700;
 }
 .pf-in {
   height: 24px;
   padding: 0 4px;
   border: 0;
-  border-bottom: 1px solid #86817a;
+  border-bottom: 1px solid var(--c-888888);
   border-radius: 0;
   background: transparent;
   font-size: 13px;
   outline: none;
 }
 .pf-in:focus {
-  border-bottom-color: #5f6b49;
-  background: #edf1e9;
+  border-bottom-color: var(--c-18a058);
+  background: var(--c-f6fbf8);
 }
 .pf-bad {
-  color: #9a4f33;
-  background: #f4ecdf;
+  color: var(--c-c07010);
+  background: var(--c-fff3dc);
 }
 .pf-ta {
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #d6d2c8;
+  border: 1px solid var(--c-cccccc);
   border-radius: 4px;
   font-size: 13px;
   resize: vertical;
@@ -171,14 +171,14 @@ const outOfRange = computed(() => {
   font-family: inherit;
 }
 .pf-ta:focus {
-  border-color: #5f6b49;
+  border-color: var(--c-18a058);
 }
 .pf-warn {
-  background: #f4ecdf;
-  box-shadow: inset 3px 0 0 #c96f4f;
+  background: var(--c-fff7e0);
+  box-shadow: inset 3px 0 0 var(--c-f0a020);
 }
 .pf-msg {
-  color: #9a4f33;
+  color: var(--c-d07a00);
   font-size: 12px;
   cursor: help;
 }
@@ -192,7 +192,7 @@ const outOfRange = computed(() => {
   }
   .pf-chip {
     padding: 5px 12px;
-    border-color: #e6e3d9;
+    border-color: var(--c-e1e1e1);
     border-radius: 16px;
     font-size: 14px;
     line-height: 20px;
@@ -200,7 +200,7 @@ const outOfRange = computed(() => {
   .pf-in {
     height: 34px;
     padding: 0 8px;
-    border: 1px solid #d6d2c8;
+    border: 1px solid var(--c-cfcfcf);
     border-radius: 6px;
     font-size: 16px;
   }

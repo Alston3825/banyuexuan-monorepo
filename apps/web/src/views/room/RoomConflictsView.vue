@@ -167,7 +167,7 @@ const activeCount = computed(() => conflicts.value.length)
   margin-bottom: 8px;
 }
 .rc-sub {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 .rc-sides {
@@ -177,12 +177,12 @@ const activeCount = computed(() => conflicts.value.length)
 }
 .rc-side {
   padding: 8px 10px;
-  border: 1px solid #eeebe3;
+  border: 1px solid var(--c-eeeeee);
   border-radius: 8px;
 }
 .rc-suggest {
-  border-color: #c96f4f;
-  background: #f4ecdf;
+  border-color: var(--c-f0a020);
+  background: var(--c-fffaf0);
 }
 .rc-name {
   display: flex;
@@ -197,7 +197,7 @@ const activeCount = computed(() => conflicts.value.length)
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid #f7f5ef;
+  border-bottom: 1px solid var(--c-f5f5f5);
 }
 @media (max-width: 767px) {
   .rc-sides {

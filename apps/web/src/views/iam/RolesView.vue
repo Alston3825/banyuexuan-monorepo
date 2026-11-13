@@ -275,8 +275,8 @@ onMounted(fetchList)
 
     <n-drawer v-model:show="permDrawerVisible" :width="420">
       <n-drawer-content :title="`权限设置 - ${permDrawerRole?.name ?? ''}`" :native-scrollbar="false">
-        <p v-if="isSystemRole" style="color: #86817a; margin-bottom: 12px">系统内置角色不可修改权限</p>
-        <div v-if="defaultsDiff?.hasDefault" style="margin-bottom: 12px; padding: 8px 10px; background: #eef2f5; border-radius: 6px; font-size: 13px">
+        <p v-if="isSystemRole" style="color: var(--c-999999); margin-bottom: 12px">系统内置角色不可修改权限</p>
+        <div v-if="defaultsDiff?.hasDefault" style="margin-bottom: 12px; padding: 8px 10px; background: var(--c-f6f8fa); border-radius: 6px; font-size: 13px">
           <template v-if="defaultsDiff.add.length === 0 && defaultsDiff.remove.length === 0">已是推荐的默认权限（共 {{ defaultsDiff.defaultCount }} 项）。</template>
           <template v-else>
             与推荐的默认权限不同：缺 {{ defaultsDiff.add.length }} 项，多 {{ defaultsDiff.remove.length }} 项。

@@ -57,9 +57,9 @@ function stayProgress(entry: CareBoardEntry): string {
 }
 
 const DELIVERY_LABEL: Record<string, string> = { VAGINAL: '顺', CESAREAN: '剖', UNKNOWN: '-' }
-const DELIVERY_COLOR: Record<string, string> = { VAGINAL: '#7d8b63', CESAREAN: '#c96f4f', UNKNOWN: '#a8a39a' }
+const DELIVERY_COLOR: Record<string, string> = { VAGINAL: 'var(--c-3ba55c)', CESAREAN: '#c96f4f', UNKNOWN: 'var(--c-b4b2a9)' }
 const GENDER_LABEL: Record<string, string> = { FEMALE: '女', MALE: '男', UNKNOWN: '-' }
-const GENDER_COLOR: Record<string, string> = { FEMALE: '#b86580', MALE: '#6e97bf', UNKNOWN: '#a8a39a' }
+const GENDER_COLOR: Record<string, string> = { FEMALE: '#b86580', MALE: '#6e97bf', UNKNOWN: 'var(--c-b4b2a9)' }
 
 /** 生产信息："09-20产（39+2）"——孕周不知道具体天数，天数部分暂不展示（系统目前只存整周数）。 */
 function deliveryText(entry: CareBoardEntry): string {
@@ -195,8 +195,8 @@ onMounted(async () => {
                       {{ GENDER_LABEL[baby.gender] }}
                     </span>
                   </template>
-                  <span v-else class="cb-badge" style="background: #a8a39a">-</span>
-                  <span class="cb-badge" :style="{ background: entry.care?.hasAllergyTag ? '#b4533a' : '#a8a39a' }" :title="entry.care?.hasAllergyTag ? `过敏：${entry.care.allergyNote ?? '有'}` : '无过敏记录'">敏</span>
+                  <span v-else class="cb-badge" style="background: var(--c-b4b2a9)">-</span>
+                  <span class="cb-badge" :style="{ background: entry.care?.hasAllergyTag ? 'var(--c-e24b4a)' : 'var(--c-b4b2a9)' }" :title="entry.care?.hasAllergyTag ? `过敏：${entry.care.allergyNote ?? '有'}` : '无过敏记录'">敏</span>
                 </span>
               </div>
             </template>
@@ -207,7 +207,7 @@ onMounted(async () => {
     <n-modal :show="!!nurseForm" @update:show="(v) => !v && (nurseForm = null)">
       <n-card v-if="nurseForm" :title="`指派护理师：${nurseForm.entry.room.roomNo} ${nurseForm.entry.customerName ?? ''}`" style="width: min(420px, 94vw)" :bordered="false" role="dialog" closable @close="nurseForm = null" aria-modal="true">
         <nurse-select v-model="nurseForm.nurseId" :store-id="selectedStoreId ?? undefined" />
-        <div style="margin-top: 8px; color: #86817a; font-size: 12px">护理师从员工账号里选；换人后以最新指派为准，历史记录里的签字不受影响。</div>
+        <div style="margin-top: 8px; color: var(--c-999999); font-size: 12px">护理师从员工账号里选；换人后以最新指派为准，历史记录里的签字不受影响。</div>
         <template #footer>
           <n-space justify="end"><n-button @click="nurseForm = null">取消</n-button><n-button type="primary" :loading="nurseSaving" @click="saveNurse">保存</n-button></n-space>
         </template>
@@ -225,11 +225,11 @@ onMounted(async () => {
 .cb-no {
   font-size: 17px;
   font-weight: 600;
-  color: #161615;
+  color: var(--c-222222);
 }
 .cb-type {
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .cb-pill {
   margin-left: auto;
@@ -243,10 +243,10 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 18px;
-  color: #3b3a37;
+  color: var(--c-444444);
 }
 .cb-label {
-  color: #86817a;
+  color: var(--c-888888);
 }
 .cb-customer {
   color: #161615;
@@ -266,11 +266,11 @@ onMounted(async () => {
   cursor: pointer;
 }
 .cb-allergy {
-  color: #b4533a;
+  color: var(--c-c0392b);
   font-weight: 600;
 }
 .cb-over {
-  color: #b4533a;
+  color: var(--c-c0392b);
   font-weight: 600;
 }
 .cb-daily {
@@ -278,10 +278,10 @@ onMounted(async () => {
   cursor: pointer;
 }
 .cb-daily-ok {
-  color: #5f6b49;
+  color: var(--c-2a8a3e);
 }
 .cb-daily-no {
-  color: #c96f4f;
+  color: var(--c-d9822b);
   text-decoration: underline;
 }
 .cb-btns {
@@ -294,8 +294,8 @@ onMounted(async () => {
   flex: 0 0 calc(50% - 3px); /* 只有一个“母婴档案”按钮，宽度取原来整行的一半 */
   border: none;
   border-radius: 6px;
-  background: #161615;
-  color: #f7f5ef;
+  background: var(--bx-ink);
+  color: var(--bx-paper);
   font-size: 11px;
   line-height: 26px;
   cursor: pointer;
@@ -312,7 +312,7 @@ onMounted(async () => {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 11px;
-  color: #6f6a62;
+  color: var(--c-666666);
 }
 .cb-badges {
   display: flex;

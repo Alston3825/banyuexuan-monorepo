@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { NConfigProvider, NLoadingBarProvider, zhCN, dateZhCN } from 'naive-ui'
-import { bxThemeOverrides } from './bx-theme'
+import { computed } from 'vue'
+import { useUiStore } from './stores/ui'
+import { themeOf } from './themes'
+
+const ui = useUiStore()
+const overrides = computed(() => themeOf(ui.theme).overrides)
 </script>
 
 <template>
-  <n-config-provider :locale="zhCN" :date-locale="dateZhCN" :theme-overrides="bxThemeOverrides">
+  <n-config-provider :locale="zhCN" :date-locale="dateZhCN" :theme-overrides="overrides">
     <n-loading-bar-provider>
       <router-view />
     </n-loading-bar-provider>

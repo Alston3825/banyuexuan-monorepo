@@ -32,28 +32,28 @@ defineEmits<{ (e: 'goto-page', page: number): void }>()
 .cf-label {
   display: block;
   font-size: 12px;
-  color: #6f6a62;
+  color: var(--c-666666);
   margin-bottom: 3px;
 }
 .cf-req {
-  color: #b4533a;
+  color: var(--c-d03050);
   margin-left: 2px;
 }
 .cf-auto {
   margin-left: 6px;
   padding: 0 6px;
   border-radius: 8px;
-  background: #eef2f5;
-  color: #3d5a78;
+  background: var(--c-e6f1fb);
+  color: var(--c-185fa5);
   font-size: 11px;
 }
 .cf-warn {
-  background: #f4ecdf;
-  border-left-color: #c96f4f;
+  background: var(--c-fff7e6);
+  border-left-color: var(--c-ef9f27);
 }
 .cf-missing {
-  background: #f6e9e6;
-  border-left-color: #b4533a;
+  background: var(--c-fdeeee);
+  border-left-color: var(--c-e24b4a);
 }
 .cf-note {
   margin-top: 3px;
@@ -61,14 +61,14 @@ defineEmits<{ (e: 'goto-page', page: number): void }>()
   line-height: 1.5;
 }
 .cf-warn .cf-note {
-  color: #9a4f33;
+  color: var(--c-854f0b);
 }
 .cf-missing .cf-note {
-  color: #8a3d2a;
+  color: var(--c-a32d2d);
 }
 .cf-page {
   margin-left: 6px;
-  color: #5b83aa;
+  color: var(--c-2080f0);
   cursor: pointer;
   text-decoration: underline;
 }

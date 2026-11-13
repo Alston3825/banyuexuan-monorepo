@@ -95,7 +95,7 @@ onMounted(fetchAll)
                   <n-button size="tiny" type="primary" @click="handleCompleteTask(task.id, 'COMPLETED')">完成</n-button>
                   <n-button size="tiny" @click="handleCompleteTask(task.id, 'SKIPPED')">跳过</n-button>
                 </template>
-                <span v-else-if="task.completionNote" style="color: var(--n-text-color-3, #86817a); font-size: 12px">{{ task.completionNote }}</span>
+                <span v-else-if="task.completionNote" style="color: var(--n-text-color-3, var(--c-999999)); font-size: 12px">{{ task.completionNote }}</span>
               </n-space>
             </n-space>
           </n-card>

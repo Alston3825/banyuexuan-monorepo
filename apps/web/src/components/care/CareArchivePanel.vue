@@ -120,20 +120,20 @@ onMounted(load)
 <style scoped>
 .ap-hint {
   margin: 0 0 10px;
-  color: #6f6a62;
+  color: var(--c-666666);
   font-size: 13px;
   line-height: 1.6;
 }
 .ap-sub {
   margin-top: 8px;
-  color: #86817a;
+  color: var(--c-999999);
   font-size: 12px;
 }
 .ap-time {
   font-size: 14px;
 }
 .ap-pages {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
 }
 .ap-thumbs :deep(.n-space) {

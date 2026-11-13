@@ -49,13 +49,13 @@ const columns: DataTableColumns<StockOverviewRow> = [
     key: 'name',
     title: '物品',
     minWidth: 220,
-    render: (r) => h('div', null, [h('div', { style: 'font-weight:600' }, r.name), h('div', { style: 'color:#86817a;font-size:12px' }, [r.spec, r.brand, r.code].filter(Boolean).join(' · '))]),
+    render: (r) => h('div', null, [h('div', { style: 'font-weight:600' }, r.name), h('div', { style: 'color:var(--c-888888);font-size:12px' }, [r.spec, r.brand, r.code].filter(Boolean).join(' · '))]),
   },
   {
     key: 'quantity',
     title: '当前库存',
     width: 120,
-    render: (r) => h('span', { style: r.status === 'OUT' || r.status === 'LOW' ? 'color:#b4533a;font-weight:700' : r.quantity > 0 ? 'font-weight:600' : 'color:#86817a' }, `${r.quantity} ${r.unit}`),
+    render: (r) => h('span', { style: r.status === 'OUT' || r.status === 'LOW' ? 'color:var(--c-d03050);font-weight:700' : r.quantity > 0 ? 'font-weight:600' : 'color:var(--c-999999)' }, `${r.quantity} ${r.unit}`),
   },
   { key: 'safetyStockThreshold', title: '安全库存线', width: 100, render: (r) => (r.safetyStockThreshold === null ? '-' : `${r.safetyStockThreshold} ${r.unit}`) },
   { key: 'status', title: '状态', width: 100, render: (r) => h(NTag, { size: 'small', type: STATUS_TAG[r.status].type, bordered: false }, { default: () => STATUS_TAG[r.status].text }) },
@@ -63,7 +63,7 @@ const columns: DataTableColumns<StockOverviewRow> = [
     key: 'warehouses',
     title: '分仓库存',
     minWidth: 180,
-    render: (r) => (r.warehouses.length === 0 ? h('span', { style: 'color:#a8a39a' }, '无库存') : r.warehouses.map((w) => `${w.warehouseName} ${w.quantity}`).join('；')),
+    render: (r) => (r.warehouses.length === 0 ? h('span', { style: 'color:var(--c-bbbbbb)' }, '无库存') : r.warehouses.map((w) => `${w.warehouseName} ${w.quantity}`).join('；')),
   },
   { key: 'avgCost', title: '平均单价（元）', width: 110, render: (r) => (r.quantity > 0 ? yuan(r.avgCost) : '-') },
   { key: 'lastCost', title: '最近采购价（元）', width: 120, render: (r) => (r.lastCost === null ? '-' : yuan(r.lastCost)) },
@@ -96,7 +96,7 @@ onMounted(async () => {
       <n-space align="center" justify="space-between" :wrap="true">
         <span>
           ⚠ <b>采购预警：{{ summary.alertCount }} 种物品库存不足</b>
-          （缺货 <b style="color: #b4533a">{{ summary.outCount }}</b> 种，低于安全库存 <b style="color: #c96f4f">{{ summary.lowCount }}</b> 种），建议尽快申购补货。
+          （缺货 <b style="color: var(--c-d03050)">{{ summary.outCount }}</b> 种，低于安全库存 <b style="color: var(--c-d9822b)">{{ summary.lowCount }}</b> 种），建议尽快申购补货。
         </span>
         <n-space :size="8">
           <n-button size="small" @click="status = 'ALERT'">只看预警物品</n-button>
@@ -138,7 +138,7 @@ onMounted(async () => {
 }
 .ws-card {
   padding: 10px 14px;
-  border: 1px solid #e6e3d9;
+  border: 1px solid var(--c-e8e8e8);
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
@@ -148,14 +148,14 @@ onMounted(async () => {
   font-weight: 700;
 }
 .ws-lab {
-  color: #86817a;
+  color: var(--c-888888);
   font-size: 12px;
   margin-top: 2px;
 }
 .ws-warn .ws-num {
-  color: #c96f4f;
+  color: var(--c-d9822b);
 }
 .ws-bad .ws-num {
-  color: #b4533a;
+  color: var(--c-d03050);
 }
 </style>
