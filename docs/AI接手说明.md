@@ -1,0 +1,37 @@
+# 伴月轩月子中心AI系统 · AI 接手说明
+
+这是本项目的长期开发入口，不依赖原聊天记录。先读本文件，再读开发约定及现有需求文档。
+
+## 权威目录与仓库
+
+本机原始开发目录：`/Users/alston/伴月轩月子中心AI系统/月子中心管理软件截图与操作视频/.claude/worktrees/silly-easley-4b2bfa`。本次没有搬迁代码或改变现有服务工作目录。
+
+独立私有仓库：https://github.com/Alston3825/banyuexuan-monorepo ，自动备份分支 `backup/live`。恢复时 clone 后显式切换该分支。已有生产仓库的 main 保持原发布流程，自动备份不会替你部署。
+
+## 技术与运行
+
+Vue3/TypeScript/Naive UI + NestJS/Prisma/MySQL/Redis + FastAPI AI微服务。
+
+本机 http://localhost:5180 与 http://localhost:3000/api/v1/health 已返回200；生产 https://fanqieai.cc/api/v1/health 已返回200。
+
+## 服务器与上传
+
+沿用 fanqieai.cc，服务器 /home/ubuntu/banyuexuan；原业务版本d54afbf。只在用户明确说“上线”时按 scripts/backup-mysql.sh → deploy.sh 流程部署。数据库和上传文件已有独立加密异地备份，不上传明文到GitHub。
+
+接口凭据、私钥、真实 .env、业务数据库和客户照片不能写进 Git；需要时从用户本机现有安全位置读取，禁止在回复或日志输出实际值。仓库里的 .env.example 只列结构。
+
+## 下一步开发
+
+先读 AGENTS.md、docs/交接手册.md、docs/进度快照.md、docs/待完善清单.md；接续权限修复后的低权限账号验收与待完善清单。后端e2e只用独立库，禁止重置真实开发库或生产库。
+
+持续维护 docs/当前开发任务.md，写清已完成、下一步、验证结果与阻塞条件。每次业务改动同步更新设计/接口文档；没有实际验证过的能力须标“待验证”。
+
+## 自动备份与恢复
+
+每5分钟检查源码变化；每天保留一份有日期的接手快照。源码、开发文档、接手说明一起备份。详见 docs/自动备份说明.md、docs/自动接手快照.md。
+
+若 Mac 关机或离线，不能实时上传；登录后补跑。自动备份是可恢复源码快照，不等于生产数据库备份，也不表示代码已通过所有测试或上线。
+
+## 开发边界
+
+用中文沟通。遵守现有 AGENTS.md/CLAUDE.md。本次用户明确授权推送上述私有备份仓库；该授权不代表可以发布生产版本、重置数据或把密钥写进Git。遇到待确认的产品选择，先整理具体方案，不自行编造需求。

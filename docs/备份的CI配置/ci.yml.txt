@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api-test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: banyuexuan_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: mysql://root:root@localhost:3306/banyuexuan_test
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-test-secret
+      JWT_REFRESH_SECRET: ci-test-refresh-secret
+      SEED_DEV_PASSWORD: Passw0rd!23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+        working-directory: apps/api
+      - run: npx prisma migrate deploy
+        working-directory: apps/api
+      - run: npx prisma db seed
+        working-directory: apps/api
+      # lint 目前有66条历史遗留报错（P2-P5开发过程中积累，从未作为强制门槛跑过），
+      # 不阻断CI，先如实报告，等专门腾出时间清理后再改回阻断。不要因为它标红就忽略——
+      # 这是暴露技术债，不是CI配置错误。
+      - run: npm run lint --workspace=@banyuexuan/api
+        continue-on-error: true
+      # 注意：目前项目里没有任何 *.spec.ts 单元测试文件（`npm run test`会直接报"No tests found"退出），
+      # 计划书3.3节要求的"状态机与金额计算类逻辑必须有单元测试覆盖"这条实际从未落地，
+      # 全部测试覆盖都是靠下面这条e2e集成测试撑着，这是已知技术债，不是本步骤漏配了。
+      - run: npx jest --config test/jest-e2e.json --runInBand --forceExit
+        working-directory: apps/api
+
+  ai-service-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+        working-directory: apps/ai-service
+      - run: pytest -q
+        working-directory: apps/ai-service
+
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace=@banyuexuan/web
+
+  # 只在合并进 main 后才构建镜像；是否推送到腾讯云TCR取决于仓库是否配置了对应secrets
+  # （TCR_REGISTRY/TCR_USERNAME/TCR_PASSWORD，去仓库 Settings -> Secrets and variables -> Actions 添加）。
+  # 没配置secrets时这个job的推送步骤会被跳过，不会导致整个流水线失败。
+  build-images:
+    needs: [api-test, ai-service-test, web-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+      TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+      TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build api image
+        run: docker build -f apps/api/Dockerfile -t banyuexuan-api:${{ github.sha }} .
+      - name: Build web image
+        run: docker build -f apps/web/Dockerfile -t banyuexuan-web:${{ github.sha }} .
+      - name: Build ai-service image
+        run: docker build -t banyuexuan-ai-service:${{ github.sha }} apps/ai-service
+      - name: Login to Tencent TCR
+        if: ${{ env.TCR_REGISTRY != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.TCR_REGISTRY }}
+          username: ${{ env.TCR_USERNAME }}
+          password: ${{ env.TCR_PASSWORD }}
+      - name: Push images to TCR
+        if: ${{ env.TCR_REGISTRY != '' }}
+        run: |
+          for svc in api web ai-service; do
+            docker tag banyuexuan-$svc:${{ github.sha }} ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
+            docker tag banyuexuan-$svc:${{ github.sha }} ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:latest
+            docker push ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:${{ github.sha }}
+            docker push ${{ env.TCR_REGISTRY }}/banyuexuan-$svc:latest
+          done

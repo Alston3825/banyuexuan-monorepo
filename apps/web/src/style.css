@@ -1,0 +1,27 @@
+:root {
+  /* 系统界面只做了浅色版：声明只用浅色，手机开了“深色模式”时输入框也不会变黑底白字 */
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* 原生输入框统一深色字，避免落在黄色提醒/透明底上看不清 */
+input,
+textarea,
+select {
+  color: #161615;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #a8a39a;
+}

@@ -1,0 +1,14 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+
+export class UpdateApplicationDto {
+  @ApiProperty({ required: false }) @IsOptional() @IsString() name?: string;
+  @ApiProperty({ required: false, enum: ['ACTIVE', 'INACTIVE'] })
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE'])
+  status?: 'ACTIVE' | 'INACTIVE';
+
+  @ApiProperty({ description: '乐观锁版本号' })
+  @IsInt()
+  version: number;
+}

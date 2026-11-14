@@ -1,0 +1,69 @@
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { IsArray, IsString } from 'class-validator';
+import { ApiTags } from '@nestjs/swagger';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { BabyProfileService } from './baby-profile.service';
+import { CreateBabyProfileDto } from './dto/create-baby-profile.dto';
+import { UpdateBabyProfileDto } from './dto/update-baby-profile.dto';
+import { QueryBabyProfileDto } from './dto/query-baby-profile.dto';
+
+class SetBabyRiskTagsDto {
+  @IsArray() @IsString({ each: true }) tagIds: string[];
+}
+
+@ApiTags('care/baby-profile')
+@Controller('care/baby-profiles')
+export class BabyProfileController {
+  constructor(private readonly babyProfileService: BabyProfileService) {}
+
+  @Get()
+  @RequirePermission('care.profile.view')
+  findAll(@Query() query: QueryBabyProfileDto) {
+    return this.babyProfileService.findMany(query);
+  }
+
+  @Get(':id')
+  @RequirePermission('care.profile.view')
+  findOne(@Param('id') id: string) {
+    return this.babyProfileService.findOneOrThrow(id);
+  }
+
+  @Get(':id/risk-tags')
+  @RequirePermission('care.profile.view')
+  riskTags(@Param('id') id: string) {
+    return this.babyProfileService.getRiskTags(id);
+  }
+
+  /** 编辑宝宝的风险标签：整体改成 tagIds（只能是母婴风险分类的标签） */
+  @Put(':id/risk-tags')
+  @RequirePermission('care.profile.update')
+  setRiskTags(@Param('id') id: string, @Body() dto: SetBabyRiskTagsDto) {
+    return this.babyProfileService.setRiskTags(id, dto.tagIds);
+  }
+
+  @Post()
+  @RequirePermission('care.profile.create')
+  create(@Body() dto: CreateBabyProfileDto) {
+    return this.babyProfileService.create(dto);
+  }
+
+  @Patch(':id')
+  @RequirePermission('care.profile.update')
+  update(@Param('id') id: string, @Body() dto: UpdateBabyProfileDto) {
+    return this.babyProfileService.update(id, dto);
+  }
+
+  @Get(':id/delete-check')
+  @RequirePermission('care.profile.update')
+  deleteCheck(@Param('id') id: string) {
+    return this.babyProfileService.getDeleteCheck(id);
+  }
+
+  /** 删除建错的宝宝档案：已有护理记录的拒绝；只有评估表/资料的需要管理员权限 + 输入宝宝名字确认。 */
+  @Delete(':id')
+  @HttpCode(204)
+  @RequirePermission('care.profile.update')
+  remove(@Param('id') id: string, @Query('force') force?: string, @Query('confirmName') confirmName?: string) {
+    return this.babyProfileService.remove(id, force === 'true', confirmName);
+  }
+}

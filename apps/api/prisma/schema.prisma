@@ -1,0 +1,4642 @@
+// 伴月轩月子中心管理系统 — P0 平台底座数据模型
+// 命名约定：Prisma 侧用 camelCase，通过 @map/@@map 落到 snake_case 列名，
+// 遵循《新系统开发文档》"关键原则"：tenant_id/store_id/created_by/created_at/updated_at/version。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 平台域 ====================
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+/// 租户：伴月轩当前只有一个租户，不建管理 CRUD API，仅由 seed 脚本创建。
+model Tenant {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  @@map("tenants")
+}
+
+enum CommonStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Region {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  stores Store[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("regions")
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  CLOSED
+}
+
+model Store {
+  id               String      @id @default(cuid())
+  tenantId         String      @map("tenant_id")
+  regionId         String      @map("region_id")
+  code             String
+  name             String
+  address          String?
+  /// 工号规则：该门店员工工号必须以此开头（如 高新店 1、枣园店 2）；空 = 不限制
+  employeeNoPrefix String?     @map("employee_no_prefix")
+  status           StoreStatus @default(PENDING)
+  createdBy        String      @map("created_by")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  version          Int         @default(0)
+
+  region                  Region                   @relation(fields: [regionId], references: [id])
+  departments             Department[]
+  teams                   Team[]
+  accounts                Account[]
+  customers               Customer[]
+  leads                   Lead[]
+  contracts               Contract[]
+  rooms                   Room[]
+  roomOccupancies         RoomOccupancy[]
+  payments                Payment[]
+  motherProfiles          MotherProfile[]
+  babyProfiles            BabyProfile[]
+  carePlans               CarePlan[]
+  careRecords             CareRecord[]
+  careAbnormalities       CareAbnormality[]
+  roomCalls               RoomCall[]
+  roomOutings             RoomOuting[]
+  roomServiceRequisitions RoomServiceRequisition[]
+  dinerProfiles           DinerProfile[]
+  mealRecords             MealRecord[]
+  customerServicePackages CustomerServicePackage[]
+  therapists              Therapist[]
+  serviceAppointments     ServiceAppointment[]
+  warehouses              Warehouse[]
+  purchaseOrders          PurchaseOrder[]
+  purchaseRequests        PurchaseRequest[]
+  goodsReceipts           GoodsReceipt[]
+  stockIssues             StockIssue[]
+  stockCounts             StockCount[]
+  shiftDefinitions        ShiftDefinition[]
+  scheduleEntries         ScheduleEntry[]
+  commissionRecords       CommissionRecord[]
+  payrollRecords          PayrollRecord[]
+  leaveRequests           LeaveRequest[]
+  expenseClaims           ExpenseClaim[]
+  generalMemos            GeneralMemo[]
+  vehicleBookings         VehicleBooking[]
+  utilityExpenses         UtilityExpense[]
+  aiSuggestions           AiSuggestion[]
+  devices                 Device[]
+  deviceEvents            DeviceEvent[]
+  deviceConnectionLogs    DeviceConnectionLog[]
+  careOutreachPlans       CareOutreachPlan[]
+  careOutreachTasks       CareOutreachTask[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, regionId])
+  @@map("stores")
+}
+
+model Department {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  storeId   String?      @map("store_id") // null = 总部/跨店部门
+  parentId  String?      @map("parent_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  store    Store?       @relation(fields: [storeId], references: [id])
+  parent   Department?  @relation("DeptTree", fields: [parentId], references: [id])
+  children Department[] @relation("DeptTree")
+  teams    Team[]
+  accounts Account[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, storeId])
+  @@map("departments")
+}
+
+model Team {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  storeId      String?      @map("store_id") // 从部门冗余，便于按店查询
+  departmentId String       @map("department_id")
+  code         String
+  name         String
+  status       CommonStatus @default(ACTIVE)
+  createdBy    String       @map("created_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  version      Int          @default(0)
+
+  store      Store?     @relation(fields: [storeId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  accounts   Account[]
+
+  @@unique([departmentId, code])
+  @@index([tenantId, storeId])
+  @@map("teams")
+}
+
+model Position {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  rank      Int?
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  accounts Account[]
+
+  @@unique([tenantId, code])
+  @@map("positions")
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+  LOCKED
+}
+
+model Account {
+  id                 String        @id @default(cuid())
+  tenantId           String        @map("tenant_id")
+  storeId            String?       @map("store_id") // 主门店，总部账号可为空
+  departmentId       String?       @map("department_id")
+  teamId             String?       @map("team_id")
+  positionId         String?       @map("position_id")
+  username           String
+  phone              String? // 敏感字段，见 FieldMaskInterceptor
+  email              String?
+  passwordHash       String        @map("password_hash")
+  /// 电子签名图（PNG 的 data URL，员工自己在“我的电子签名”里录入一次，护理档案签字时选用）
+  signatureData      String?       @map("signature_data") @db.MediumText
+  /// 界面配色方案（每人自选，见前端 themes.ts）；空=用系统默认
+  uiTheme            String?       @map("ui_theme") @db.VarChar(32)
+  signatureUpdatedAt DateTime?     @map("signature_updated_at")
+  realName           String        @map("real_name")
+  status             AccountStatus @default(ACTIVE)
+  lastLoginAt        DateTime?     @map("last_login_at")
+  createdBy          String        @map("created_by")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  version            Int           @default(0)
+
+  store                  Store?                  @relation(fields: [storeId], references: [id])
+  department             Department?             @relation(fields: [departmentId], references: [id])
+  team                   Team?                   @relation(fields: [teamId], references: [id])
+  position               Position?               @relation(fields: [positionId], references: [id])
+  roleAssignments        AccountRoleAssignment[]
+  refreshTokens          RefreshToken[]
+  assignedCustomers      Customer[]              @relation("CustomerStoreSales")
+  phoneSalesCustomers    Customer[]              @relation("CustomerPhoneSales")
+  assignedLeads          Lead[]
+  assignedOpportunities  SalesOpportunity[]
+  employeeProfile        EmployeeProfile?
+  expenseClaims          ExpenseClaim[]
+  generalMemos           GeneralMemo[]
+  vehicleBookings        VehicleBooking[]
+  acceptedAiSuggestions  AiSuggestion[]
+  examAttempts           ExamAttempt[]           @relation("ExamAttemptAccount")
+  gradedExamAttempts     ExamAttempt[]           @relation("ExamAttemptGradedBy")
+  signedContracts        Contract[]              @relation("ContractSigner")
+  completedOutreachTasks CareOutreachTask[]
+  devices                StaffDevice[]
+  careDailySignatures    CareDailySignature[]
+  nursedMotherProfiles   MotherProfile[]         @relation("MotherPrimaryNurse")
+
+  @@unique([tenantId, username])
+  @@unique([tenantId, phone])
+  @@index([tenantId, storeId])
+  @@map("accounts")
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean      @default(false) @map("is_system") // 内置角色不可删除
+  status      CommonStatus @default(ACTIVE)
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  version     Int          @default(0)
+
+  permissions RoleOnPermission[]
+  assignments AccountRoleAssignment[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+enum PermissionPointType {
+  MODULE
+  PAGE
+  BUTTON
+  FIELD
+}
+
+/// RBAC 四级权限目录：模块/页面/按钮/字段，全局系统目录（非租户隔离），由 seed 脚本维护。
+model PermissionPoint {
+  id            String              @id @default(cuid())
+  applicationId String?             @map("application_id")
+  parentId      String?             @map("parent_id")
+  type          PermissionPointType
+  code          String              @unique
+  name          String
+  isSensitive   Boolean             @default(false) @map("is_sensitive")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  application Application?       @relation(fields: [applicationId], references: [id])
+  parent      PermissionPoint?   @relation("PermTree", fields: [parentId], references: [id])
+  children    PermissionPoint[]  @relation("PermTree")
+  roles       RoleOnPermission[]
+
+  @@map("permission_points")
+}
+
+model RoleOnPermission {
+  id                String   @id @default(cuid())
+  roleId            String   @map("role_id")
+  permissionPointId String   @map("permission_point_id")
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  role            Role            @relation(fields: [roleId], references: [id])
+  permissionPoint PermissionPoint @relation(fields: [permissionPointId], references: [id])
+
+  @@unique([roleId, permissionPointId])
+  @@map("role_permissions")
+}
+
+enum DataScopeType {
+  TENANT
+  REGION
+  STORE
+  DEPARTMENT
+  TEAM
+  SELF
+}
+
+/// 数据范围授权：账号-角色绑定携带 scope，跨店查询/执行需要独立的一条授权记录。
+model AccountRoleAssignment {
+  id        String        @id @default(cuid())
+  tenantId  String        @map("tenant_id")
+  accountId String        @map("account_id")
+  roleId    String        @map("role_id")
+  scopeType DataScopeType @map("scope_type")
+  scopeId   String?       @map("scope_id") // TENANT/SELF 时为空
+  grantedBy String        @map("granted_by")
+  grantedAt DateTime      @default(now()) @map("granted_at")
+  expiresAt DateTime?     @map("expires_at")
+  revokedAt DateTime?     @map("revoked_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  @@index([accountId])
+  @@index([tenantId, scopeType, scopeId])
+  @@map("account_role_assignments")
+}
+
+enum ApplicationType {
+  WEB
+  MOBILE
+  OPENAPI
+}
+
+model Application {
+  id        String          @id @default(cuid())
+  tenantId  String?         @map("tenant_id") // null = 平台级应用
+  code      String          @unique
+  name      String
+  type      ApplicationType
+  status    CommonStatus    @default(ACTIVE)
+  createdBy String          @map("created_by")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+  version   Int             @default(0)
+
+  permissionPoints PermissionPoint[]
+
+  @@map("applications")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  color     String?
+  category  String?
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  bindings TagBinding[]
+
+  @@unique([tenantId, name])
+  @@map("tags")
+}
+
+/// 多态挂接：标签可打在任意未来实体上（entityType + entityId）。
+model TagBinding {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id")
+  tagId      String    @map("tag_id")
+  entityType String    @map("entity_type")
+  entityId   String    @map("entity_id")
+  createdBy  String    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  // 换标签时不物理删除旧绑定、只标记撤销时间——客户分类/类型标签这类"会随时间变化、
+  // 且需要能汇总统计变动记录"的场景（业务规则确认记录"客户标签设计"一节）依赖这个字段
+  // 重建历史：null=当前生效，非null=这条绑定在什么时候被换掉了。通用的一次性打标场景
+  // （不需要历史）可以继续硬删，两种用法并存，不强制。
+  revokedAt  DateTime? @map("revoked_at")
+
+  tag Tag @relation(fields: [tagId], references: [id])
+
+  // 之前这里有 @@unique([tagId, entityType, entityId])：加了revokedAt保留历史之后就不能再
+  // 用了——同一个标签换出去再换回来（比如客户从A类改成B类，之后又改回A类）会撞到这个唯一
+  // 约束（旧的那条A类绑定revokedAt非空但tuple没变）。改成应用层保证"同一分类同一时刻只有
+  // 一条revokedAt为null的生效绑定"，见 TagService.setExclusiveTag()。
+  @@index([entityType, entityId])
+  @@index([tagId, entityType, entityId, revokedAt])
+  @@map("tag_bindings")
+}
+
+enum ParameterValueType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+model Parameter {
+  id          String             @id @default(cuid())
+  tenantId    String?            @map("tenant_id") // null = 全局系统默认值
+  storeId     String?            @map("store_id") // 非空覆盖到店级
+  key         String
+  value       String             @db.Text
+  valueType   ParameterValueType @default(STRING) @map("value_type")
+  description String?
+  isSystem    Boolean            @default(false) @map("is_system")
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  // 注意：MySQL 唯一索引中 NULL 不互斥，(tenantId=X, storeId=NULL, key=K) 理论上可重复插入；
+  // ParameterService 在应用层做"先查后插"兜底校验，不完全依赖数据库唯一约束。
+  @@unique([tenantId, storeId, key])
+  @@map("parameters")
+}
+
+// ==================== 审计 ====================
+
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  VOID
+  STATE_TRANSITION
+  APPROVE
+  REJECT
+  WITHDRAW
+  REASSIGN
+  ADD_APPROVER
+  CC
+  ARCHIVE
+  SENSITIVE_QUERY
+  EXPORT
+  PRINT
+}
+
+/// 只增不改：不提供 update/delete 方法，关键记录只允许冲正/作废，符合审计总则。
+model AuditLog {
+  id            String      @id @default(cuid())
+  tenantId      String?     @map("tenant_id") // 登录失败等无租户上下文场景可为空
+  storeId       String?     @map("store_id")
+  accountId     String?     @map("account_id")
+  action        AuditAction
+  entityType    String      @map("entity_type")
+  entityId      String?     @map("entity_id")
+  beforeData    Json?       @map("before_data")
+  afterData     Json?       @map("after_data")
+  changedFields Json?       @map("changed_fields")
+  ip            String?
+  userAgent     String?     @map("user_agent")
+  requestId     String?     @map("request_id")
+  result        String      @default("SUCCESS")
+  remark        String?     @db.Text
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@index([accountId, createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== 工作流引擎骨架 ====================
+
+enum WorkflowDefStatus {
+  DRAFT
+  PUBLISHED
+  DISABLED
+}
+
+model WorkflowDefinition {
+  id        String            @id @default(cuid())
+  tenantId  String            @map("tenant_id")
+  code      String // 业务场景 key，如 "DEMO_APPROVAL"
+  name      String
+  version   Int               @default(1)
+  status    WorkflowDefStatus @default(PUBLISHED)
+  createdBy String            @map("created_by")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  nodes     WorkflowNode[]
+  instances WorkflowInstance[]
+
+  @@unique([tenantId, code, version])
+  @@map("workflow_definitions")
+}
+
+enum WorkflowNodeApproverType {
+  ROLE
+  ACCOUNT
+}
+
+/// 节点审批方式：ALL=会签（节点上所有审批人都通过才进入下一节点）；ANY=或签（任意一人通过即可）
+enum WorkflowApprovalMode {
+  ALL
+  ANY
+}
+
+/// 顺序审批节点定义。
+model WorkflowNode {
+  id                   String                   @id @default(cuid())
+  workflowDefinitionId String                   @map("workflow_definition_id")
+  seq                  Int
+  name                 String
+  approverType         WorkflowNodeApproverType @map("approver_type")
+  approverRoleId       String?                  @map("approver_role_id")
+  /// 指定多个角色：角色 id 数组（角色成员 + 指定员工 都算审批人）；approverRoleId 存第一个，兼容旧数据
+  approverRoleIds      Json?                    @map("approver_role_ids")
+  approverAccountId    String?                  @map("approver_account_id")
+  /// 指定多位员工（或签选 2~3 人、会签几人都要过）：员工 id 数组；approverAccountId 存第一位，兼容旧数据
+  approverAccountIds   Json?                    @map("approver_account_ids")
+  approvalMode         WorkflowApprovalMode     @default(ALL) @map("approval_mode")
+  /// 处理时限（小时）：审批人收到待办后超过这个时间算“超时”，在待办里标红提醒；空=不限时
+  timeoutHours         Int?                     @map("timeout_hours")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  definition WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+
+  @@unique([workflowDefinitionId, seq])
+  @@map("workflow_nodes")
+}
+
+enum WorkflowInstanceStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  ARCHIVED
+}
+
+/// businessType/businessId 泛化挂接任意业务单据，P1+ 真实单据复用同一引擎无需改动。
+model WorkflowInstance {
+  id                   String                 @id @default(cuid())
+  tenantId             String                 @map("tenant_id")
+  storeId              String?                @map("store_id")
+  workflowDefinitionId String                 @map("workflow_definition_id")
+  businessType         String                 @map("business_type")
+  businessId           String                 @map("business_id")
+  title                String
+  status               WorkflowInstanceStatus @default(DRAFT)
+  currentNodeSeq       Int?                   @map("current_node_seq")
+  initiatorId          String                 @map("initiator_id")
+  submittedAt          DateTime?              @map("submitted_at")
+  finishedAt           DateTime?              @map("finished_at")
+  createdBy            String                 @map("created_by")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  version              Int                    @default(0)
+
+  definition WorkflowDefinition         @relation(fields: [workflowDefinitionId], references: [id])
+  approvers  WorkflowInstanceApprover[]
+  actions    WorkflowActionLog[]
+
+  @@index([tenantId, businessType, businessId])
+  @@index([status])
+  @@map("workflow_instances")
+}
+
+enum WorkflowApproverRole {
+  APPROVER
+  ADDED_APPROVER
+  CC
+}
+
+enum WorkflowApproverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REASSIGNED
+  SKIPPED
+  NOTIFIED
+}
+
+/// 单表覆盖：普通审批人 / 加签 / 抄送 / 转交链（reassignedFromId 指向被转交的原记录）。
+model WorkflowInstanceApprover {
+  id                 String                 @id @default(cuid())
+  workflowInstanceId String                 @map("workflow_instance_id")
+  nodeSeq            Int                    @map("node_seq")
+  accountId          String                 @map("account_id")
+  role               WorkflowApproverRole   @default(APPROVER)
+  status             WorkflowApproverStatus @default(PENDING)
+  comment            String?                @db.Text
+  actedAt            DateTime?              @map("acted_at")
+  reassignedFromId   String?                @map("reassigned_from_id")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  instance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+
+  @@index([workflowInstanceId, nodeSeq])
+  @@index([accountId, status])
+  @@map("workflow_instance_approvers")
+}
+
+enum WorkflowAction {
+  SUBMIT
+  APPROVE
+  REJECT
+  WITHDRAW
+  REASSIGN
+  ADD_APPROVER
+  CC
+  ARCHIVE
+  URGE
+}
+
+/// 审批时间线，供后续 UI 展示；每次动作同时写一份摘要进 AuditLog。
+model WorkflowActionLog {
+  id                 String         @id @default(cuid())
+  workflowInstanceId String         @map("workflow_instance_id")
+  nodeSeq            Int?           @map("node_seq")
+  actorId            String         @map("actor_id")
+  action             WorkflowAction
+  comment            String?        @db.Text
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  instance WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+
+  @@index([workflowInstanceId, createdAt])
+  @@map("workflow_action_logs")
+}
+
+// ==================== 认证 ====================
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  accountId String    @map("account_id")
+  tokenHash String    @unique @map("token_hash")
+  userAgent String?   @map("user_agent")
+  ip        String?
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("refresh_tokens")
+}
+
+// ==================== 工作流引擎示例业务实体 ====================
+
+/// P0 专用最小审批业务实体，仅用于验证工作流引擎骨架端到端可用；
+/// P1+ 真实单据（合同/收款等）复用同一 WorkflowEngineService，不需要为每种业务再写一套状态机。
+model DemoApprovalRequest {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @map("tenant_id")
+  storeId     String?                @map("store_id")
+  title       String
+  content     String                 @db.Text
+  amount      Int? // 最小货币单位（分）
+  applicantId String                 @map("applicant_id")
+  status      WorkflowInstanceStatus @default(DRAFT)
+  createdBy   String                 @map("created_by")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  version     Int                    @default(0)
+
+  @@map("demo_approval_requests")
+}
+
+// ==================== CRM：客户与线索管理 ====================
+
+enum CustomerSource {
+  WALK_IN // 自然到店
+  REFERRAL // 转介绍
+  ONLINE_AD // 线上广告投放
+  SOCIAL_MEDIA // 社交媒体/私域
+  PARTNER // 渠道合作
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  FOLLOWING
+  CONVERTED
+  LOST
+}
+
+enum OpportunityStage {
+  FOLLOWING
+  QUOTED
+  WON
+  LOST
+}
+
+enum FollowUpType {
+  PHONE_CALL
+  WECHAT
+  SMS
+  ON_SITE_VISIT
+  INVITATION // 邀约到店
+  OTHER
+}
+
+/// 客户主数据：租户全局共享，不做门店级数据隔离（已与业务方确认）。
+/// primaryStoreId 仅用于展示/报表（首次建档门店），不参与任何权限范围过滤。
+/// 字段保持最小化——合同/收款/房态预订等 P1 后续切片会引用 Customer.id，
+/// 但不因为它们而预先在这里加字段，那些模块的专属数据放在各自的表里。
+model Customer {
+  id                       String         @id @default(cuid())
+  tenantId                 String         @map("tenant_id")
+  customerNo               String         @map("customer_no")
+  name                     String
+  phone                    String // 敏感字段，见 FieldMaskInterceptor + SENSITIVE_FIELD_REGISTRY.Customer
+  salutation               String?        @db.VarChar(32) // 宝妈称呼（如“小雨妈妈”），呼叫定位系统平板/手表上用它称呼客户
+  source                   CustomerSource @default(WALK_IN)
+  primaryStoreId           String?        @map("primary_store_id") // 首次建档门店，仅展示/报表用途
+  assignedToId             String?        @map("assigned_to_id") // 当前归属销售，无保护期/锁定机制
+  // 以下几项是"新建客户表格内容不完整"这轮补的（业务规则确认记录"客户档案表单扩展"一节）：
+  // 参考了行业同类系统的建档字段，但没有照单全收——身份证号/HIS登记号/亲属信息/客户分配
+  // 这类字段本轮没加，理由见确认记录。客户分类标签(A-E)/客户类型标签(鹰派萌派等)不在这里，
+  // 走的是已有的 Tag/TagBinding 多态标签系统（后台"标签管理"可配置，变更历史靠
+  // TagBinding.revokedAt 保留，不是这个表的字段）。
+  wechat                   String?        @map("wechat") // 同手机号，二者不能同时为空由应用层校验
+  serviceTypes             Json?          @map("service_types") // 客户类型(多选)：月子房/月嫂上户/月子餐外送/产康/宝宝托管，见CUSTOMER_SERVICE_TYPES
+  hospital                 String?        @map("hospital") // 建卡/产检医院
+  idCardNo                 String?        @map("id_card_no") // 身份证号（来自纸质合同，测试阶段按普通信息处理，不打码）
+  emergencyContactName     String?        @map("emergency_contact_name")
+  emergencyContactRelation String?        @map("emergency_contact_relation")
+  emergencyContactPhone    String?        @map("emergency_contact_phone")
+  // —— 2026-10 "新建客户页面按行业系统改版"新增的字段 ——
+  birthday                 DateTime?      @map("birthday") @db.Date // 妈妈生日，填身份证时自动算出，可手改
+  allergens                String?        @map("allergens") @db.Text // 过敏源（自由文本）；建产妇档案时作为默认值带入
+  dietTaboo                String?        @map("diet_taboo") // 饮食禁忌（自由文本，销售/前台录入，如：忌辛辣、对海鲜过敏）
+  zone                     String?        @map("zone") // 片区（如 陆家嘴、世博小区），先用自由文本，以后可升级成基础资料
+  hisNo                    String?        @map("his_no") // HIS 登记号（医院信息系统）
+  passportNo               String?        @map("passport_no") // 国际证件号（护照等，没有身份证的外籍/港澳台客户）
+  registeredAt             DateTime       @default(now()) @map("registered_at") // 添加时间：默认当前，可手改（补录历史客户时用），和 createdAt（记录入库时间）分开
+  ccAccountIds             Json?          @map("cc_account_ids") // 抄送人（员工账号 id 数组）；系统暂无站内通知，目前只记录和展示
+  channelTypeId            String?        @map("channel_type_id") // 渠道类型（可自定义，见 CustomerChannelType）；上面的 source 是它的"旧版 6 类"归并值，自定义类型一律记 OTHER
+  channelId                String?        @map("channel_id") // 具体渠道，属于 channelTypeId 这个类型
+  referrerType             ReferrerType?  @map("referrer_type")
+  referrerId               String?        @map("referrer_id") // 推荐人：老客户或员工，按 referrerType 指向 Customer / Account（多态，不建外键）
+  phoneSalesId             String?        @map("phone_sales_id") // 电话销售员；门店销售员沿用 assignedToId（归属销售）
+  expectedDueDate          DateTime?      @map("expected_due_date") // 预产期
+  region                   String?        @map("region") // 地区，自由文本（省市区），暂不做级联下拉
+  address                  String?        @db.Text
+  remark                   String?        @db.Text
+  /// 归档：用过的客户（有合同/入住/收款等）不能删，只能归档——列表默认隐藏、不能再新建预订/合同，可随时恢复
+  archivedAt               DateTime?      @map("archived_at")
+  archivedBy               String?        @map("archived_by")
+  archiveReason            String?        @map("archive_reason")
+  createdBy                String         @map("created_by")
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
+  version                  Int            @default(0)
+
+  primaryStore            Store?                   @relation(fields: [primaryStoreId], references: [id])
+  assignedTo              Account?                 @relation("CustomerStoreSales", fields: [assignedToId], references: [id])
+  phoneSales              Account?                 @relation("CustomerPhoneSales", fields: [phoneSalesId], references: [id])
+  channelType             CustomerChannelType?     @relation(fields: [channelTypeId], references: [id])
+  channel                 CustomerChannel?         @relation(fields: [channelId], references: [id])
+  leads                   Lead[]
+  opportunities           SalesOpportunity[]
+  contracts               Contract[]
+  roomOccupancies         RoomOccupancy[]
+  payments                Payment[]
+  motherProfiles          MotherProfile[]
+  babyProfiles            BabyProfile[]
+  dinerProfiles           DinerProfile[]
+  customerServicePackages CustomerServicePackage[]
+  serviceAppointments     ServiceAppointment[]
+  account                 CustomerAccount?
+
+  @@unique([tenantId, customerNo])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, primaryStoreId])
+  @@index([tenantId, phone])
+  @@index([tenantId, channelId])
+  @@index([tenantId, channelTypeId])
+  @@index([tenantId, phoneSalesId])
+  @@map("customers")
+}
+
+enum ReferrerType {
+  CUSTOMER
+  ACCOUNT
+}
+
+/// 渠道类型（可自定义）。系统初始带 6 个内置类型（legacySource 记着它对应旧枚举，线索转客户、
+/// 报表等沿用旧枚举的地方靠它换算），用户可以再加自己的类型、给任何类型改名/停用。
+model CustomerChannelType {
+  id           String          @id @default(cuid())
+  tenantId     String          @map("tenant_id")
+  name         String
+  legacySource CustomerSource? @map("legacy_source") // 内置类型才有；自定义类型为空
+  sortOrder    Int             @default(0) @map("sort_order")
+  status       CommonStatus    @default(ACTIVE)
+  createdBy    String          @map("created_by")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  version      Int             @default(0)
+
+  channels  CustomerChannel[]
+  customers Customer[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, legacySource])
+  @@map("customer_channel_types")
+}
+
+/// 具体渠道（某个渠道类型下面可维护的渠道，如 线上广告 > 小红书 / 渠道合作 > 某医院）。
+/// 客户通过 channelId 指向这里。
+model CustomerChannel {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  typeId    String       @map("type_id")
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  type      CustomerChannelType @relation(fields: [typeId], references: [id])
+  customers Customer[]
+
+  @@unique([tenantId, typeId, name])
+  @@map("customer_channels")
+}
+
+/// 线索：NEW -> ASSIGNED -> FOLLOWING -> CONVERTED；LOST 可从 NEW/ASSIGNED/FOLLOWING 到达。
+/// 同时承载"客户预约"登记：客户从登记到跟进的流程节点统计需要的字段（预约类型、到店时间、
+/// 处理状态、处理结果等）都挂在这张表上，见下面 appointment 开头和 process 开头的那些字段——
+/// 跟 status（NEW/ASSIGNED 等）是两套互不干扰的状态：status 管线索转化生命周期，
+/// processed/processResults 管这条预约有没有人工跟进处理过、处理出了什么结果。
+model Lead {
+  id           String         @id @default(cuid())
+  tenantId     String         @map("tenant_id")
+  leadNo       String         @map("lead_no")
+  name         String
+  phone        String
+  source       CustomerSource @default(WALK_IN)
+  storeId      String?        @map("store_id") // 线索录入门店，仅展示用途，不做范围过滤
+  status       LeadStatus     @default(NEW)
+  assignedToId String?        @map("assigned_to_id") // 处理人/母婴顾问
+  customerId   String?        @map("customer_id") // 关联客户：转化时自动回填，也允许人工提前关联到已有客户档案
+  lostReason   String?        @map("lost_reason") @db.Text
+  remark       String?        @db.Text
+
+  appointmentType LeadAppointmentType? @map("appointment_type") // 预约类型：预约参观/预约试餐
+  appointmentTime DateTime?            @map("appointment_time") // 预约到店时间
+  appointmentNote String?              @map("appointment_note") @db.Text // 预约说明
+  processed       Boolean              @default(false) @map("processed") // 处理状态：未处理(false,红)/已处理(true,绿)
+  processResults  Json?                @map("process_results") // 处理结果，多选：见 LEAD_PROCESS_RESULTS 常量
+  handleRemark    String?              @map("handle_remark") @db.Text // 处理说明
+
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  store         Store?             @relation(fields: [storeId], references: [id])
+  assignedTo    Account?           @relation(fields: [assignedToId], references: [id])
+  customer      Customer?          @relation(fields: [customerId], references: [id])
+  opportunities SalesOpportunity[]
+
+  @@unique([tenantId, leadNo])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, storeId])
+  @@map("leads")
+}
+
+enum LeadAppointmentType {
+  VISIT // 预约参观
+  TRIAL_MEAL // 预约试餐
+}
+
+/// 销售机会：FOLLOWING -> QUOTED -> WON；LOST 可从 FOLLOWING/QUOTED 到达，WON 为终态不可转 LOST。
+/// leadId 可空——允许无原始线索的机会（如老客户加购/转介绍直接开单）。
+model SalesOpportunity {
+  id            String           @id @default(cuid())
+  tenantId      String           @map("tenant_id")
+  opportunityNo String           @map("opportunity_no")
+  customerId    String           @map("customer_id")
+  leadId        String?          @map("lead_id")
+  stage         OpportunityStage @default(FOLLOWING)
+  amount        Int? // 意向金额，最小货币单位（分）
+  assignedToId  String?          @map("assigned_to_id")
+  lostReason    String?          @map("lost_reason") @db.Text
+  remark        String?          @db.Text
+  createdBy     String           @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  version       Int              @default(0)
+
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  lead       Lead?      @relation(fields: [leadId], references: [id])
+  assignedTo Account?   @relation(fields: [assignedToId], references: [id])
+  contracts  Contract[]
+
+  @@unique([tenantId, opportunityNo])
+  @@index([tenantId, stage])
+  @@index([tenantId, customerId])
+  @@index([tenantId, assignedToId])
+  @@map("sales_opportunities")
+}
+
+/// 跟进/邀约记录：多态挂接（businessType/businessId），镜像 WorkflowInstance 的
+/// businessType/businessId 命名与设计——不建三个可空外键，未来新增可跟进的实体
+/// （如合同回访）无需改表结构。这是只增不改的日志类实体（没有 version/updatedAt），
+/// 与 WorkflowActionLog 保持同一建模风格，而非套用"每个业务模型都有 version"的模板。
+model FollowUpRecord {
+  id             String       @id @default(cuid())
+  tenantId       String       @map("tenant_id")
+  businessType   String       @map("business_type") // 'LEAD' | 'OPPORTUNITY' | 'CUSTOMER'
+  businessId     String       @map("business_id")
+  type           FollowUpType
+  content        String       @db.Text
+  nextFollowUpAt DateTime?    @map("next_follow_up_at")
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([tenantId, businessType, businessId])
+  @@index([tenantId, createdAt])
+  @@map("follow_up_records")
+}
+
+// ==================== 合同管理 ====================
+
+enum ContractStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  VOIDED
+  /// 纸质合同已上传（AI 已识别或待手工录入），等销售核对确认
+  PENDING_REVIEW
+}
+
+/// AI 识别进度：NONE=没走识别（手工录入）；PENDING=排队中；RUNNING=识别中；DONE=完成；FAILED=失败（可重试）
+enum ContractExtractStatus {
+  NONE
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum CareMode {
+  ONE_TO_ONE
+  ONE_TO_TWO
+}
+
+enum ContractOrientation {
+  SOUTH
+  NORTH
+  BOTH
+}
+
+enum ContractFileKind {
+  /// 用户上传的原始文件（PDF/照片），永久保留
+  ORIGINAL
+  /// 由原始文件渲染出的逐页图片，核对页/查看用
+  PAGE
+}
+
+enum ContractItemKind {
+  GIFT
+  ADDON
+}
+
+/// 合同 = 纸质合同的数据台账 + 原件存档（2026-09-20 改造）：销售线下签完纸质合同后拍照/传 PDF，
+/// AI 识别出核心数据，销售在核对页确认后入库；系统里不再保存合同正文、不做电子签署、不走审批。
+/// 状态：PENDING_REVIEW(待核对) -> ACTIVE(已确认；有没有排房看 RoomOccupancy.contractId) -> VOIDED(作废)。
+/// 合同上只写房型不写房号、也没有入住日期：入住/离店日期是销售按预产期推后几天"预估"的，
+/// 客户实际入住当天才确定（行业惯例），所以 estimatedCheckIn/Out 只是预估值，房态以预订记录为准。
+/// 租户全局可见，不做门店级数据隔离（同 Customer）。
+model Contract {
+  id            String         @id @default(cuid())
+  tenantId      String         @map("tenant_id")
+  contractNo    String         @map("contract_no") // 系统内部流水号（CT...），纸质合同上的编号是 paperNo
+  customerId    String?        @map("customer_id") // 核对确认前可能还没匹配/新建客户
+  opportunityId String?        @map("opportunity_id")
+  storeId       String         @map("store_id")
+  title         String         @default("母婴护理服务协议")
+  content       String?        @db.Text // 历史遗留：电子合同正文，纸质合同不再使用（TEXT 列不能有默认值，所以可空）
+  amount        Int            @default(0) // 套餐金额，最小货币单位（分）
+  startDate     DateTime?      @map("start_date") // 历史遗留，新流程用 estimatedCheckIn/Out
+  endDate       DateTime?      @map("end_date")
+  status        ContractStatus @default(PENDING_REVIEW)
+  voidReason    String?        @map("void_reason") @db.Text
+  createdBy     String         @map("created_by")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  version       Int            @default(0)
+
+  // —— 纸质合同信息 ——
+  paperNo           String?               @map("paper_no") // 纸质合同封面编号，如 2026-08-363
+  signedDate        DateTime?             @map("signed_date") @db.Date
+  signerId          String?               @map("signer_id") // 签单人（销售账号），默认上传人
+  // 客户信息快照（合同签订时填写的内容）。确认时匹配/新建 Customer 并把空缺字段补进去
+  clientName        String?               @map("client_name")
+  clientPhone       String?               @map("client_phone")
+  clientIdCardNo    String?               @map("client_id_card_no")
+  clientHospital    String?               @map("client_hospital")
+  clientAddress     String?               @map("client_address") @db.Text
+  emergencyName     String?               @map("emergency_name")
+  emergencyRelation String?               @map("emergency_relation")
+  emergencyPhone    String?               @map("emergency_phone")
+  fetus             String? // single / twin / multi
+  dueDate           DateTime?             @map("due_date") @db.Date // 合同上的预产期（签约时快照）
+  // —— 套餐 ——
+  roomTypeText      String?               @map("room_type_text") // 合同上手写的房型原文，如 至臻(2间房-南-北)
+  roomTypeId        String?               @map("room_type_id") // 匹配到系统里的房型
+  orientation       ContractOrientation?
+  careMode          CareMode?             @map("care_mode")
+  inHouseDays       Int?                  @map("in_house_days") // N+N 的第一个 N：所内入住天数（房态只用这个）
+  homeServiceDays   Int                   @default(0) @map("home_service_days") // 第二个 N：出所后到家服务天数
+  daysText          String?               @map("days_text") // 合同上的原文，如 28+28
+  // —— 预估入住（合同上没有，销售预估，实际入住当天才确定）——
+  estimatedCheckIn  DateTime?             @map("estimated_check_in") @db.Date
+  estimatedCheckOut DateTime?             @map("estimated_check_out") @db.Date
+  // —— 定金 ——
+  depositAmount     Int?                  @map("deposit_amount") // 分
+  depositPaid       Boolean               @default(false) @map("deposit_paid")
+  depositMethod     PaymentMethod?        @map("deposit_method")
+  depositPaidAt     DateTime?             @map("deposit_paid_at") @db.Date
+  depositPaymentId  String?               @map("deposit_payment_id") // 确认时生成的收款记录
+  // —— AI 识别 ——
+  extractStatus     ContractExtractStatus @default(NONE) @map("extract_status")
+  extractError      String?               @map("extract_error") @db.Text
+  extractWarnings   Json?                 @map("extract_warnings") // 需要人工核对的提醒清单
+  extractedAt       DateTime?             @map("extracted_at")
+  confirmedAt       DateTime?             @map("confirmed_at")
+  confirmedById     String?               @map("confirmed_by_id")
+
+  customer        Customer?            @relation(fields: [customerId], references: [id])
+  opportunity     SalesOpportunity?    @relation(fields: [opportunityId], references: [id])
+  store           Store                @relation(fields: [storeId], references: [id])
+  signer          Account?             @relation("ContractSigner", fields: [signerId], references: [id])
+  roomType        RoomType?            @relation(fields: [roomTypeId], references: [id])
+  roomOccupancies RoomOccupancy[]
+  payments        Payment[]
+  files           ContractFile[]
+  items           ContractItem[]
+  extractions     ContractExtraction[]
+
+  @@unique([tenantId, contractNo])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, paperNo])
+  @@map("contracts")
+}
+
+/// 合同原件与逐页图片。文件本体存在服务器磁盘（CONTRACT_STORAGE_DIR），这里只记路径。
+model ContractFile {
+  id          String           @id @default(cuid())
+  tenantId    String           @map("tenant_id")
+  contractId  String           @map("contract_id")
+  kind        ContractFileKind
+  fileName    String           @map("file_name")
+  storagePath String           @map("storage_path") // 相对 CONTRACT_STORAGE_DIR 的路径
+  mimeType    String           @map("mime_type")
+  sizeBytes   Int              @map("size_bytes")
+  pageNo      Int?             @map("page_no")
+  pageKind    String?          @map("page_kind") // AI 判断的页面类型：cover/body_1/body_2/body_sign/attachment…
+  createdBy   String           @map("created_by")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_files")
+}
+
+/// 合同约定的赠送/加购项目（手写内容，AI 识别后可人工修改）。
+model ContractItem {
+  id          String           @id @default(cuid())
+  tenantId    String           @map("tenant_id")
+  contractId  String           @map("contract_id")
+  kind        ContractItemKind @default(GIFT)
+  name        String
+  quantity    String?
+  needsReview Boolean          @default(false) @map("needs_review") // AI 没看清，提醒销售核对
+  sortOrder   Int              @default(0) @map("sort_order")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_items")
+}
+
+/// AI 每次识别的完整原始结果，留痕用（排查为什么识别错、评估模型准确度）。
+model ContractExtraction {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  contractId String   @map("contract_id")
+  model      String?
+  latencyMs  Int?     @map("latency_ms")
+  result     Json
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_extractions")
+}
+
+// ==================== 房态预订（住店运营域） ====================
+
+enum RoomOccupancyStatus {
+  RESERVED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+model RoomType {
+  id            String       @id @default(cuid())
+  tenantId      String       @map("tenant_id")
+  code          String
+  name          String
+  description   String?      @db.Text
+  standardPrice Int?         @map("standard_price") // 参考价，最小货币单位（分），可空——非强制定价
+  status        CommonStatus @default(ACTIVE)
+  createdBy     String       @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  version       Int          @default(0)
+
+  rooms     Room[]
+  contracts Contract[]
+
+  @@unique([tenantId, code])
+  @@map("room_types")
+}
+
+/// 房间：不存房态枚举，房态由 RoomOccupancy 实时计算得出（见 RoomService.computeStatus）。
+/// underMaintenance/needsCleaning 是独立于占用记录的标志位（沿用开发文档"维修为独立标志"的设计）。
+model Room {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  storeId          String   @map("store_id")
+  roomTypeId       String   @map("room_type_id")
+  roomNo           String   @map("room_no")
+  floor            String // 允许 "1F"/"B1" 等标签，不做纯数字假设
+  underMaintenance Boolean  @default(false) @map("under_maintenance")
+  maintenanceNote  String?  @map("maintenance_note") @db.Text
+  needsCleaning    Boolean  @default(false) @map("needs_cleaning")
+  createdBy        String   @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  version          Int      @default(0)
+
+  store          Store               @relation(fields: [storeId], references: [id])
+  roomType       RoomType            @relation(fields: [roomTypeId], references: [id])
+  occupancies    RoomOccupancy[]
+  devices        Device[]
+  deviceBindings RoomDeviceBinding[]
+
+  @@unique([tenantId, storeId, roomNo])
+  @@index([tenantId, storeId])
+  @@map("rooms")
+}
+
+/// 占房记录：预订/入住/离店/取消的状态机主体。合同可选（弱关联，仿照 Contract.opportunityId）。
+model RoomOccupancy {
+  id               String              @id @default(cuid())
+  tenantId         String              @map("tenant_id")
+  occupancyNo      String              @map("occupancy_no")
+  roomId           String              @map("room_id")
+  storeId          String              @map("store_id") // 冗余存储，便于按店过滤，仿照 Contract.storeId
+  customerId       String              @map("customer_id")
+  contractId       String?             @map("contract_id")
+  status           RoomOccupancyStatus @default(RESERVED)
+  plannedCheckIn   DateTime            @map("planned_check_in")
+  plannedCheckOut  DateTime            @map("planned_check_out")
+  actualCheckInAt  DateTime?           @map("actual_check_in_at")
+  actualCheckOutAt DateTime?           @map("actual_check_out_at")
+  cancelReason     String?             @map("cancel_reason") @db.Text
+  remark           String?             @db.Text
+  createdBy        String              @map("created_by")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  version          Int                 @default(0)
+
+  room                    Room                     @relation(fields: [roomId], references: [id])
+  store                   Store                    @relation(fields: [storeId], references: [id])
+  customer                Customer                 @relation(fields: [customerId], references: [id])
+  contract                Contract?                @relation(fields: [contractId], references: [id])
+  motherProfiles          MotherProfile[]
+  roomCalls               RoomCall[]
+  roomOutings             RoomOuting[]
+  roomServiceRequisitions RoomServiceRequisition[]
+  dinerProfiles           DinerProfile[]
+
+  @@unique([tenantId, occupancyNo])
+  @@index([tenantId, roomId])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("room_occupancies")
+}
+
+// ==================== 收款管理（交易与供应域） ====================
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  WECHAT
+  ALIPAY
+  POS_CARD
+  OTHER
+}
+
+enum PaymentStatus {
+  RECORDED
+  PENDING_REFUND
+  REFUNDED
+}
+
+/// 收款记录：只做"收款"（客户付钱给中心），不做应付/付款。
+/// 退款不新增独立冲正单据，是同一条记录上的状态迁移（见 PaymentRecordService 注释），
+/// 与 Contract.void() 的处理口径一致，为控制本轮范围做的取舍。
+model Payment {
+  id           String        @id @default(cuid())
+  tenantId     String        @map("tenant_id")
+  paymentNo    String        @map("payment_no")
+  contractId   String        @map("contract_id")
+  customerId   String        @map("customer_id")
+  storeId      String        @map("store_id")
+  amount       Int // 收款金额，最小货币单位（分）
+  method       PaymentMethod @default(CASH)
+  status       PaymentStatus @default(RECORDED)
+  refundReason String?       @map("refund_reason") @db.Text
+  remark       String?       @db.Text
+  createdBy    String        @map("created_by")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  version      Int           @default(0)
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
+
+  @@unique([tenantId, paymentNo])
+  @@index([tenantId, contractId])
+  @@index([tenantId, status])
+  @@map("payments")
+}
+
+// ==================== 财务结算深化（会员账户：赠送优先扣减，见业务规则确认记录#5） ====================
+// 与 Payment（强绑定 Contract 的合同收款）是两类不同性质的资金记录，不合并、不互相依赖，
+// 呼应竞品"多资金池独立核算"的精神，但V1只用一个账户的"本金/赠送"两个子池覆盖核心区分。
+// 余额变更（充值/消费/退款/调整）均用数据库原子 increment 保证并发安全，不要求前端传
+// expectedVersion——这是高频小额记账场景，与"整单编辑"的乐观锁语义不同（详见业务规则确认记录）。
+
+enum CustomerAccountTransactionType {
+  RECHARGE
+  CONSUME
+  REFUND
+  ADJUST
+}
+
+model CustomerAccount {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  customerId       String   @unique @map("customer_id")
+  principalBalance Int      @default(0) @map("principal_balance") // 客户实付本金余额，最小货币单位（分）
+  giftBalance      Int      @default(0) @map("gift_balance") // 赠送/权益余额，最小货币单位（分）
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  version          Int      @default(0)
+
+  customer     Customer                     @relation(fields: [customerId], references: [id])
+  transactions CustomerAccountTransaction[]
+
+  @@map("customer_accounts")
+}
+
+/// 消费(CONSUME)按"赠送优先，再扣本金"顺序自动拆分 principalDelta/giftDelta（均为负数）；
+/// 退款(REFUND)由操作员显式指定退回本金/赠送各多少，系统不做反查原消费记录的自动比例拆分。
+model CustomerAccountTransaction {
+  id             String                         @id @default(cuid())
+  tenantId       String                         @map("tenant_id")
+  accountId      String                         @map("account_id")
+  type           CustomerAccountTransactionType
+  principalDelta Int                            @default(0) @map("principal_delta") // 可正可负
+  giftDelta      Int                            @default(0) @map("gift_delta") // 可正可负
+  principalAfter Int                            @map("principal_after")
+  giftAfter      Int                            @map("gift_after")
+  sourceType     String?                        @map("source_type") // 如 MANUAL/SERVICE_APPOINTMENT/CONTRACT
+  sourceId       String?                        @map("source_id")
+  remark         String?                        @db.Text
+  createdBy      String                         @map("created_by")
+  createdAt      DateTime                       @default(now()) @map("created_at")
+
+  account CustomerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, accountId])
+  @@map("customer_account_transactions")
+}
+
+// ==================== 护理域（母婴履约深化 P2 第一切片：表单引擎 + 档案） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.3 节
+// + docs/业务规则确认记录.md #6、#7（2026-07-28 确认）。
+
+enum CareTargetType {
+  MOTHER
+  BABY
+}
+
+enum CareFieldControlType {
+  NUMBER
+  TEXT
+  TEXTAREA
+  SELECT
+  RADIO
+}
+
+enum CareFormDepartment {
+  NURSING // 护理部
+  POSTPARTUM_RECOVERY // 产康部
+  MEAL // 膳食部
+  CUSTOMER_SERVICE // 客服部
+  MEDICAL // 医务部（本切片不做"医嘱"能力，仅保留场景分类供未来扩展）
+}
+
+enum CareFormScene {
+  GENERAL // 通用
+  IN_HOUSE // 所内
+  HOME_VISIT // 上户
+  HOSPITAL // 医院
+}
+
+/// 护理字段元数据：四层可配置表单引擎的最底层（字段→项目→方案→计划）。
+/// normalMin/normalMax 用于数值型字段的正常值域判定，normalOptionValues 用于选项型
+/// 字段（数组，列出哪些选项值算正常）；两者都为空表示该字段仅作记录、不参与护理异常
+/// 自动判定。本期只做"超范围即异常"的单档判定，不做多级严重度（业务规则确认记录#7）。
+model CareFieldDefinition {
+  id                 String               @id @default(cuid())
+  tenantId           String               @map("tenant_id")
+  code               String
+  name               String
+  targetType         CareTargetType       @map("target_type")
+  controlType        CareFieldControlType @map("control_type")
+  unit               String?
+  options            Json? // SELECT/RADIO 候选项：[{value,label}]
+  normalMin          Float?               @map("normal_min")
+  normalMax          Float?               @map("normal_max")
+  normalOptionValues Json?                @map("normal_option_values") // 选项型字段的正常值集合：string[]
+  visibleToClient    Boolean              @default(false) @map("visible_to_client")
+  status             CommonStatus         @default(ACTIVE)
+  createdBy          String               @map("created_by")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  version            Int                  @default(0)
+
+  formFields    CareFormTemplateField[]
+  abnormalities CareAbnormality[]
+
+  @@unique([tenantId, code])
+  @@map("care_field_definitions")
+}
+
+/// 护理项目（表单模板）：按部门+场景分类的表单容器，字段引用通过中间表携带顺序与必填。
+model CareFormTemplate {
+  id         String             @id @default(cuid())
+  tenantId   String             @map("tenant_id")
+  code       String
+  name       String
+  targetType CareTargetType     @map("target_type")
+  department CareFormDepartment
+  scene      CareFormScene      @default(GENERAL)
+  status     CommonStatus       @default(ACTIVE)
+  createdBy  String             @map("created_by")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+  version    Int                @default(0)
+
+  fields      CareFormTemplateField[]
+  planItems   CarePlanTemplateItem[]
+  planTasks   CarePlanTask[]
+  careRecords CareRecord[]
+
+  @@unique([tenantId, code])
+  @@map("care_form_templates")
+}
+
+model CareFormTemplateField {
+  id             String  @id @default(cuid())
+  formTemplateId String  @map("form_template_id")
+  fieldId        String  @map("field_id")
+  sortOrder      Int     @default(0) @map("sort_order")
+  required       Boolean @default(false)
+
+  formTemplate CareFormTemplate    @relation(fields: [formTemplateId], references: [id])
+  field        CareFieldDefinition @relation(fields: [fieldId], references: [id])
+
+  @@unique([formTemplateId, fieldId])
+  @@map("care_form_template_fields")
+}
+
+/// 护理方案（模板）：把多个表单模板按"入住第几天"组合成天数化方案，
+/// 如"妈妈护理入住方案28天"。CarePlan 激活时据此批量生成 CarePlanTask。
+model CarePlanTemplate {
+  id         String         @id @default(cuid())
+  tenantId   String         @map("tenant_id")
+  code       String
+  name       String
+  targetType CareTargetType @map("target_type")
+  totalDays  Int            @map("total_days")
+  status     CommonStatus   @default(ACTIVE)
+  createdBy  String         @map("created_by")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  version    Int            @default(0)
+
+  items CarePlanTemplateItem[]
+  plans CarePlan[]
+
+  @@unique([tenantId, code])
+  @@map("care_plan_templates")
+}
+
+model CarePlanTemplateItem {
+  id             String @id @default(cuid())
+  planTemplateId String @map("plan_template_id")
+  dayOffset      Int    @map("day_offset") // 入住第几天，从1开始
+  formTemplateId String @map("form_template_id")
+
+  planTemplate CarePlanTemplate @relation(fields: [planTemplateId], references: [id])
+  formTemplate CareFormTemplate @relation(fields: [formTemplateId], references: [id])
+
+  @@unique([planTemplateId, dayOffset, formTemplateId])
+  @@map("care_plan_template_items")
+}
+
+enum DeliveryMethod {
+  VAGINAL
+  CESAREAN
+  UNKNOWN
+}
+
+/// 妈妈档案：一次入住/一次月子周期一条记录，不是与 Customer 一一对应——同一客户
+/// "再次入住"（二胎/二次月子）时新建一条档案，历史档案与其护理记录不覆盖、不删除，
+/// 呼应"离店后房间释放但护理档案保留"的验收标准（业务规则确认记录#6）。
+/// 风险标签（早产/传染病/高敏/妈咪住院等）不建独立字段，复用平台 Tag/TagBinding
+/// （entityType='MOTHER_PROFILE'）。
+model MotherProfile {
+  id                   String         @id @default(cuid())
+  tenantId             String         @map("tenant_id")
+  storeId              String         @map("store_id")
+  customerId           String         @map("customer_id")
+  occupancyId          String?        @map("occupancy_id")
+  deliveryMethod       DeliveryMethod @default(UNKNOWN) @map("delivery_method")
+  deliveryDate         DateTime?      @map("delivery_date")
+  gestationalWeeks     Int?           @map("gestational_weeks")
+  expectedDeliveryDate DateTime?      @map("expected_delivery_date")
+  /// 护理要点/医嘱：护理看板卡片上展示的简短提示，与 remark（建档备注）分开维护；
+  /// 后续会扩展成"护理重点概要"，现在先是一个自由文本字段。
+  careNote             String?        @map("care_note") @db.Text
+  /// 过敏源（产妇本人）：建档时从客户资料带入可改；护理看板的“过敏/敏”以它为准（为空时才参考入所评估单）
+  allergens            String?        @map("allergens") @db.Text
+  /// 主责护理师（责任护士）：从员工账号里选，在母婴档案里指派/更换；护理看板、房态看板展示。
+  primaryNurseId       String?        @map("primary_nurse_id")
+  remark               String?        @db.Text
+  /// 归档（结案）：有护理记录的档案不能删，归档后列表默认隐藏，可恢复
+  archivedAt           DateTime?      @map("archived_at")
+  archivedBy           String?        @map("archived_by")
+  createdBy            String         @map("created_by")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+  version              Int            @default(0)
+
+  store               Store                @relation(fields: [storeId], references: [id])
+  customer            Customer             @relation(fields: [customerId], references: [id])
+  occupancy           RoomOccupancy?       @relation(fields: [occupancyId], references: [id])
+  primaryNurse        Account?             @relation("MotherPrimaryNurse", fields: [primaryNurseId], references: [id])
+  babies              BabyProfile[]
+  carePlans           CarePlan[]
+  careRecords         CareRecord[]
+  abnormalities       CareAbnormality[]
+  outreachPlans       CareOutreachPlan[]
+  documents           CareDocument[]
+  dailyRecords        CareDailyRecord[]
+  medicationAuths     CareMedicationAuth[]
+  planVersions        CarePlanVersion[]
+  serviceLogs         CareServiceLog[]
+  confirmLinks        CareConfirmLink[]
+  admissionAssessment CareMotherAdmission?
+  dischargeAssessment CareMotherDischarge?
+
+  @@index([tenantId, customerId])
+  @@index([primaryNurseId])
+  @@map("mother_profiles")
+}
+
+enum BabyGender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+/// 宝宝档案：多胞胎＝同一 motherProfileId 下多条记录，用 sequenceNo 区分（业务规则确认记录#6）。
+model BabyProfile {
+  id               String     @id @default(cuid())
+  tenantId         String     @map("tenant_id")
+  storeId          String     @map("store_id")
+  customerId       String     @map("customer_id")
+  motherProfileId  String     @map("mother_profile_id")
+  sequenceNo       Int        @default(1) @map("sequence_no")
+  name             String?
+  gender           BabyGender @default(UNKNOWN)
+  birthDate        DateTime?  @map("birth_date")
+  birthWeightGrams Int?       @map("birth_weight_grams")
+  apgarScore       String?    @map("apgar_score")
+  allergens        String?    @map("allergens") @db.Text // 宝宝过敏源
+  remark           String?    @db.Text
+  createdBy        String     @map("created_by")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  version          Int        @default(0)
+
+  store               Store                 @relation(fields: [storeId], references: [id])
+  customer            Customer              @relation(fields: [customerId], references: [id])
+  motherProfile       MotherProfile         @relation(fields: [motherProfileId], references: [id])
+  carePlans           CarePlan[]
+  careRecords         CareRecord[]
+  abnormalities       CareAbnormality[]
+  documents           CareDocument[]
+  dailyBabyRecords    CareDailyBabyRecord[]
+  medicationAuths     CareMedicationAuth[]
+  planVersions        CarePlanVersion[]
+  serviceLogs         CareServiceLog[]
+  growthRecords       BabyGrowthRecord[]
+  growthShares        BabyGrowthShare[]
+  admissionAssessment CareBabyAdmission?
+  dischargeAssessment CareBabyDischarge?
+
+  @@unique([motherProfileId, sequenceNo])
+  @@index([tenantId, customerId])
+  @@map("baby_profiles")
+}
+
+// ==================== 护理档案：纸质表格留档 + 单次评估（P1） ====================
+// 纸质表格拍照上传后原件永久保留（CareDocument/CareDocumentFile）；需要结构化的表格，
+// 识别结果先放在 CareDocument.extractData 里等人工复核，复核确认后才写入下面四张评估表，
+// 没确认前不进入统计。字段说明书见 src/care/care-assessment/assessment-specs.ts。
+
+enum CareDocType {
+  MOTHER_ADMISSION // 产妇入住评估单
+  BABY_ADMISSION // 新生儿入所评估
+  MOTHER_DISCHARGE // 妈妈出所健康评估表
+  BABY_DISCHARGE // 宝宝出所健康评估表
+  DAILY_RECORD // 新生儿和产妇日常护理记录（P2）
+  MEDICATION_AUTH // 新生儿用药服药喂药委托书（P3）
+  CARE_PLAN // 产妇常规护理计划/护理计划（P4）
+  RISK_NOTICE // 产妇及新生儿风险告知书（只留档）
+  ORIENTATION // 会所入住宣教（只留档）
+  CHOKING_PROTOCOL // 新生儿呛奶应急预案及处理方法（只留档）
+  OTHER
+}
+
+enum CareDocStatus {
+  /// 已上传/已识别，等待人工复核入库
+  DRAFT
+  /// 已确认（结构化数据已入库，或只留档类资料已归档）
+  CONFIRMED
+}
+
+/// 一份纸质资料（可含多张照片）。妈妈和宝宝的资料都挂在妈妈档案下（宝宝资料另带 babyProfileId）。
+model CareDocument {
+  id              String                @id @default(cuid())
+  tenantId        String                @map("tenant_id")
+  storeId         String                @map("store_id")
+  docType         CareDocType           @map("doc_type")
+  motherProfileId String                @map("mother_profile_id")
+  babyProfileId   String?               @map("baby_profile_id")
+  status          CareDocStatus         @default(DRAFT)
+  title           String?
+  docDate         DateTime?             @map("doc_date") @db.Date
+  remark          String?               @db.Text
+  extractStatus   ContractExtractStatus @default(NONE) @map("extract_status")
+  extractError    String?               @map("extract_error") @db.Text
+  extractData     Json?                 @map("extract_data") // AI 识别出的字段（key 同评估表字段）
+  extractWarnings Json?                 @map("extract_warnings") // 需要人工核对的提醒
+  extractModel    String?               @map("extract_model")
+  /// 识别范围：空=整张纸；BABY_FEEDING=只认宝宝单页（宝宝体征 + 24小时喂养记录单），不读妈妈栏
+  extractScope    String?               @map("extract_scope")
+  extractedAt     DateTime?             @map("extracted_at")
+  confirmedBy     String?               @map("confirmed_by")
+  confirmedAt     DateTime?             @map("confirmed_at")
+  createdBy       String                @map("created_by")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  version         Int                   @default(0)
+
+  motherProfile    MotherProfile         @relation(fields: [motherProfileId], references: [id])
+  babyProfile      BabyProfile?          @relation(fields: [babyProfileId], references: [id])
+  files            CareDocumentFile[]
+  motherAdmission  CareMotherAdmission[]
+  babyAdmission    CareBabyAdmission[]
+  motherDischarge  CareMotherDischarge[]
+  babyDischarge    CareBabyDischarge[]
+  dailyRecords     CareDailyRecord[]     @relation("DailyRecordDocument")
+  medicationAuths  CareMedicationAuth[]  @relation("MedicationAuthDocument")
+  dailyBabyRecords CareDailyBabyRecord[] @relation("DailyBabyRecordDocument")
+
+  @@index([tenantId, motherProfileId, docType])
+  @@index([tenantId, status])
+  @@map("care_documents")
+}
+
+model CareDocumentFile {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  documentId   String   @map("document_id")
+  fileName     String   @map("file_name")
+  storagePath  String   @map("storage_path") // 相对存储根目录的路径（展示/识别用的文件，HEIC 会转成 JPEG）
+  originalPath String?  @map("original_path") // 上传的原始文件（和 storagePath 不同时才有，如苹果 HEIC 原图），永久保留
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document CareDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("care_document_files")
+}
+
+/// 产妇入住评估单：一个妈妈档案一份（单次评估，可修改，修改留审计记录）。
+model CareMotherAdmission {
+  id                      String    @id @default(cuid())
+  tenantId                String    @map("tenant_id")
+  storeId                 String    @map("store_id")
+  motherProfileId         String    @map("mother_profile_id")
+  documentId              String?   @map("document_id") // 对应的纸质原件照片（可为空：手工录入时没拍照）
+  // —— 以下是纸质表上的字段（由 care-assessment/assessment-specs.ts 生成）——
+  age                     Int?      @map("age") // 年龄
+  gestationalWeeks        String?   @map("gestational_weeks") // 孕周
+  bloodType               String?   @map("blood_type") // 血型
+  deliveryHospital        String?   @map("delivery_hospital") // 分娩医院
+  admissionDate           DateTime? @map("admission_date") @db.Date // 入所日期
+  deliveryDate            DateTime? @map("delivery_date") @db.Date // 分娩日期
+  deliveryMethod          String?   @map("delivery_method") // 分娩方式
+  heightCm                Float?    @map("height_cm") // 身高
+  weightKg                Float?    @map("weight_kg") // 体重
+  chiefComplaint          String?   @map("chief_complaint") // 主诉
+  allergyHistory          String?   @map("allergy_history") // 过敏史
+  allergyNote             String?   @map("allergy_note") // 过敏说明
+  pastHistory             String?   @map("past_history") // 既往病史
+  pregnancyComplications  String?   @map("pregnancy_complications") // 孕期合并症
+  abnormalDeliveryReason  String?   @map("abnormal_delivery_reason") // 异常生产原因
+  hemorrhoids             String?   @map("hemorrhoids") // 痔疮
+  temperature             Float?    @map("temperature") // 体温
+  pulse                   Int?      @map("pulse") // 脉搏
+  respiration             Int?      @map("respiration") // 呼吸
+  bpSystolic              Int?      @map("bp_systolic") // 收缩压(高压)
+  bpDiastolic             Int?      @map("bp_diastolic") // 舒张压(低压)
+  fundusFingersBelowNavel Float?    @map("fundus_fingers_below_navel") // 子宫高度：脐下几指
+  uterineContraction      String?   @map("uterine_contraction") // 宫缩情况
+  breast                  String?   @map("breast") // 乳房
+  breastNote              String?   @map("breast_note") // 乳房异常说明
+  nipple                  String?   @map("nipple") // 乳头
+  nippleNote              String?   @map("nipple_note") // 乳头异常说明
+  perineum                Json?     @map("perineum") // 会阴
+  perineumNote            String?   @map("perineum_note") // 会阴其他说明
+  woundDressing           Json?     @map("wound_dressing") // 剖宫产腹部伤口敷料
+  dressingNote            String?   @map("dressing_note") // 敷料备注
+  lochiaColor             String?   @map("lochia_color") // 恶露颜色
+  lochiaAmount            String?   @map("lochia_amount") // 恶露量
+  lochiaOdor              String?   @map("lochia_odor") // 恶露气味
+  legEdema                String?   @map("leg_edema") // 下肢水肿
+  nightSweat              String?   @map("night_sweat") // 盗汗
+  dietTaboo               String?   @map("diet_taboo") // 饮食禁忌
+  handlingNotes           String?   @map("handling_notes") @db.Text // 处理
+  assessorName            String?   @map("assessor_name") // 评估人员
+  responsibleNurseName    String?   @map("responsible_nurse_name") // 责任护士
+  clientSignerName        String?   @map("client_signer_name") // 宝妈或家属签字
+  assessedAt              DateTime? @map("assessed_at") @db.Date // 评估日期
+  createdBy               String    @map("created_by")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  version                 Int       @default(0)
+
+  motherProfile MotherProfile @relation(fields: [motherProfileId], references: [id])
+  document      CareDocument? @relation(fields: [documentId], references: [id])
+
+  @@unique([motherProfileId])
+  @@index([tenantId, storeId])
+  @@map("care_mother_admissions")
+}
+
+/// 新生儿入所评估：一个宝宝档案一份（单次评估，可修改，修改留审计记录）。
+model CareBabyAdmission {
+  id                   String    @id @default(cuid())
+  tenantId             String    @map("tenant_id")
+  storeId              String    @map("store_id")
+  babyProfileId        String    @map("baby_profile_id")
+  documentId           String?   @map("document_id") // 对应的纸质原件照片（可为空：手工录入时没拍照）
+  // —— 以下是纸质表上的字段（由 care-assessment/assessment-specs.ts 生成）——
+  gestationalWeeks     String?   @map("gestational_weeks") // 孕周
+  birthDate            DateTime? @map("birth_date") @db.Date // 出生日期
+  admissionDate        DateTime? @map("admission_date") @db.Date // 入所日期
+  mentalState          String?   @map("mental_state") // 精神状况
+  birthMethod          String?   @map("birth_method") // 出生方式
+  birthWeightG         Int?      @map("birth_weight_g") // 出生体重
+  birthLengthCm        Float?    @map("birth_length_cm") // 出生身长
+  admissionWeightG     Int?      @map("admission_weight_g") // 入所体重
+  admissionLengthCm    Float?    @map("admission_length_cm") // 入所身长
+  headCircumferenceCm  Float?    @map("head_circumference_cm") // 入所头围
+  chestCircumferenceCm Float?    @map("chest_circumference_cm") // 入所胸围
+  temperature          Float?    @map("temperature") // 入所体温
+  breastCondition      String?   @map("breast_condition") // 乳房情况
+  testis               String?   @map("testis") // 男：睾丸
+  hydrocele            String?   @map("hydrocele") // 男：鞘膜积液
+  urethraMale          String?   @map("urethra_male") // 男：尿道
+  labiaDevelopment     String?   @map("labia_development") // 女：阴蒂阴唇发育
+  labiaNote            String?   @map("labia_note") // 女：发育异常说明
+  vaginalDischarge     String?   @map("vaginal_discharge") // 女：阴道分泌物
+  vaginalDischargeNote String?   @map("vaginal_discharge_note") // 女：分泌物说明
+  urethraFemale        String?   @map("urethra_female") // 女：尿道
+  urethraFemaleNote    String?   @map("urethra_female_note") // 女：尿道异常说明
+  head                 String?   @map("head") // 头部
+  skin                 Json?     @map("skin") // 皮肤
+  fontanelle           String?   @map("fontanelle") // 前囟
+  facialFeatures       String?   @map("facial_features") // 五官
+  oralCavity           String?   @map("oral_cavity") // 口腔
+  hearingScreening     String?   @map("hearing_screening") // 听力筛查
+  neck                 String?   @map("neck") // 颈部
+  anus                 String?   @map("anus") // 肛门
+  lungs                String?   @map("lungs") // 肺部
+  heart                String?   @map("heart") // 心脏
+  heartNote            String?   @map("heart_note") // 心脏异常原因
+  abdomen              String?   @map("abdomen") // 腹部
+  limbs                String?   @map("limbs") // 四肢活动
+  limbsNote            String?   @map("limbs_note") // 四肢异常原因
+  umbilicalStatus      String?   @map("umbilical_status") // 脐带
+  umbilicalAbnormal    Json?     @map("umbilical_abnormal") // 脐带异常
+  buttocks             String?   @map("buttocks") // 臀部
+  hepB                 String?   @map("hep_b") // 乙肝疫苗已接种
+  bcg                  String?   @map("bcg") // 卡介苗已接种
+  vaccineReason        String?   @map("vaccine_reason") // 未接种原因
+  jaundiceForehead     Float?    @map("jaundice_forehead") // 黄疸值-前额
+  jaundiceCanthus      Float?    @map("jaundice_canthus") // 黄疸值-眼角
+  jaundiceChest        Float?    @map("jaundice_chest") // 黄疸值-前胸
+  pku                  String?   @map("pku") // PKU足底血已采
+  pkuReason            String?   @map("pku_reason") // 未采原因
+  feedingMethod        String?   @map("feeding_method") // 喂养方式
+  formulaMl            Int?      @map("formula_ml") // 人工喂养每次奶量
+  feedingStatus        String?   @map("feeding_status") // 吃奶情况
+  feedingIssues        Json?     @map("feeding_issues") // 吐奶/呛奶
+  specialNotes         String?   @map("special_notes") @db.Text // 特殊情况
+  assessorName         String?   @map("assessor_name") // 评估人员
+  responsibleNurseName String?   @map("responsible_nurse_name") // 责护
+  clientSignerName     String?   @map("client_signer_name") // 宝妈或家属签字
+  assessedAt           DateTime? @map("assessed_at") @db.Date // 评估日期
+  createdBy            String    @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  version              Int       @default(0)
+
+  babyProfile BabyProfile   @relation(fields: [babyProfileId], references: [id])
+  document    CareDocument? @relation(fields: [documentId], references: [id])
+
+  @@unique([babyProfileId])
+  @@index([tenantId, storeId])
+  @@map("care_baby_admissions")
+}
+
+/// 妈妈出所健康评估表：一个妈妈档案一份（单次评估，可修改，修改留审计记录）。
+model CareMotherDischarge {
+  id                      String    @id @default(cuid())
+  tenantId                String    @map("tenant_id")
+  storeId                 String    @map("store_id")
+  motherProfileId         String    @map("mother_profile_id")
+  documentId              String?   @map("document_id") // 对应的纸质原件照片（可为空：手工录入时没拍照）
+  // —— 以下是纸质表上的字段（由 care-assessment/assessment-specs.ts 生成）——
+  admissionDate           DateTime? @map("admission_date") @db.Date // 入住日期
+  dischargeDate           DateTime? @map("discharge_date") @db.Date // 出所日期
+  age                     Int?      @map("age") // 年龄
+  temperature             Float?    @map("temperature") // 体温
+  pulse                   Int?      @map("pulse") // 脉搏
+  respiration             Int?      @map("respiration") // 呼吸
+  bpSystolic              Int?      @map("bp_systolic") // 收缩压(高压)
+  bpDiastolic             Int?      @map("bp_diastolic") // 舒张压(低压)
+  heightCm                Float?    @map("height_cm") // 身高
+  weightKg                Float?    @map("weight_kg") // 体重
+  fundus                  String?   @map("fundus") // 子宫恢复
+  fundusFingersBelowNavel Float?    @map("fundus_fingers_below_navel") // 未入盆：脐下几指
+  lochiaAmount            String?   @map("lochia_amount") // 恶露量
+  lochiaColor             String?   @map("lochia_color") // 颜色
+  lochiaProperty          String?   @map("lochia_property") // 性状
+  lochiaOdor              String?   @map("lochia_odor") // 味道
+  woundSite               Json?     @map("wound_site") // 伤口部位
+  woundStatus             Json?     @map("wound_status") // 伤口情况
+  breastStatus            Json?     @map("breast_status") // 乳房
+  leftNipple              Json?     @map("left_nipple") // 左侧乳头
+  rightNipple             Json?     @map("right_nipple") // 右侧乳头
+  milkSecretion           String?   @map("milk_secretion") // 乳汁分泌
+  hemorrhoids             String?   @map("hemorrhoids") // 痔疮
+  hemorrhoidsNote         String?   @map("hemorrhoids_note") // 痔疮说明
+  bowel                   String?   @map("bowel") // 排便情况
+  mentalState             String?   @map("mental_state") // 精神状态
+  edema                   Json?     @map("edema") // 水肿情况
+  otherSpecial            String?   @map("other_special") @db.Text // 其他特殊情况
+  dischargeTips           String?   @map("discharge_tips") @db.Text // 出所温馨提示
+  assessorName            String?   @map("assessor_name") // 评估人员
+  assessedAt              DateTime? @map("assessed_at") @db.Date // 评估日期
+  createdBy               String    @map("created_by")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  version                 Int       @default(0)
+
+  motherProfile MotherProfile @relation(fields: [motherProfileId], references: [id])
+  document      CareDocument? @relation(fields: [documentId], references: [id])
+
+  @@unique([motherProfileId])
+  @@index([tenantId, storeId])
+  @@map("care_mother_discharges")
+}
+
+/// 宝宝出所健康评估表：一个宝宝档案一份（单次评估，可修改，修改留审计记录）。
+model CareBabyDischarge {
+  id                        String    @id @default(cuid())
+  tenantId                  String    @map("tenant_id")
+  storeId                   String    @map("store_id")
+  babyProfileId             String    @map("baby_profile_id")
+  documentId                String?   @map("document_id") // 对应的纸质原件照片（可为空：手工录入时没拍照）
+  // —— 以下是纸质表上的字段（由 care-assessment/assessment-specs.ts 生成）——
+  ageDays                   Int?      @map("age_days") // 日龄
+  admissionDate             DateTime? @map("admission_date") @db.Date // 入所日期
+  dischargeDate             DateTime? @map("discharge_date") @db.Date // 出所日期
+  temperature               Float?    @map("temperature") // 体温
+  respiration               Int?      @map("respiration") // 呼吸
+  admissionLengthCm         Float?    @map("admission_length_cm") // 入所身长
+  dischargeLengthCm         Float?    @map("discharge_length_cm") // 出所身长
+  admissionWeightG          Int?      @map("admission_weight_g") // 入所体重（克）
+  dischargeWeightG          Int?      @map("discharge_weight_g") // 出所体重（克）
+  admissionHeadCm           Float?    @map("admission_head_cm") // 入所头围
+  dischargeHeadCm           Float?    @map("discharge_head_cm") // 出所头围
+  admissionJaundiceForehead Float?    @map("admission_jaundice_forehead") // 入所黄疸-前额
+  admissionJaundiceCanthus  Float?    @map("admission_jaundice_canthus") // 入所黄疸-眼角
+  admissionJaundiceChest    Float?    @map("admission_jaundice_chest") // 入所黄疸-前胸
+  dischargeJaundiceForehead Float?    @map("discharge_jaundice_forehead") // 出所黄疸-前额
+  dischargeJaundiceCanthus  Float?    @map("discharge_jaundice_canthus") // 出所黄疸-眼角
+  dischargeJaundiceChest    Float?    @map("discharge_jaundice_chest") // 出所黄疸-前胸
+  rash                      String?   @map("rash") // 皮疹
+  redButtocks               String?   @map("red_buttocks") // 红臀
+  headFinding               String?   @map("head_finding") // 头部
+  face                      String?   @map("face") // 面部
+  sclera                    String?   @map("sclera") // 巩膜
+  eyeSecretion              String?   @map("eye_secretion") // 眼部分泌物
+  ear                       String?   @map("ear") // 耳部
+  earNote                   String?   @map("ear_note") // 耳部其他
+  oralCavity                String?   @map("oral_cavity") // 口腔
+  mucosa                    String?   @map("mucosa") // 粘膜
+  throat                    String?   @map("throat") // 咽
+  tongue                    String?   @map("tongue") // 舌
+  neck                      String?   @map("neck") // 颈部
+  feedingMethod             String?   @map("feeding_method") // 喂养
+  breastRedSwollen          String?   @map("breast_red_swollen") // 胸部乳房红肿
+  umbilical                 Json?     @map("umbilical") // 脐部
+  umbilicalNote             String?   @map("umbilical_note") // 脐部其他说明
+  testis                    String?   @map("testis") // 男孩：睾丸
+  maleFindings              Json?     @map("male_findings") // 男孩：其他
+  labiaDevelopment          String?   @map("labia_development") // 女孩：阴蒂阴唇发育
+  vaginalDischarge          String?   @map("vaginal_discharge") // 女孩：阴道分泌物
+  urethraOpening            String?   @map("urethra_opening") // 女孩：尿道口
+  otherMalformation         String?   @map("other_malformation") // 其他畸形
+  anus                      String?   @map("anus") // 肛门
+  anusNote                  String?   @map("anus_note") // 肛门说明
+  spineLimbs                String?   @map("spine_limbs") // 脊柱四肢
+  spineLimbsNote            String?   @map("spine_limbs_note") // 脊柱四肢说明
+  dischargeTips             String?   @map("discharge_tips") @db.Text // 出所温馨提示
+  assessorName              String?   @map("assessor_name") // 护理师
+  clientSignerName          String?   @map("client_signer_name") // 宝妈或家属签字
+  assessedAt                DateTime? @map("assessed_at") @db.Date // 评估日期
+  createdBy                 String    @map("created_by")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+  version                   Int       @default(0)
+
+  babyProfile BabyProfile   @relation(fields: [babyProfileId], references: [id])
+  document    CareDocument? @relation(fields: [documentId], references: [id])
+
+  @@unique([babyProfileId])
+  @@index([tenantId, storeId])
+  @@map("care_baby_discharges")
+}
+
+/// 日常护理记录（妈妈那一栏）：一个妈妈档案每天一条，住几天就有几条。字段见 care-daily/daily-specs.ts。
+model CareDailyRecord {
+  id                 String   @id @default(cuid())
+  tenantId           String   @map("tenant_id")
+  storeId            String   @map("store_id")
+  motherProfileId    String   @map("mother_profile_id")
+  recordDate         DateTime @map("record_date") @db.Date
+  stayDay            Int?     @map("stay_day") // 入住第几天（创建时按入住日算出，可改）
+  documentId         String?  @map("document_id") // 纸质原件照片（可为空）
+  motherTemperature  Float?   @map("mother_temperature") // 体温
+  motherPulse        Int?     @map("mother_pulse") // 脉搏
+  motherBpSystolic   Int?     @map("mother_bp_systolic") // 收缩压(高压)
+  motherBpDiastolic  Int?     @map("mother_bp_diastolic") // 舒张压(低压)
+  breast             Json?    @map("breast") // 乳房
+  breastBody         Json?    @map("breast_body") // 乳体
+  milk               String?  @map("milk") // 乳汁
+  woundCesarean      Json?    @map("wound_cesarean") // 剖宫产伤口
+  woundVaginal       Json?    @map("wound_vaginal") // 顺产伤口
+  lochiaStatus       String?  @map("lochia_status") // 恶露状态
+  lochiaColor        String?  @map("lochia_color") // 恶露颜色
+  lochiaAmount       String?  @map("lochia_amount") // 恶露量
+  lochiaOdor         String?  @map("lochia_odor") // 恶露气味
+  bowel              String?  @map("bowel") // 大便
+  urine              String?  @map("urine") // 小便
+  motherPlan         String?  @map("mother_plan") @db.Text // 妈妈护理计划
+  motherNurseName    String?  @map("mother_nurse_name") // 护理师签字（产妇）
+  motherClientSigner String?  @map("mother_client_signer") // 客户签字（产妇）
+  createdBy          String   @map("created_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  version            Int      @default(0)
+
+  motherProfile MotherProfile           @relation(fields: [motherProfileId], references: [id])
+  document      CareDocument?           @relation("DailyRecordDocument", fields: [documentId], references: [id])
+  babies        CareDailyBabyRecord[]
+  signatures    CareDailySignature[]
+  confirmations CareDailyConfirmation[]
+
+  @@unique([motherProfileId, recordDate])
+  @@index([tenantId, storeId, recordDate])
+  @@map("care_daily_records")
+}
+
+enum CareSignShift {
+  DAY // 白班
+  NIGHT // 夜班
+  RELIEF // 替班/支援
+}
+
+enum CareConfirmMethod {
+  SIGNATURE // 客户手写签名
+  BUTTON // 客户点击确认（需长按 + 本人手机号后四位核验）
+}
+
+/// 日常护理记录的护理师签字：谁（账号）、哪个班次、什么时间、签字时的内容指纹。
+/// 一个妈妈一天可以有多位护理师各签一条（1对多服务、早晚班不同人、替班都支持）；
+/// 只能用自己的账号签自己的字，签字图取签字当时的快照。内容签字后被改动 → contentHash 对不上 → 页面提示“需重新签字”。
+model CareDailySignature {
+  id             String        @id @default(cuid())
+  tenantId       String        @map("tenant_id")
+  storeId        String        @map("store_id")
+  dailyRecordId  String        @map("daily_record_id")
+  shift          CareSignShift
+  nurseAccountId String        @map("nurse_account_id")
+  nurseName      String        @map("nurse_name") // 签字时的姓名快照
+  signatureData  String?       @map("signature_data") @db.MediumText // 签字时的签名图快照
+  contentHash    String        @map("content_hash") @db.VarChar(64)
+  signedAt       DateTime      @default(now()) @map("signed_at")
+  ip             String?
+  deviceId       String?       @map("device_id") @db.VarChar(64)
+
+  dailyRecord  CareDailyRecord @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  nurseAccount Account         @relation(fields: [nurseAccountId], references: [id])
+
+  @@unique([dailyRecordId, nurseAccountId])
+  @@index([tenantId, nurseAccountId])
+  @@map("care_daily_signatures")
+}
+
+/// 发给客户的“护理记录确认”链接（客户用手机打开，不用登录）。链接本身只存哈希；7 天有效；
+/// 打开后要先输入登记手机号后四位核验本人，输错 5 次锁 30 分钟。后期小程序复用同一套接口。
+model CareConfirmLink {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  storeId         String    @map("store_id")
+  motherProfileId String    @map("mother_profile_id")
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt       DateTime  @map("expires_at")
+  createdBy       String    @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  revokedAt       DateTime? @map("revoked_at")
+  failedAttempts  Int       @default(0) @map("failed_attempts")
+  lockedUntil     DateTime? @map("locked_until")
+  openCount       Int       @default(0) @map("open_count")
+  lastOpenedAt    DateTime? @map("last_opened_at")
+
+  motherProfile MotherProfile           @relation(fields: [motherProfileId], references: [id])
+  confirmations CareDailyConfirmation[]
+
+  @@index([tenantId, motherProfileId])
+  @@map("care_confirm_links")
+}
+
+/// 客户对某一天护理记录小结 + 满意度的确认。每次确认一条（内容被改后客户重新确认会再产生一条，取最新）。
+/// 证据：链接、手机号后四位核验通过、IP/设备/浏览器、页面停留时长、长按时长、手写签名图或按钮确认、
+/// 确认当时的内容指纹，以及系统判断的风险标记（如在护理师用过的设备上确认）。
+model CareDailyConfirmation {
+  id            String            @id @default(cuid())
+  tenantId      String            @map("tenant_id")
+  storeId       String            @map("store_id")
+  dailyRecordId String            @map("daily_record_id")
+  linkId        String            @map("link_id")
+  batchId       String            @map("batch_id") @db.VarChar(40) // 一次点“确认”提交的多天共用一个
+  method        CareConfirmMethod
+  signatureData String?           @map("signature_data") @db.MediumText
+  satisfaction  Int // 当天整体满意度 1~5
+  /// 对当班各位护理师的评价：[{signatureId, nurseAccountId, nurseName, shift, score}]
+  nurseRatings  Json?             @map("nurse_ratings")
+  comment       String?           @db.VarChar(500)
+  contentHash   String            @map("content_hash") @db.VarChar(64)
+  confirmedAt   DateTime          @default(now()) @map("confirmed_at")
+  ip            String?
+  userAgent     String?           @map("user_agent") @db.VarChar(300)
+  deviceId      String?           @map("device_id") @db.VarChar(64)
+  dwellMs       Int               @map("dwell_ms") // 从看到内容到点确认的时长（服务器计时）
+  holdMs        Int?              @map("hold_ms") // 长按确认键的时长（客户端上报）
+  riskFlags     Json?             @map("risk_flags") // 如 ["STAFF_DEVICE"]
+
+  dailyRecord CareDailyRecord @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  link        CareConfirmLink @relation(fields: [linkId], references: [id])
+
+  @@index([dailyRecordId, confirmedAt])
+  @@index([deviceId])
+  @@map("care_daily_confirmations")
+}
+
+/// 员工登录过的设备（浏览器本地生成的随机设备号）。用来识别“客户确认是不是在护理师自己的手机上点的”。
+model StaffDevice {
+  id          String   @id @default(cuid())
+  accountId   String   @map("account_id")
+  deviceId    String   @map("device_id") @db.VarChar(64)
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  lastIp      String?  @map("last_ip")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, deviceId])
+  @@index([deviceId])
+  @@map("staff_devices")
+}
+
+/// 日常护理记录里每个宝宝的那一栏（多胞胎每个宝宝一条）。
+model CareDailyBabyRecord {
+  id                String   @id @default(cuid())
+  tenantId          String   @map("tenant_id")
+  storeId           String   @map("store_id")
+  dailyRecordId     String   @map("daily_record_id")
+  babyProfileId     String   @map("baby_profile_id")
+  documentId        String?  @map("document_id")
+  ageDays           Int?     @map("age_days") // 出生天数
+  weightG           Int?     @map("weight_g") // 宝宝体重（克）
+  lengthCm          Float?   @map("length_cm") // 宝宝身长（选填，进生长曲线）
+  headCm            Float?   @map("head_cm") // 宝宝头围（选填，进生长曲线）
+  tempMorning       Float?   @map("temp_morning") // 体温(早)
+  tempEvening       Float?   @map("temp_evening") // 体温(晚)
+  eye               Json?    @map("eye") // 眼
+  mouth             Json?    @map("mouth") // 口
+  nose              Json?    @map("nose") // 鼻
+  umbilical         Json?    @map("umbilical") // 脐带
+  genitalia         Json?    @map("genitalia") // 生殖器
+  skin              Json?    @map("skin") // 皮肤
+  healthAssessment  String?  @map("health_assessment") // 健康评估
+  jaundiceForehead  Float?   @map("jaundice_forehead") // 黄疸-前额
+  jaundiceCanthus   Float?   @map("jaundice_canthus") // 黄疸-眼角
+  jaundiceChest     Float?   @map("jaundice_chest") // 黄疸-前胸
+  babyPlan          String?  @map("baby_plan") @db.Text // 宝宝护理计划
+  dayShiftSummary   String?  @map("day_shift_summary") @db.Text // 白班护理总结
+  nightShiftSummary String?  @map("night_shift_summary") @db.Text // 夜班护理总结
+  dayNurseName      String?  @map("day_nurse_name") // 护理师签字（白班）
+  nightNurseName    String?  @map("night_nurse_name") // 护理师签字（夜班）
+  babyClientSigner  String?  @map("baby_client_signer") // 客户签字（白班）
+  nightClientSigner String?  @map("night_client_signer") // 客户签字（夜班）
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  version           Int      @default(0)
+
+  dailyRecord CareDailyRecord    @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  babyProfile BabyProfile        @relation(fields: [babyProfileId], references: [id])
+  document    CareDocument?      @relation("DailyBabyRecordDocument", fields: [documentId], references: [id])
+  feedings    CareFeedingEntry[]
+  nursings    CareNursingEntry[]
+
+  @@unique([dailyRecordId, babyProfileId])
+  @@index([babyProfileId])
+  @@map("care_daily_baby_records")
+}
+
+/// 24 小时宝宝喂养记录单的一行（一次喂养/排泄）。
+model CareFeedingEntry {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  babyDailyId    String   @map("baby_daily_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+  time           String?  @map("time") // 时间
+  directFeedMin  Int?     @map("direct_feed_min") // 亲喂(分钟)
+  breastMilkMl   Int?     @map("breast_milk_ml") // 母乳(ml)
+  formulaMl      Int?     @map("formula_ml") // 奶粉(ml)
+  medication     String?  @map("medication") // 药名（药物记录）
+  medicationDose String?  @map("medication_dose") // 剂量（药物记录）
+  waterMl        Int?     @map("water_ml") // 喂水(ml)
+  urine          String?  @map("urine") // 小便
+  stool          String?  @map("stool") // 大便
+  stoolColor     String?  @map("stool_color") // 大便颜色
+  stoolAmount    String?  @map("stool_amount") // 大便量
+  stoolTexture   String?  @map("stool_texture") // 大便性状
+  nurseName      String?  @map("nurse_name") // 责护签字
+  remark         String?  @map("remark") // 备注
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  babyDaily CareDailyBabyRecord @relation(fields: [babyDailyId], references: [id], onDelete: Cascade)
+
+  @@index([babyDailyId])
+  @@map("care_feeding_entries")
+}
+
+/// 新生儿 24 小时护理记录的一行（晨护/脐带护理/皮肤护理/臀部护理/面部护理打勾=已做，其他项手写）
+model CareNursingEntry {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  babyDailyId   String   @map("baby_daily_id")
+  sortOrder     Int      @default(0) @map("sort_order")
+  time          String?  @map("time")
+  morningCare   String?  @map("morning_care")
+  cordCare      String?  @map("cord_care")
+  skinCare      String?  @map("skin_care")
+  jaundicePatch String?  @map("jaundice_patch") // 已取消该项，旧数据保留
+  hipCare       String?  @map("hip_care")
+  faceCare      String?  @map("face_care")
+  swimming      String?  @map("swimming")
+  bathing       String?  @map("bathing")
+  massage       String?  @map("massage")
+  earlyEdu      String?  @map("early_edu")
+  otherCare     String?  @map("other_care")
+  nurseName     String?  @map("nurse_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  babyDaily CareDailyBabyRecord @relation(fields: [babyDailyId], references: [id], onDelete: Cascade)
+
+  @@index([babyDailyId])
+  @@map("care_nursing_entries")
+}
+
+enum CareMedicationStatus {
+  /// 当前有效的委托
+  ACTIVE
+  /// 已被一份新的变更委托替换（历史保留）
+  SUPERSEDED
+  /// 已停药
+  STOPPED
+}
+
+/// 新生儿用药服药喂药委托书：家长委托护理师给宝宝按要求服药。一份委托书一条记录（含多种药品行），
+/// 住店期间病情变化需要调整时新签一份（previousAuthId 指向上一份，旧的自动变成"已替换"），
+/// 这样每一次委托的内容、家属签字（原件照片）都完整保留，用来分清责任。
+model CareMedicationAuth {
+  id              String               @id @default(cuid())
+  tenantId        String               @map("tenant_id")
+  storeId         String               @map("store_id")
+  motherProfileId String               @map("mother_profile_id")
+  babyProfileId   String               @map("baby_profile_id")
+  previousAuthId  String?              @map("previous_auth_id")
+  status          CareMedicationStatus @default(ACTIVE)
+  authDate        DateTime?            @map("auth_date") @db.Date // 委托日期
+  medicationStart DateTime?            @map("medication_start") @db.Date // 用药日期
+  signerName      String?              @map("signer_name") // 宝妈或家属签字（姓名）
+  nurseName       String?              @map("nurse_name") // 护理师签字（姓名）
+  changeNote      String?              @map("change_note") @db.Text // 这一份相对上一份变了什么
+  remark          String?              @db.Text
+  stoppedAt       DateTime?            @map("stopped_at")
+  stoppedBy       String?              @map("stopped_by")
+  stopNote        String?              @map("stop_note") @db.Text
+  documentId      String?              @map("document_id") // 家属签字的纸质原件照片
+  createdBy       String               @map("created_by")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  version         Int                  @default(0)
+
+  motherProfile MotherProfile        @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile          @relation(fields: [babyProfileId], references: [id])
+  previous      CareMedicationAuth?  @relation("MedicationChain", fields: [previousAuthId], references: [id])
+  next          CareMedicationAuth[] @relation("MedicationChain")
+  document      CareDocument?        @relation("MedicationAuthDocument", fields: [documentId], references: [id])
+  items         CareMedicationItem[]
+
+  @@index([tenantId, babyProfileId, status])
+  @@index([tenantId, motherProfileId])
+  @@map("care_medication_auths")
+}
+
+/// 委托书里的一行药品。
+model CareMedicationItem {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  authId       String    @map("auth_id")
+  sortOrder    Int       @default(0) @map("sort_order")
+  drugName     String    @map("drug_name")
+  route        String? // ORAL 内服 / EXTERNAL 外用
+  times        Json? // ["MORNING","NOON","EVENING"]
+  dose         String? // 剂量（纸质表上没有这一栏，系统里补）
+  courseDays   Int?      @map("course_days") // 疗程天数
+  startDate    DateTime? @map("start_date") @db.Date
+  endDate      DateTime? @map("end_date") @db.Date
+  notes        String?   @db.Text // 用药注意事项（饭前饭后、间隔时长等）
+  familySigned String?   @map("family_signed") // 家长签名栏是否已签：YES
+
+  auth CareMedicationAuth @relation(fields: [authId], references: [id], onDelete: Cascade)
+
+  @@index([authId])
+  @@map("care_medication_items")
+}
+
+enum CareLevel {
+  LEVEL1 // 一级（重点）
+  LEVEL2 // 二级
+  LEVEL3 // 三级（常规）
+}
+
+enum CarePlanVersionStatus {
+  DRAFT // 护理长编辑中
+  PENDING_REVIEW // 已提交，等护理主任审核
+  ACTIVE // 当前生效的版本
+  SUPERSEDED // 已被新版本替换（历史只读）
+  REJECTED // 被驳回，等修改后再提交
+}
+
+enum CarePlanSource {
+  INITIAL // 入所首次制定
+  REGULAR_REVIEW // 每 7 天的定期评审（护理长）
+  DIRECTOR_ROUND // 护理主任查房时调整
+}
+
+/// 个人化护理计划（版本制）：入所评估后由护理长制定，护理主任审核后生效；之后每 7 天护理长评审一次
+/// （写上阶段执行结果 + 调整后的新计划），护理主任查房可随时调整。每次调整都是一个新版本，
+/// 旧版本只读保留，完整记录"护理计划是怎么一步步调整的"。babyProfileId 为空表示妈妈的计划，
+/// 有值表示这个宝宝的计划；同一个对象同一时间只有一个 ACTIVE 版本（应用层保证）。
+/// 注意：和旧的按模板生成任务的 CarePlan 是两回事，旧的保留不动。
+model CarePlanVersion {
+  id                String                @id @default(cuid())
+  tenantId          String                @map("tenant_id")
+  storeId           String                @map("store_id")
+  motherProfileId   String                @map("mother_profile_id")
+  babyProfileId     String?               @map("baby_profile_id")
+  versionNo         Int                   @map("version_no")
+  status            CarePlanVersionStatus @default(DRAFT)
+  level             CareLevel
+  source            CarePlanSource        @default(INITIAL)
+  assessmentSummary String?               @map("assessment_summary") @db.Text // 评估依据/当前主要问题
+  focusPoints       String?               @map("focus_points") @db.Text // 重点关注（护理看板“医嘱”取这里）
+  measures          Json? // 具体措施 [{title, content, frequency}]
+  progressNote      String?               @map("progress_note") @db.Text // 上阶段执行结果（评审时写）
+  adjustReason      String?               @map("adjust_reason") @db.Text // 调整原因
+  previousVersionId String?               @map("previous_version_id")
+  createdBy         String                @map("created_by")
+  createdByName     String?               @map("created_by_name")
+  submittedAt       DateTime?             @map("submitted_at")
+  reviewerId        String?               @map("reviewer_id")
+  reviewerName      String?               @map("reviewer_name")
+  reviewedAt        DateTime?             @map("reviewed_at")
+  reviewComment     String?               @map("review_comment") @db.Text
+  effectiveAt       DateTime?             @map("effective_at")
+  nextReviewDue     DateTime?             @map("next_review_due") @db.Date
+  endedAt           DateTime?             @map("ended_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  version           Int                   @default(0)
+
+  motherProfile MotherProfile @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile?  @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, motherProfileId, status])
+  @@index([tenantId, status, nextReviewDue])
+  @@map("care_plan_versions")
+}
+
+/// 服务执行记录：对应纸质《产妇常规护理计划》——会阴护理、理疗、按摩子宫、各类查房、中药洗头泡脚、床品更换，
+/// 以及宣教项目（带护理员/客户签名）每做一次记一条；"共 N 次"由系统数出来，不用手填。
+/// serviceCode 见 care-plan-version/care-standards.ts；宝宝的项目带 babyProfileId。
+model CareServiceLog {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  storeId         String   @map("store_id")
+  motherProfileId String   @map("mother_profile_id")
+  babyProfileId   String?  @map("baby_profile_id")
+  serviceCode     String   @map("service_code")
+  doneDate        DateTime @map("done_date") @db.Date
+  doneTime        String?  @map("done_time") @db.VarChar(5) // 做的时间 HH:mm（旧记录没有）
+  systolic        Int? // 测量类项目：收缩压 mmHg（产妇血压）
+  diastolic       Int? // 舒张压 mmHg
+  heartRate       Int?     @map("heart_rate") // 心率 次/分（测血压时一起测）
+  weightKg        Decimal? @map("weight_kg") @db.Decimal(5, 2) // 测量类项目：体重 kg（产妇体重）
+  doneByName      String?  @map("done_by_name") // 护理员/查房人
+  clientSigned    Boolean  @default(false) @map("client_signed") // 客户已签字（宣教项目）
+  note            String?
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  motherProfile MotherProfile @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile?  @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, motherProfileId, serviceCode])
+  @@map("care_service_logs")
+}
+
+enum CarePlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+/// 护理计划：motherProfileId/babyProfileId 二选一（应用层保证，Prisma 无数据库级 XOR 约束）。
+/// 激活时按 CarePlanTemplateItem 批量生成 CarePlanTask（每日任务卡片）。
+model CarePlan {
+  id              String         @id @default(cuid())
+  tenantId        String         @map("tenant_id")
+  storeId         String         @map("store_id")
+  planNo          String         @map("plan_no")
+  planTemplateId  String         @map("plan_template_id")
+  motherProfileId String?        @map("mother_profile_id")
+  babyProfileId   String?        @map("baby_profile_id")
+  startDate       DateTime       @map("start_date") // 通常=入住日，方案第1天对应此日期
+  status          CarePlanStatus @default(DRAFT)
+  terminateReason String?        @map("terminate_reason") @db.Text
+  createdBy       String         @map("created_by")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  version         Int            @default(0)
+
+  store         Store            @relation(fields: [storeId], references: [id])
+  planTemplate  CarePlanTemplate @relation(fields: [planTemplateId], references: [id])
+  motherProfile MotherProfile?   @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile?     @relation(fields: [babyProfileId], references: [id])
+  tasks         CarePlanTask[]
+
+  @@unique([tenantId, planNo])
+  @@index([tenantId, motherProfileId])
+  @@index([tenantId, babyProfileId])
+  @@map("care_plans")
+}
+
+enum CarePlanTaskStatus {
+  PENDING
+  COMPLETED
+  MISSED
+}
+
+/// 每日任务卡片：由 CarePlan 激活时按模板批量生成。careRecordId 在任务完成（护理记录提交）时回填。
+model CarePlanTask {
+  id             String             @id @default(cuid())
+  carePlanId     String             @map("care_plan_id")
+  dayOffset      Int                @map("day_offset")
+  scheduledDate  DateTime           @map("scheduled_date")
+  formTemplateId String             @map("form_template_id")
+  status         CarePlanTaskStatus @default(PENDING)
+  careRecordId   String?            @unique @map("care_record_id")
+
+  carePlan     CarePlan         @relation(fields: [carePlanId], references: [id])
+  formTemplate CareFormTemplate @relation(fields: [formTemplateId], references: [id])
+  careRecord   CareRecord?      @relation("TaskCareRecord", fields: [careRecordId], references: [id])
+
+  @@index([carePlanId, scheduledDate])
+  @@map("care_plan_tasks")
+}
+
+// ==================== 离店后关怀跟踪（P5"会员体系/大健康延伸"切片，见业务规则确认记录"离店后关怀跟踪模块实现中"） ====================
+// 具体关怀节点的天数/内容不由AI预设，只搭建可配置框架；由店长/护理人员手动为已离店的妈妈档案生成计划
+// （不随房态离店流程自动触发），是结构上完全独立于CarePlan(住院期间护理方案)的运营型回访工具。
+
+enum CareOutreachPlanStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+enum CareOutreachTaskStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+/// 关怀模板：总部统一定义关怀节点框架，同 care.plan-template/care.form-template 口径仅
+/// SUPER_ADMIN维护。具体第几天提醒什么内容由用户/护理团队自行配置，不预设任何医学随访规则。
+model CareOutreachTemplate {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  items CareOutreachTemplateItem[]
+  plans CareOutreachPlan[]
+
+  @@unique([tenantId, code])
+  @@map("care_outreach_templates")
+}
+
+model CareOutreachTemplateItem {
+  id         String  @id @default(cuid())
+  templateId String  @map("template_id")
+  dayOffset  Int     @map("day_offset") // 离店日之后第几天，0=离店当天
+  title      String
+  content    String? @db.Text // 提醒要点/话术，自由文本，由用户/护理团队自行填写
+
+  template CareOutreachTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, dayOffset, title])
+  @@map("care_outreach_template_items")
+}
+
+/// 关怀计划：由店长/护理人员在母婴档案页手动选择模板生成（不随RoomOccupancy离店流程自动
+/// 触发，避免侵入已充分测试的核心状态机，也便于按客户情况灵活选择模板）。
+model CareOutreachPlan {
+  id              String                 @id @default(cuid())
+  tenantId        String                 @map("tenant_id")
+  storeId         String                 @map("store_id")
+  planNo          String                 @map("plan_no")
+  templateId      String                 @map("template_id")
+  motherProfileId String                 @map("mother_profile_id")
+  checkedOutAt    DateTime               @map("checked_out_at") // 生成计划时锚定的离店日期，节点日期=此日期+dayOffset天
+  status          CareOutreachPlanStatus @default(ACTIVE)
+  terminateReason String?                @map("terminate_reason") @db.Text
+  createdBy       String                 @map("created_by")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  version         Int                    @default(0)
+
+  store         Store                @relation(fields: [storeId], references: [id])
+  template      CareOutreachTemplate @relation(fields: [templateId], references: [id])
+  motherProfile MotherProfile        @relation(fields: [motherProfileId], references: [id])
+  tasks         CareOutreachTask[]
+
+  @@unique([tenantId, planNo])
+  @@index([tenantId, motherProfileId])
+  @@map("care_outreach_plans")
+}
+
+/// 关怀任务：完成方式是简单打卡+备注（同AiSuggestion.accept/dismiss模式），不复用
+/// CareFormTemplate/CareRecord的结构化临床记录引擎——回访提醒与住院期间规范化护理记录性质不同。
+model CareOutreachTask {
+  id             String                 @id @default(cuid())
+  tenantId       String                 @map("tenant_id")
+  storeId        String                 @map("store_id")
+  planId         String                 @map("plan_id")
+  dayOffset      Int                    @map("day_offset")
+  scheduledDate  DateTime               @map("scheduled_date")
+  title          String
+  content        String?                @db.Text
+  status         CareOutreachTaskStatus @default(PENDING)
+  completedById  String?                @map("completed_by_id")
+  completedAt    DateTime?              @map("completed_at")
+  completionNote String?                @map("completion_note") @db.Text
+
+  plan        CareOutreachPlan @relation(fields: [planId], references: [id])
+  completedBy Account?         @relation(fields: [completedById], references: [id])
+  store       Store            @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, planId])
+  @@index([tenantId, storeId, scheduledDate])
+  @@map("care_outreach_tasks")
+}
+
+/// 护理执行记录：一旦提交不可编辑（原记录不可变）。当天遗漏的记录通过"补录"提交
+/// （isBackfilled=true 且必须填 backfillReason）；对已提交记录的修正通过"更正"提交一条
+/// 新记录（correctionOfId 指向原记录），原记录保留、新增更正记录，配合 AuditLog 留痕
+/// （业务规则确认记录#7）。values 是字段值的快照（{fieldCode: value}），字段定义变更
+/// 不影响历史记录内容。
+model CareRecord {
+  id              String         @id @default(cuid())
+  tenantId        String         @map("tenant_id")
+  storeId         String         @map("store_id")
+  recordNo        String         @map("record_no")
+  formTemplateId  String         @map("form_template_id")
+  targetType      CareTargetType @map("target_type")
+  motherProfileId String?        @map("mother_profile_id")
+  babyProfileId   String?        @map("baby_profile_id")
+  occurredAt      DateTime       @map("occurred_at") // 护理行为实际发生时间（如所属班次时段）
+  values          Json // {fieldCode: value} 快照
+  isBackfilled    Boolean        @default(false) @map("is_backfilled")
+  backfillReason  String?        @map("backfill_reason") @db.Text
+  correctionOfId  String?        @map("correction_of_id")
+  submittedBy     String         @map("submitted_by")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  store         Store             @relation(fields: [storeId], references: [id])
+  formTemplate  CareFormTemplate  @relation(fields: [formTemplateId], references: [id])
+  motherProfile MotherProfile?    @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile?      @relation(fields: [babyProfileId], references: [id])
+  correctionOf  CareRecord?       @relation("RecordCorrection", fields: [correctionOfId], references: [id])
+  corrections   CareRecord[]      @relation("RecordCorrection")
+  planTask      CarePlanTask?     @relation("TaskCareRecord")
+  abnormalities CareAbnormality[]
+
+  @@unique([tenantId, recordNo])
+  @@index([tenantId, motherProfileId])
+  @@index([tenantId, babyProfileId])
+  @@map("care_records")
+}
+
+enum CareAbnormalityStatus {
+  OPEN
+  FOLLOWING
+  RESOLVED
+  IGNORED
+}
+
+/// 护理异常：由 CareRecord 提交时按字段定义的正常值域自动生成（单档判定，不做多级严重度，
+/// 业务规则确认记录#7）。跟进复用平台通用的 FollowUpRecord（businessType='CARE_ABNORMALITY'），
+/// 不新建独立跟进表。状态机：OPEN -> FOLLOWING -> RESOLVED；OPEN/FOLLOWING -> IGNORED。
+model CareAbnormality {
+  id              String                @id @default(cuid())
+  tenantId        String                @map("tenant_id")
+  storeId         String                @map("store_id")
+  careRecordId    String                @map("care_record_id")
+  fieldId         String                @map("field_id")
+  targetType      CareTargetType        @map("target_type")
+  motherProfileId String?               @map("mother_profile_id")
+  babyProfileId   String?               @map("baby_profile_id")
+  occurredAt      DateTime              @map("occurred_at")
+  fieldValue      Json                  @map("field_value") // 触发异常的原始值快照
+  status          CareAbnormalityStatus @default(OPEN)
+  resolvedBy      String?               @map("resolved_by")
+  resolvedAt      DateTime?             @map("resolved_at")
+  resolveNote     String?               @map("resolve_note") @db.Text
+  createdBy       String                @map("created_by")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  version         Int                   @default(0)
+
+  store         Store               @relation(fields: [storeId], references: [id])
+  careRecord    CareRecord          @relation(fields: [careRecordId], references: [id])
+  field         CareFieldDefinition @relation(fields: [fieldId], references: [id])
+  motherProfile MotherProfile?      @relation(fields: [motherProfileId], references: [id])
+  babyProfile   BabyProfile?        @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, motherProfileId])
+  @@index([tenantId, babyProfileId])
+  @@map("care_abnormalities")
+}
+
+// ==================== 住店运营细化（呼叫/外出/客房服务领用） ====================
+
+enum RoomCallStatus {
+  PENDING
+  HANDLED
+}
+
+model RoomCall {
+  id          String         @id @default(cuid())
+  tenantId    String         @map("tenant_id")
+  storeId     String         @map("store_id")
+  occupancyId String         @map("occupancy_id")
+  reason      String
+  status      RoomCallStatus @default(PENDING)
+  calledAt    DateTime       @default(now()) @map("called_at")
+  handledAt   DateTime?      @map("handled_at")
+  handledBy   String?        @map("handled_by")
+  remark      String?        @db.Text
+  createdBy   String         @map("created_by")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  store     Store         @relation(fields: [storeId], references: [id])
+  occupancy RoomOccupancy @relation(fields: [occupancyId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("room_calls")
+}
+
+enum RoomOutingStatus {
+  PLANNED
+  OUT
+  RETURNED
+  CANCELLED
+}
+
+/// 外出管理：PLANNED -(签出)-> OUT -(签回)-> RETURNED；PLANNED -> CANCELLED。
+model RoomOuting {
+  id            String           @id @default(cuid())
+  tenantId      String           @map("tenant_id")
+  storeId       String           @map("store_id")
+  occupancyId   String           @map("occupancy_id")
+  plannedOutAt  DateTime         @map("planned_out_at")
+  plannedBackAt DateTime         @map("planned_back_at")
+  actualOutAt   DateTime?        @map("actual_out_at")
+  actualBackAt  DateTime?        @map("actual_back_at")
+  riskNote      String?          @map("risk_note") @db.Text
+  status        RoomOutingStatus @default(PLANNED)
+  cancelReason  String?          @map("cancel_reason") @db.Text
+  createdBy     String           @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  version       Int              @default(0)
+
+  store     Store         @relation(fields: [storeId], references: [id])
+  occupancy RoomOccupancy @relation(fields: [occupancyId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("room_outings")
+}
+
+enum RoomRequisitionStatus {
+  REQUESTED
+  FULFILLED
+}
+
+/// 客房服务领用：本期不接库存域（P3 才有真实进销存单据），itemName 为自由文本登记，
+/// 不与任何库存表联动扣减，待 P3 库存域落地后再补出库单联动。
+model RoomServiceRequisition {
+  id          String                @id @default(cuid())
+  tenantId    String                @map("tenant_id")
+  storeId     String                @map("store_id")
+  occupancyId String                @map("occupancy_id")
+  itemName    String                @map("item_name")
+  quantity    Int                   @default(1)
+  status      RoomRequisitionStatus @default(REQUESTED)
+  requestedAt DateTime              @default(now()) @map("requested_at")
+  fulfilledAt DateTime?             @map("fulfilled_at")
+  fulfilledBy String?               @map("fulfilled_by")
+  remark      String?               @db.Text
+  createdBy   String                @map("created_by")
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  store     Store         @relation(fields: [storeId], references: [id])
+  occupancy RoomOccupancy @relation(fields: [occupancyId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("room_service_requisitions")
+}
+
+// ==================== 月子餐（膳食域） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.6 节。
+// 预算→采购/出库联动（与库存打通）本期不做，待 P3 库存域落地后再接入。
+
+enum MealPlanType {
+  MONTH_MEAL // 月子餐
+  MINI_MONTH // 小月子
+  TRIAL // 试吃
+  DELIVERY // 外送餐
+  VIP
+}
+
+enum MealSlot {
+  BREAKFAST
+  MORNING_SNACK
+  LUNCH
+  AFTERNOON_SNACK
+  DINNER
+  NIGHT_SNACK
+}
+
+/// 膳食计划模板：phases 仅作阶段化展示用（如"7-7-7-7"对应产褥期分阶段营养需求），
+/// 真正驱动每日排餐的是 MealPlanTemplateItem（dayOffset+slot -> 默认菜品）。
+model MealPlanTemplate {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  code      String
+  name      String
+  planType  MealPlanType @map("plan_type")
+  totalDays Int          @map("total_days")
+  phases    Json? // 展示用：[{name,days}]
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  items         MealPlanTemplateItem[]
+  dinerProfiles DinerProfile[]
+
+  @@unique([tenantId, code])
+  @@map("meal_plan_templates")
+}
+
+/// 菜品：ingredientTags 用于与"食材类禁忌"做冲突匹配（DietaryRestriction.category=INGREDIENT）。
+model MealItem {
+  id             String       @id @default(cuid())
+  tenantId       String       @map("tenant_id")
+  code           String
+  name           String
+  defaultSlot    MealSlot     @map("default_slot")
+  ingredientTags Json? // string[]
+  status         CommonStatus @default(ACTIVE)
+  createdBy      String       @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  version        Int          @default(0)
+
+  planItems           MealPlanTemplateItem[]
+  mealRecordsDefault  MealRecord[]           @relation("DefaultMealItem")
+  mealRecordsSelected MealRecord[]           @relation("SelectedMealItem")
+
+  @@unique([tenantId, code])
+  @@map("meal_items")
+}
+
+model MealPlanTemplateItem {
+  id             String   @id @default(cuid())
+  planTemplateId String   @map("plan_template_id")
+  dayOffset      Int      @map("day_offset")
+  slot           MealSlot
+  mealItemId     String   @map("meal_item_id")
+
+  planTemplate MealPlanTemplate @relation(fields: [planTemplateId], references: [id])
+  mealItem     MealItem         @relation(fields: [mealItemId], references: [id])
+
+  @@unique([planTemplateId, dayOffset, slot])
+  @@map("meal_plan_template_items")
+}
+
+enum DietaryRestrictionCategory {
+  INGREDIENT // 食材类：忌鸡蛋/忌牛肉等
+  MEDICAL // 病理性：妊娠高血压/妊娠糖尿病等
+}
+
+model DietaryRestriction {
+  id        String                     @id @default(cuid())
+  tenantId  String                     @map("tenant_id")
+  code      String
+  name      String
+  category  DietaryRestrictionCategory
+  status    CommonStatus               @default(ACTIVE)
+  createdBy String                     @map("created_by")
+  createdAt DateTime                   @default(now()) @map("created_at")
+  updatedAt DateTime                   @updatedAt @map("updated_at")
+  version   Int                        @default(0)
+
+  dinerRestrictions DinerRestriction[]
+
+  @@unique([tenantId, code])
+  @@map("dietary_restrictions")
+}
+
+enum DinerProfileStatus {
+  ACTIVE
+  ENDED
+}
+
+/// 用膳人：客户绑定膳食计划模板的一段用膳周期，startDate/endDate 由 totalDays 推算。
+/// 创建时按 MealPlanTemplateItem 批量生成 MealRecord（同 CarePlan 生成 CarePlanTask 的模式）。
+model DinerProfile {
+  id                 String             @id @default(cuid())
+  tenantId           String             @map("tenant_id")
+  storeId            String             @map("store_id")
+  customerId         String             @map("customer_id")
+  mealPlanTemplateId String             @map("meal_plan_template_id")
+  occupancyId        String?            @map("occupancy_id")
+  startDate          DateTime           @map("start_date")
+  endDate            DateTime           @map("end_date")
+  status             DinerProfileStatus @default(ACTIVE)
+  createdBy          String             @map("created_by")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  version            Int                @default(0)
+
+  store            Store              @relation(fields: [storeId], references: [id])
+  customer         Customer           @relation(fields: [customerId], references: [id])
+  mealPlanTemplate MealPlanTemplate   @relation(fields: [mealPlanTemplateId], references: [id])
+  occupancy        RoomOccupancy?     @relation(fields: [occupancyId], references: [id])
+  restrictions     DinerRestriction[]
+  mealRecords      MealRecord[]
+
+  @@index([tenantId, customerId])
+  @@map("diner_profiles")
+}
+
+model DinerRestriction {
+  id             String @id @default(cuid())
+  dinerProfileId String @map("diner_profile_id")
+  restrictionId  String @map("restriction_id")
+
+  dinerProfile DinerProfile       @relation(fields: [dinerProfileId], references: [id])
+  restriction  DietaryRestriction @relation(fields: [restrictionId], references: [id])
+
+  @@unique([dinerProfileId, restrictionId])
+  @@map("diner_restrictions")
+}
+
+enum MealRecordStatus {
+  PLANNED
+  SERVED
+  CANCELLED
+}
+
+/// 每日排餐记录：defaultMealItemId 来自方案排期，isCustomSelected 标记客户"自选餐"覆盖了
+/// 默认菜品（早餐/早点不可当日自选、当日9点后不可自选，见 MealRecordService 注释）。
+model MealRecord {
+  id                 String           @id @default(cuid())
+  tenantId           String           @map("tenant_id")
+  storeId            String           @map("store_id")
+  dinerProfileId     String           @map("diner_profile_id")
+  scheduledDate      DateTime         @map("scheduled_date")
+  slot               MealSlot
+  defaultMealItemId  String           @map("default_meal_item_id")
+  isCustomSelected   Boolean          @default(false) @map("is_custom_selected")
+  selectedMealItemId String?          @map("selected_meal_item_id")
+  selectedAt         DateTime?        @map("selected_at")
+  status             MealRecordStatus @default(PLANNED)
+  servedAt           DateTime?        @map("served_at")
+  servedBy           String?          @map("served_by")
+  rating             Int?
+  comment            String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  version            Int              @default(0)
+
+  store            Store        @relation(fields: [storeId], references: [id])
+  dinerProfile     DinerProfile @relation(fields: [dinerProfileId], references: [id])
+  defaultMealItem  MealItem     @relation("DefaultMealItem", fields: [defaultMealItemId], references: [id])
+  selectedMealItem MealItem?    @relation("SelectedMealItem", fields: [selectedMealItemId], references: [id])
+
+  @@index([tenantId, dinerProfileId, scheduledDate])
+  @@map("meal_records")
+}
+
+// ==================== 产康服务（服务域） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.4 节。
+// 本期不做：跨店服务通兑、双销售人分成、优惠审批、物料出库联动——均待后续切片/P3库存域补上。
+
+model ServiceProduct {
+  id              String       @id @default(cuid())
+  tenantId        String       @map("tenant_id")
+  code            String
+  name            String
+  durationMinutes Int?         @map("duration_minutes")
+  unitPrice       Int?         @map("unit_price") // 最小货币单位，可空——仅按套餐消耗、不单卖的项目可不设散卖价
+  status          CommonStatus @default(ACTIVE)
+  createdBy       String       @map("created_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  version         Int          @default(0)
+
+  appointments ServiceAppointment[]
+
+  @@unique([tenantId, code])
+  @@map("service_products")
+}
+
+/// 服务包：购买时不预先绑定具体项目，执行时才临时消耗额度（"按需项目机制"，竞品分析3.4）。
+model ServicePackage {
+  id            String       @id @default(cuid())
+  tenantId      String       @map("tenant_id")
+  code          String
+  name          String
+  totalSessions Int          @map("total_sessions")
+  price         Int // 最小货币单位
+  status        CommonStatus @default(ACTIVE)
+  createdBy     String       @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  version       Int          @default(0)
+
+  customerPackages CustomerServicePackage[]
+
+  @@unique([tenantId, code])
+  @@map("service_packages")
+}
+
+enum CustomerServicePackageStatus {
+  ACTIVE
+  EXHAUSTED
+}
+
+model CustomerServicePackage {
+  id                String                       @id @default(cuid())
+  tenantId          String                       @map("tenant_id")
+  storeId           String                       @map("store_id")
+  customerId        String                       @map("customer_id")
+  packageId         String                       @map("package_id")
+  remainingSessions Int                          @map("remaining_sessions")
+  amount            Int
+  status            CustomerServicePackageStatus @default(ACTIVE)
+  purchasedAt       DateTime                     @default(now()) @map("purchased_at")
+  createdBy         String                       @map("created_by")
+  createdAt         DateTime                     @default(now()) @map("created_at")
+  updatedAt         DateTime                     @updatedAt @map("updated_at")
+  version           Int                          @default(0)
+
+  store        Store                @relation(fields: [storeId], references: [id])
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  package      ServicePackage       @relation(fields: [packageId], references: [id])
+  appointments ServiceAppointment[]
+
+  @@index([tenantId, customerId])
+  @@map("customer_service_packages")
+}
+
+model Therapist {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  storeId   String       @map("store_id")
+  name      String
+  phone     String?
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  store        Store                @relation(fields: [storeId], references: [id])
+  appointments ServiceAppointment[]
+
+  @@index([tenantId, storeId])
+  @@map("therapists")
+}
+
+enum ServiceAppointmentStatus {
+  BOOKED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+/// 预约：BOOKED -(完成)-> COMPLETED（若 sourcePackageId 存在则扣减套餐剩余次数）；
+/// BOOKED -> CANCELLED/NO_SHOW。完成即视为执行+消项（本期不拆独立执行记录表）。
+model ServiceAppointment {
+  id              String                   @id @default(cuid())
+  tenantId        String                   @map("tenant_id")
+  storeId         String                   @map("store_id")
+  appointmentNo   String                   @map("appointment_no")
+  customerId      String                   @map("customer_id")
+  productId       String                   @map("product_id")
+  therapistId     String?                  @map("therapist_id")
+  sourcePackageId String?                  @map("source_package_id")
+  scheduledAt     DateTime                 @map("scheduled_at")
+  durationMinutes Int                      @map("duration_minutes")
+  status          ServiceAppointmentStatus @default(BOOKED)
+  completedAt     DateTime?                @map("completed_at")
+  cancelReason    String?                  @map("cancel_reason") @db.Text
+  rating          Int?
+  comment         String?                  @db.Text
+  createdBy       String                   @map("created_by")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  version         Int                      @default(0)
+
+  store         Store                   @relation(fields: [storeId], references: [id])
+  customer      Customer                @relation(fields: [customerId], references: [id])
+  product       ServiceProduct          @relation(fields: [productId], references: [id])
+  therapist     Therapist?              @relation(fields: [therapistId], references: [id])
+  sourcePackage CustomerServicePackage? @relation(fields: [sourcePackageId], references: [id])
+
+  @@unique([tenantId, appointmentNo])
+  @@index([tenantId, customerId])
+  @@index([tenantId, therapistId, scheduledAt])
+  @@map("service_appointments")
+}
+
+// ==================== 库存（进销存全链路，交易与供应域） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.7 节
+// + docs/伴月轩月子中心管理系统_新系统开发文档_V1.0.docx 第9章"后勤管理"（复用同一套模型）。
+// 单据状态机审批复用通用工作流引擎，采用与 Contract/Payment 完全相同的
+// "reconcileStatus() 懒同步"模式（见各 Service 注释），不侵入 WorkflowEngineModule。
+// 范围收窄（记录供后续参考）：
+//   - 采购单(PurchaseOrder)始终走审批，不受仓库"免审批"配置影响（花钱承诺，风险等级不同于仓内操作）；
+//     入库单若挂在已审批的采购单下则跳过自身审批（视为已获授权），未挂采购单的临时入库仍按
+//     仓库 requiresApproval 配置决定是否需要审批；出库/领用/调拨/盘点同样按仓库配置决定。
+//   - 调拨单以"源仓库"的 requiresApproval 配置为准（源头承担风险方）。
+//   - 不做采购单"收货进度/超收校验"，入库数量与采购数量的对比只做展示，不做强校验。
+//   - 服务物料桥梁（护理/产康服务核销后自动生成待出库列表）、备料包（套餐→物料清单自动关联）
+//     本期不做，待后续切片把 P2 的护理/产康/月子餐模块反向接入库存域时再设计。
+//   - 移动加权平均法核算成本；批次(StockBatch)只追踪数量与效期，用于"先到期先出"(FEFO)扣减与
+//     过期预警，不做批次级FIFO成本核算（成本核算只在 WarehouseStock 汇总层做加权平均）。
+
+enum WarehousePurpose {
+  OPERATING // 经营性库存（食材、服务耗材等）
+  LOGISTICS // 后勤库房（P3后勤管理模块复用同一套模型，仅用本字段隔离）
+}
+
+model Supplier {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  code        String
+  name        String
+  contactName String?      @map("contact_name")
+  phone       String?
+  remark      String?      @db.Text
+  status      CommonStatus @default(ACTIVE)
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  version     Int          @default(0)
+
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@map("suppliers")
+}
+
+/// 仓库：requiresApproval=false 时该仓库的入库/出库/领用/盘点单跳过工作流审批，直接
+/// DRAFT->APPROVED（"仓库级免审批"配置，竞品分析3.7）。
+model Warehouse {
+  id               String           @id @default(cuid())
+  tenantId         String           @map("tenant_id")
+  storeId          String           @map("store_id")
+  code             String
+  name             String
+  purpose          WarehousePurpose @default(OPERATING)
+  requiresApproval Boolean          @default(true) @map("requires_approval")
+  status           CommonStatus     @default(ACTIVE)
+  createdBy        String           @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  version          Int              @default(0)
+
+  store          Store            @relation(fields: [storeId], references: [id])
+  stocks         WarehouseStock[]
+  batches        StockBatch[]
+  goodsReceipts  GoodsReceipt[]
+  stockIssues    StockIssue[]
+  transfersOut   StockTransfer[]  @relation("TransferFrom")
+  transfersIn    StockTransfer[]  @relation("TransferTo")
+  stockCounts    StockCount[]
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@map("warehouses")
+}
+
+model InventoryItem {
+  id                   String           @id @default(cuid())
+  tenantId             String           @map("tenant_id")
+  code                 String
+  name                 String
+  unit                 String // 计量单位，如"件"/"kg"/"箱"
+  category             String?
+  spec                 String?          @db.VarChar(200) // 规格/型号/尺寸（如“100*120”“27卷/箱”）
+  brand                String?          @db.VarChar(100) // 品牌
+  referencePrice       Decimal?         @map("reference_price") @db.Decimal(12, 4) // 参考单价（最近一次采购价，按“单位”计），仅供申购参考
+  purpose              WarehousePurpose @default(OPERATING)
+  safetyStockThreshold Int?             @map("safety_stock_threshold") // 低于此数量触发低库存预警，空=不预警
+  shelfLifeDays        Int?             @map("shelf_life_days") // 保质期天数，空=不追踪效期
+  status               CommonStatus     @default(ACTIVE)
+  createdBy            String           @map("created_by")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  version              Int              @default(0)
+
+  stocks               WarehouseStock[]
+  batches              StockBatch[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
+  stockIssueItems      StockIssueItem[]
+  stockTransferItems   StockTransferItem[]
+  stockCountItems      StockCountItem[]
+
+  @@unique([tenantId, code])
+  @@map("inventory_items")
+}
+
+/// 库存汇总层：每个仓库+物品的当前数量与移动加权平均成本，只能被各单据的 execute() 更新，
+/// 不提供直接编辑接口（保证所有变动都有单据留痕）。
+model WarehouseStock {
+  id          String   @id @default(cuid())
+  warehouseId String   @map("warehouse_id")
+  itemId      String   @map("item_id")
+  quantity    Int      @default(0)
+  avgCost     Int      @default(0) @map("avg_cost") // 移动加权平均单位成本，最小货币单位
+  version     Int      @default(0) // 乐观锁：quantity/avgCost 是"读旧值算新值再写回"，并发入出库
+  // 必须靠这个字段做重试保护，纯 increment/decrement 不足以保护成本这类需要重新计算的字段
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@unique([warehouseId, itemId])
+  @@map("warehouse_stocks")
+}
+
+/// 批次层：追踪效期用于 FEFO（先到期先出）扣减与过期预警，不做批次级成本核算。
+/// sourceType/sourceId 追溯批次的产生来源（入库单/调拨单/盘点盈余）。
+model StockBatch {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  warehouseId String    @map("warehouse_id")
+  itemId      String    @map("item_id")
+  batchNo     String    @map("batch_no")
+  quantity    Int // 该批次剩余数量
+  unitCost    Int       @map("unit_cost") // 该批次入库时的单位成本，仅供追溯展示
+  receivedAt  DateTime  @map("received_at")
+  expiresAt   DateTime? @map("expires_at") // 空=不追踪效期（item.shelfLifeDays 未配置）
+  sourceType  String    @map("source_type") // GOODS_RECEIPT / STOCK_TRANSFER / STOCK_COUNT
+  sourceId    String    @map("source_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([warehouseId, itemId, expiresAt])
+  @@map("stock_batches")
+}
+
+enum InventoryDocStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+  /// 采购单：采购员已完成采购，等货到（已自动生成待收货的入库单）
+  PURCHASED
+  /// 入库单：等快递到货，客服逐项确认收货
+  PENDING_RECEIPT
+  /// 采购单/入库单：已有部分货品到货入库，还有没到的
+  PARTIALLY_RECEIVED
+}
+
+/// 申购单类型：DEPARTMENT=部门申购单（部门负责人填，提交后自动出现在客服的“待汇总”里，本身不走审批）；
+/// SUMMARY=汇总申购单（客服汇总各部门申购单生成，或沿用 Excel 导入的整张申购表；提交店长审批）
+enum PurchaseRequestKind {
+  SUMMARY
+  DEPARTMENT
+}
+
+enum PurchaseRequestStatus {
+  DRAFT // 草稿（刚导入/刚建，可改数量单价）
+  PENDING_APPROVAL // 审批中
+  APPROVED // 已批准（可生成采购单）
+  REJECTED // 已驳回
+  CANCELLED // 已取消
+  ORDERED // 已生成采购单
+  SUBMITTED // 部门申购单：已提交，等客服汇总
+  COLLECTED // 部门申购单：已被客服汇总进某张汇总申购单
+}
+
+/// 申购单(SG)：各部门每月提交的采购申请（对应公司现在用的《申购表》Excel：申请部门、申请人、物品、数量、单价、用途）。
+/// 流程：导入/新建(DRAFT) → 提交审批(PENDING_APPROVAL，走通用工作流，店长审批) → APPROVED → 选供应商和仓库“生成采购单”(ORDERED)。
+/// 金额用元（小数），生成采购单时单价四舍五入到分。
+model PurchaseRequest {
+  id               String                @id @default(cuid())
+  tenantId         String                @map("tenant_id")
+  storeId          String                @map("store_id")
+  requestNo        String                @map("request_no")
+  requestDate      DateTime              @map("request_date") @db.Date // 申购日期（表头里的日期，如 2026.8.25）
+  status           PurchaseRequestStatus @default(DRAFT)
+  totalAmount      Decimal               @default(0) @map("total_amount") @db.Decimal(14, 2) // 冗余汇总，元
+  sourceFileName   String?               @map("source_file_name") // Excel 导入时的文件名
+  remark           String?               @db.Text
+  cancelReason     String?               @map("cancel_reason") @db.Text
+  purchaseOrderId  String?               @map("purchase_order_id") // 已生成的采购单
+  kind             PurchaseRequestKind   @default(SUMMARY)
+  departmentName   String?               @map("department_name") // 部门申购单：申请部门
+  summaryRequestId String?               @map("summary_request_id") // 部门申购单被汇总进的汇总申购单
+  createdBy        String                @map("created_by")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  version          Int                   @default(0)
+
+  store          Store                 @relation(fields: [storeId], references: [id])
+  purchaseOrder  PurchaseOrder?        @relation(fields: [purchaseOrderId], references: [id])
+  items          PurchaseRequestItem[]
+  summaryRequest PurchaseRequest?      @relation("RequestCollect", fields: [summaryRequestId], references: [id])
+  collected      PurchaseRequest[]     @relation("RequestCollect")
+
+  @@unique([tenantId, requestNo])
+  @@index([tenantId, storeId, requestDate])
+  @@index([tenantId, status])
+  @@index([tenantId, kind, status])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                String   @id @default(cuid())
+  purchaseRequestId String   @map("purchase_request_id")
+  sortNo            Int      @map("sort_no") // 在表里的先后顺序
+  itemId            String?  @map("item_id") // 对应的物品资料（没对上时为空，生成采购单前要补）
+  name              String // 物品名称（申购时的快照）
+  spec              String?  @db.VarChar(200)
+  brand             String?  @db.VarChar(100)
+  unit              String?
+  quantity          Int
+  unitPrice         Decimal? @map("unit_price") @db.Decimal(12, 4) // 元；没填 = 待询价
+  subtotal          Decimal  @default(0) @db.Decimal(14, 2) // quantity * unitPrice，没单价时为 0
+  department        String? // 申请部门
+  requester         String? // 申请人
+  purpose           String? // 用途
+  remark            String?
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  item            InventoryItem?  @relation(fields: [itemId], references: [id])
+
+  @@index([purchaseRequestId])
+  @@map("purchase_request_items")
+}
+
+/// 采购单(CG)：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED；
+/// APPROVED 后可据此创建入库单（收货数量与采购数量的对比只做展示，不做强校验，见 schema 顶部范围收窄说明）。
+model PurchaseOrder {
+  id                 String             @id @default(cuid())
+  tenantId           String             @map("tenant_id")
+  storeId            String             @map("store_id")
+  warehouseId        String             @map("warehouse_id")
+  supplierId         String             @map("supplier_id")
+  orderNo            String             @map("order_no")
+  status             InventoryDocStatus @default(DRAFT)
+  totalAmount        Int                @default(0) @map("total_amount") // 冗余汇总，最小货币单位
+  remark             String?            @db.Text
+  cancelReason       String?            @map("cancel_reason") @db.Text
+  /// 采购员点“确认采购”的时间/人、运单号与备注（确认采购会自动生成待收货的入库单）
+  purchasedAt        DateTime?          @map("purchased_at")
+  purchasedById      String?            @map("purchased_by_id")
+  expressNo          String?            @map("express_no")
+  purchaseNote       String?            @map("purchase_note") @db.Text
+  /// 采购平台（1688/TAOBAO/PDD/OTHER）与平台订单号；物流：快递公司（快递100编码）、收/寄件手机尾号（顺丰需要）、
+  /// 快递100 返回的状态码、轨迹（JSON）、最近一次查询时间/出错信息
+  platform           String?            @map("platform") @db.VarChar(20)
+  platformOrderNo    String?            @map("platform_order_no") @db.VarChar(64)
+  expressCompany     String?            @map("express_company") @db.VarChar(40)
+  expressPhoneTail   String?            @map("express_phone_tail") @db.VarChar(8)
+  logisticsState     Int?               @map("logistics_state")
+  logisticsTrace     Json?              @map("logistics_trace")
+  logisticsCheckedAt DateTime?          @map("logistics_checked_at")
+  logisticsError     String?            @map("logistics_error") @db.VarChar(255)
+  createdBy          String             @map("created_by")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  version            Int                @default(0)
+
+  store            Store                   @relation(fields: [storeId], references: [id])
+  warehouse        Warehouse               @relation(fields: [warehouseId], references: [id])
+  supplier         Supplier                @relation(fields: [supplierId], references: [id])
+  items            PurchaseOrderItem[]
+  goodsReceipts    GoodsReceipt[]
+  purchaseRequests PurchaseRequest[]
+  shipments        PurchaseOrderShipment[]
+
+  @@unique([tenantId, orderNo])
+  @@index([tenantId, status])
+  @@map("purchase_orders")
+}
+
+/// 采购单下的“平台订单/包裹”：一张采购单常对应 1688 上拆开下的很多笔订单，每笔（每个运单号）单独记平台订单号、卖家、金额和物流轨迹。
+model PurchaseOrderShipment {
+  id                 String    @id @default(cuid())
+  tenantId           String    @map("tenant_id")
+  purchaseOrderId    String    @map("purchase_order_id")
+  platform           String    @default("1688") @db.VarChar(20)
+  platformOrderNo    String    @map("platform_order_no") @db.VarChar(64)
+  sellerName         String?   @map("seller_name") @db.VarChar(120)
+  goodsTitle         String?   @map("goods_title") @db.VarChar(500)
+  /// 实付金额（分）
+  amount             Int       @default(0)
+  orderStatus        String?   @map("order_status") @db.VarChar(40)
+  expressCompany     String?   @map("express_company") @db.VarChar(40)
+  /// 运单号；还没发货时为空字符串（唯一键不能含 NULL）
+  expressNo          String    @default("") @map("express_no") @db.VarChar(100)
+  logisticsState     Int?      @map("logistics_state")
+  logisticsTrace     Json?     @map("logistics_trace")
+  logisticsCheckedAt DateTime? @map("logistics_checked_at")
+  logisticsError     String?   @map("logistics_error") @db.VarChar(255)
+  createdBy          String    @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@unique([purchaseOrderId, platformOrderNo, expressNo])
+  @@index([tenantId, platformOrderNo])
+  @@map("purchase_order_shipments")
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String @map("purchase_order_id")
+  itemId          String @map("item_id")
+  quantity        Int
+  unitPrice       Int    @map("unit_price") // 最小货币单位
+  subtotal        Int // quantity * unitPrice，创建时算好落库，避免每次读取重复计算
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+/// 入库单(RK)：执行(execute)时更新 WarehouseStock（移动加权平均法重算成本）并生成 StockBatch。
+/// 完成后不可变，需要冲正时创建一张新的入库单/出库单反向操作，不修改已完成单据本身。
+model GoodsReceipt {
+  id              String             @id @default(cuid())
+  tenantId        String             @map("tenant_id")
+  storeId         String             @map("store_id")
+  warehouseId     String             @map("warehouse_id")
+  purchaseOrderId String?            @map("purchase_order_id") // 挂在已审批采购单下则跳过自身审批
+  receiptNo       String             @map("receipt_no")
+  status          InventoryDocStatus @default(DRAFT)
+  remark          String?            @db.Text
+  cancelReason    String?            @map("cancel_reason") @db.Text
+  completedAt     DateTime?          @map("completed_at")
+  /// 逐项收货的入库单（由“确认采购”自动生成）：货品陆续到，客服每次确认到了哪几项、各多少，立即入库；
+  /// 不走“提交→执行”。老的手工入库单 tracked=false，行为不变。
+  tracked         Boolean            @default(false)
+  shortClosedNote String?            @map("short_closed_note") @db.Text // 结束收货时登记的“未到货原因”
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  version         Int                @default(0)
+
+  store         Store                      @relation(fields: [storeId], references: [id])
+  warehouse     Warehouse                  @relation(fields: [warehouseId], references: [id])
+  purchaseOrder PurchaseOrder?             @relation(fields: [purchaseOrderId], references: [id])
+  items         GoodsReceiptItem[]
+  confirmations GoodsReceiptConfirmation[]
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, status])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id               String @id @default(cuid())
+  goodsReceiptId   String @map("goods_receipt_id")
+  itemId           String @map("item_id")
+  quantity         Int // 老入库单：本次入库数量；逐项收货的入库单：采购数量（应到）
+  unitCost         Int    @map("unit_cost") // 最小货币单位，用于移动加权平均法与批次成本
+  receivedQuantity Int    @default(0) @map("received_quantity") // 逐项收货的入库单：已到货入库的累计数量
+
+  goodsReceipt      GoodsReceipt                   @relation(fields: [goodsReceiptId], references: [id])
+  item              InventoryItem                  @relation(fields: [itemId], references: [id])
+  confirmationLines GoodsReceiptConfirmationLine[]
+
+  @@map("goods_receipt_items")
+}
+
+/// 收货确认记录：每次快递到货，客服确认收到了哪几项、各多少，对应一次库存入账。
+model GoodsReceiptConfirmation {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  goodsReceiptId String   @map("goods_receipt_id")
+  confirmedById  String   @map("confirmed_by_id")
+  confirmedAt    DateTime @default(now()) @map("confirmed_at")
+  expressNo      String?  @map("express_no") // 这一批的快递单号
+  note           String?  @db.Text
+
+  goodsReceipt GoodsReceipt                   @relation(fields: [goodsReceiptId], references: [id])
+  lines        GoodsReceiptConfirmationLine[]
+
+  @@index([goodsReceiptId, confirmedAt])
+  @@map("goods_receipt_confirmations")
+}
+
+model GoodsReceiptConfirmationLine {
+  id                 String    @id @default(cuid())
+  confirmationId     String    @map("confirmation_id")
+  goodsReceiptItemId String    @map("goods_receipt_item_id")
+  quantity           Int
+  expiresAt          DateTime? @map("expires_at") // 这批货的到期日（不填则按物品保质期推算）
+  note               String? // 如：外包装破损、少 1 件
+
+  confirmation GoodsReceiptConfirmation @relation(fields: [confirmationId], references: [id], onDelete: Cascade)
+  receiptItem  GoodsReceiptItem         @relation(fields: [goodsReceiptItemId], references: [id])
+
+  @@index([confirmationId])
+  @@map("goods_receipt_confirmation_lines")
+}
+
+enum StockIssueType {
+  ISSUE // 一般出库
+  REQUISITION // 部门领用（对应竞品分析的"领用单(LY)"，用途/部门在 remark 里登记）
+  LOSS // 报损
+}
+
+/// 出库/领用单(CK/LY 合一，用 issueType 区分)：执行时按 FEFO 扣减 StockBatch，
+/// WarehouseStock.avgCost 不变（出库不改变剩余库存的加权平均成本）。
+model StockIssue {
+  id           String             @id @default(cuid())
+  tenantId     String             @map("tenant_id")
+  storeId      String             @map("store_id")
+  warehouseId  String             @map("warehouse_id")
+  issueNo      String             @map("issue_no")
+  issueType    StockIssueType     @default(ISSUE) @map("issue_type")
+  status       InventoryDocStatus @default(DRAFT)
+  remark       String?            @db.Text
+  cancelReason String?            @map("cancel_reason") @db.Text
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  version      Int                @default(0)
+
+  store     Store            @relation(fields: [storeId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  items     StockIssueItem[]
+
+  @@unique([tenantId, issueNo])
+  @@index([tenantId, status])
+  @@map("stock_issues")
+}
+
+model StockIssueItem {
+  id           String @id @default(cuid())
+  stockIssueId String @map("stock_issue_id")
+  itemId       String @map("item_id")
+  quantity     Int
+  unitCost     Int?   @map("unit_cost") // 执行时按当前 avgCost 快照写入，用于成本报表，创建时为空
+
+  stockIssue StockIssue    @relation(fields: [stockIssueId], references: [id])
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_issue_items")
+}
+
+/// 调拨单(DB，含跨店)：以源仓库(fromWarehouse)的 requiresApproval 配置决定是否需要审批。
+/// 执行时源仓库按 FEFO 扣减、批次"搬家"到目标仓库（沿用原 receivedAt/expiresAt），
+/// 目标仓库按移动加权平均法用源仓库当前 avgCost 重算成本。
+model StockTransfer {
+  id              String             @id @default(cuid())
+  tenantId        String             @map("tenant_id")
+  fromWarehouseId String             @map("from_warehouse_id")
+  toWarehouseId   String             @map("to_warehouse_id")
+  transferNo      String             @map("transfer_no")
+  status          InventoryDocStatus @default(DRAFT)
+  remark          String?            @db.Text
+  cancelReason    String?            @map("cancel_reason") @db.Text
+  completedAt     DateTime?          @map("completed_at")
+  createdBy       String             @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  version         Int                @default(0)
+
+  fromWarehouse Warehouse           @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse           @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  items         StockTransferItem[]
+
+  @@unique([tenantId, transferNo])
+  @@index([tenantId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id              String @id @default(cuid())
+  stockTransferId String @map("stock_transfer_id")
+  itemId          String @map("item_id")
+  quantity        Int
+
+  stockTransfer StockTransfer @relation(fields: [stockTransferId], references: [id])
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_transfer_items")
+}
+
+/// 盘点单(PD)：创建时快照系统当前数量(systemQuantity)，执行时把 WarehouseStock.quantity
+/// 直接修正为盘点数(countedQuantity)，盈亏差额(diffQuantity)通过批次调整留痕
+/// （盘盈生成新批次、盘亏按FEFO消耗批次），avgCost 不变。
+model StockCount {
+  id           String             @id @default(cuid())
+  tenantId     String             @map("tenant_id")
+  storeId      String             @map("store_id")
+  warehouseId  String             @map("warehouse_id")
+  countNo      String             @map("count_no")
+  status       InventoryDocStatus @default(DRAFT)
+  remark       String?            @db.Text
+  cancelReason String?            @map("cancel_reason") @db.Text
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  version      Int                @default(0)
+
+  store     Store            @relation(fields: [storeId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  items     StockCountItem[]
+
+  @@unique([tenantId, countNo])
+  @@index([tenantId, status])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id              String @id @default(cuid())
+  stockCountId    String @map("stock_count_id")
+  itemId          String @map("item_id")
+  systemQuantity  Int    @map("system_quantity") // 创建盘点单时快照的系统账面数量
+  countedQuantity Int    @map("counted_quantity") // 实际盘点数量
+  diffQuantity    Int    @map("diff_quantity") // countedQuantity - systemQuantity，创建时算好落库
+
+  stockCount StockCount    @relation(fields: [stockCountId], references: [id])
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("stock_count_items")
+}
+
+// ==================== 人事（组织与治理域） ====================
+// 业务规则依据：docs/竞品分析-一月妈咪月子中心管理系统功能架构逆向分析.md 3.9 节
+// + docs/业务规则确认记录.md「2026-07-29 P3人事排班薪酬启动」章节的范围收窄记录。
+// 提成/薪资审批复用通用工作流引擎，采用与 Contract/Payment/Inventory 完全相同的
+// "reconcileStatus() 懒同步"模式。
+// 范围收窄（记录供后续参考）：
+//   - 员工档案是 Account 的 1:1 HR 扩展，不重开一套身份信息。
+//   - 业绩提成(三级分账)与手工费(三人分摊)统一成一个 CommissionRecord+Allocation 模型，
+//     角色用自由文本而非写死的三级/三人枚举。
+//   - 业绩目标三级分配、变更管理自动冲正、排班冲突检测/自动排班建议、到期提醒的自动推送——
+//     本期均不做。
+
+enum EmploymentType {
+  EMPLOYEE // 员工制
+  NON_EMPLOYEE // 非员工制（如按次结算的兼职/合作人员）
+}
+
+enum EmployeeGender {
+  MALE
+  FEMALE
+}
+
+/// 员工合同类型（对应员工信息表“合同类型”列）
+enum EmployeeContractType {
+  LABOR // 劳动合同
+  PROBATION // 试用期合同
+  SERVICE // 劳务合同
+  OVERAGE // 用工协议（超龄）
+  PENDING_SIGN // 待签
+}
+
+/// 社保缴纳（对应员工信息表“社保缴纳”列：参保 / “/”）
+enum SocialInsuranceStatus {
+  ENROLLED // 参保
+  NOT_ENROLLED // 未参保
+}
+
+enum EmployeeProfileStatus {
+  ACTIVE // 在职
+  ON_LEAVE // 休假中
+  TERMINATED // 已离职
+}
+
+/// 员工档案：Account 的 1:1 HR 扩展（姓名/门店/部门/团队/职位等身份信息已在 Account 上，
+/// 这里只存 HR 特有字段），accountId 唯一。
+model EmployeeProfile {
+  id                       String                 @id @default(cuid())
+  tenantId                 String                 @map("tenant_id")
+  accountId                String                 @unique @map("account_id")
+  employeeNo               String                 @map("employee_no") // 工号（归档后仍保留，用于历史查询）
+  /// 占用中的工号：在册员工 = employeeNo；离职归档后置空 → 工号释放，可回收给新员工。唯一约束建在这一列上。
+  activeEmployeeNo         String?                @map("active_employee_no")
+  /// 离职归档时间；归档后档案只读、账号停用、工号释放
+  archivedAt               DateTime?              @map("archived_at")
+  hireDate                 DateTime               @map("hire_date")
+  employmentType           EmploymentType         @default(EMPLOYEE) @map("employment_type")
+  healthCertExpiresAt      DateTime?              @map("health_cert_expires_at")
+  contractExpiresAt        DateTime?              @map("contract_expires_at")
+  probationEndsAt          DateTime?              @map("probation_ends_at")
+  terminationDate          DateTime?              @map("termination_date")
+  terminationReason        String?                @map("termination_reason") // 离职原因
+  status                   EmployeeProfileStatus  @default(ACTIVE)
+  // —— 员工信息表里的字段 ——
+  contractType             EmployeeContractType?  @map("contract_type") // 合同类型
+  socialInsurance          SocialInsuranceStatus? @map("social_insurance") // 社保缴纳
+  idCardNo                 String?                @map("id_card_no") @db.VarChar(18) // 身份证号（敏感，按权限掩码）
+  gender                   EmployeeGender? // 性别（填身份证号时自动识别）
+  birthDate                DateTime?              @map("birth_date") @db.Date // 出生日期（填身份证号时自动识别）
+  bankAccountNo            String?                @map("bank_account_no") @db.VarChar(32) // 工资卡账号（敏感，按权限掩码）
+  bankName                 String?                @map("bank_name") @db.VarChar(100) // 开户行
+  emergencyContactName     String?                @map("emergency_contact_name") // 紧急联系人
+  emergencyContactPhone    String?                @map("emergency_contact_phone")
+  emergencyContactRelation String?                @map("emergency_contact_relation") // 与员工关系
+  address                  String?                @db.VarChar(255) // 现住址
+  /// 呼叫定位系统：护理师手表设备号（watch_id），同租户内唯一
+  watchId                  String?                @map("watch_id") @db.VarChar(64)
+  /// 呼叫定位系统：当班状态（在岗/离岗/休息），派单只派给在岗的人
+  dutyStatus               DutyStatus             @default(OFF_DUTY) @map("duty_status")
+  /// 呼叫定位系统：负责的楼层列表，如 ["2F","3F"]
+  responsibleFloors        Json?                  @map("responsible_floors")
+  remark                   String?                @db.Text
+  createdBy                String                 @map("created_by")
+  createdAt                DateTime               @default(now()) @map("created_at")
+  updatedAt                DateTime               @updatedAt @map("updated_at")
+  version                  Int                    @default(0)
+
+  account               Account                @relation(fields: [accountId], references: [id])
+  scheduleEntries       ScheduleEntry[]
+  commissionAllocations CommissionAllocation[]
+  payrollRecords        PayrollRecord[]
+  leaveRequests         LeaveRequest[]
+
+  @@unique([tenantId, activeEmployeeNo])
+  @@unique([tenantId, idCardNo])
+  @@index([tenantId, employeeNo])
+  @@map("employee_profiles")
+}
+
+/// 班次定义：门店级可配置（不同门店班次时段可能不同），如白班/中班/晚班/夜班/护士早班。
+model ShiftDefinition {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  storeId   String       @map("store_id")
+  code      String
+  name      String
+  startTime String       @map("start_time") // "HH:mm"，跨零点的班次（如夜班22:00-06:00）由前端按 startTime>endTime 判断显示
+  endTime   String       @map("end_time")
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  store           Store           @relation(fields: [storeId], references: [id])
+  scheduleEntries ScheduleEntry[]
+
+  @@unique([tenantId, storeId, code])
+  @@map("shift_definitions")
+}
+
+/// 排班记录：一名员工一天一条（本期不支持一天拆分多班次）。
+model ScheduleEntry {
+  id                String   @id @default(cuid())
+  tenantId          String   @map("tenant_id")
+  storeId           String   @map("store_id")
+  employeeProfileId String   @map("employee_profile_id")
+  workDate          DateTime @map("work_date")
+  shiftDefinitionId String   @map("shift_definition_id")
+  remark            String?  @db.Text
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  version           Int      @default(0)
+
+  store           Store           @relation(fields: [storeId], references: [id])
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+  shiftDefinition ShiftDefinition @relation(fields: [shiftDefinitionId], references: [id])
+
+  @@unique([employeeProfileId, workDate])
+  @@index([tenantId, storeId, workDate])
+  @@map("schedule_entries")
+}
+
+enum CommissionType {
+  SALES // 业绩提成：基于签约/续签/服务包/项目/服务卡等"回款"触发
+  LABOR // 手工费：基于护理/产康具体服务项目触发
+}
+
+enum CommissionRecordStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// 提成记录：DRAFT -(提交)-> PENDING_APPROVAL -(工作流审批)-> APPROVED/REJECTED。
+/// sourceType/sourceId 追溯触发单据（如 PAYMENT/SERVICE_APPOINTMENT/CUSTOMER_SERVICE_PACKAGE），
+/// 不做外键约束（跨模块泛化引用，同 WorkflowInstance.businessType/businessId 的设计）。
+model CommissionRecord {
+  id           String                 @id @default(cuid())
+  tenantId     String                 @map("tenant_id")
+  storeId      String                 @map("store_id")
+  type         CommissionType
+  sourceType   String                 @map("source_type")
+  sourceId     String                 @map("source_id")
+  totalAmount  Int                    @map("total_amount") // 最小货币单位，等于各分配明细之和
+  status       CommissionRecordStatus @default(DRAFT)
+  remark       String?                @db.Text
+  cancelReason String?                @map("cancel_reason") @db.Text
+  createdBy    String                 @map("created_by")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  version      Int                    @default(0)
+
+  store       Store                  @relation(fields: [storeId], references: [id])
+  allocations CommissionAllocation[]
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, sourceType, sourceId])
+  @@map("commission_records")
+}
+
+/// 分配明细：roleLabel 用自由文本（如"销售"/"主管"/"店长"/"第一服务人"），
+/// 不写死三级/三人的固定结构，一笔业绩可按需拆给任意多名员工。
+model CommissionAllocation {
+  id                 String @id @default(cuid())
+  commissionRecordId String @map("commission_record_id")
+  employeeProfileId  String @map("employee_profile_id")
+  roleLabel          String @map("role_label")
+  basisPoints        Int    @map("basis_points") // 万分比，0-10000 代表 0.00%-100.00%
+  amount             Int // totalAmount * basisPoints / 10000，创建时算好落库
+
+  commissionRecord CommissionRecord @relation(fields: [commissionRecordId], references: [id])
+  employeeProfile  EmployeeProfile  @relation(fields: [employeeProfileId], references: [id])
+
+  @@index([employeeProfileId])
+  @@map("commission_allocations")
+}
+
+enum PayrollRecordStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  PAID
+}
+
+/// 薪资单：DRAFT -(提交)-> PENDING_APPROVAL -(2级审批：店长初审->超管终审)-> APPROVED
+/// -(标记发放)-> PAID。commissionTotal 是创建时对该员工当期已批准 CommissionAllocation 的
+/// 快照汇总，之后提成再变化不会回溯影响已生成的薪资单。
+model PayrollRecord {
+  id                String              @id @default(cuid())
+  tenantId          String              @map("tenant_id")
+  storeId           String              @map("store_id")
+  employeeProfileId String              @map("employee_profile_id")
+  period            String // "YYYY-MM"
+  baseSalary        Int                 @map("base_salary")
+  commissionTotal   Int                 @default(0) @map("commission_total")
+  deductions        Int                 @default(0)
+  netAmount         Int                 @map("net_amount") // baseSalary + commissionTotal - deductions，创建时算好落库
+  status            PayrollRecordStatus @default(DRAFT)
+  paidAt            DateTime?           @map("paid_at")
+  remark            String?             @db.Text
+  cancelReason      String?             @map("cancel_reason") @db.Text
+  createdBy         String              @map("created_by")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  version           Int                 @default(0)
+
+  store           Store           @relation(fields: [storeId], references: [id])
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+
+  @@unique([tenantId, employeeProfileId, period])
+  @@index([tenantId, storeId, status])
+  @@map("payroll_records")
+}
+
+// ==================== 办公审批（固定几种常用单据类型，不做自定义表单引擎，见业务规则确认记录#13） ====================
+// 三种单据共用同一状态机 OfficeApprovalStatus，均为单级店长审批，完全复用通用工作流引擎，
+// reconcileStatus() 懒同步模式与 CommissionRecord/PayrollRecord 完全同构。
+// 范围收窄：物品申领已由库存域 StockIssue(issueType=REQUISITION) 覆盖、退款已由
+// Payment.requestRefund 覆盖，均不在此重复建模；请假是HR域明确延后的"请假管理"在此补上；
+// 日常签呈(GeneralMemo)是标题+正文自由文本的兜底通用审批入口。
+
+enum OfficeApprovalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  SICK
+  PERSONAL
+  ANNUAL
+  OTHER
+}
+
+model LeaveRequest {
+  id                String               @id @default(cuid())
+  tenantId          String               @map("tenant_id")
+  storeId           String               @map("store_id")
+  employeeProfileId String               @map("employee_profile_id")
+  leaveType         LeaveType            @map("leave_type")
+  startDate         DateTime             @map("start_date")
+  endDate           DateTime             @map("end_date")
+  reason            String               @db.Text
+  status            OfficeApprovalStatus @default(DRAFT)
+  cancelReason      String?              @map("cancel_reason") @db.Text
+  createdBy         String               @map("created_by")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  version           Int                  @default(0)
+
+  store           Store           @relation(fields: [storeId], references: [id])
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("leave_requests")
+}
+
+model ExpenseClaim {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  amount       Int // 最小货币单位（分）
+  category     String // 自由文本，如 差旅/办公用品/招待
+  reason       String               @db.Text
+  status       OfficeApprovalStatus @default(DRAFT)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("expense_claims")
+}
+
+/// 兜底的通用审批入口：标题+正文自由文本，覆盖"以上都不是"的长尾审批需求。
+model GeneralMemo {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  title        String
+  content      String               @db.Text
+  status       OfficeApprovalStatus @default(DRAFT)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, storeId, status])
+  @@map("general_memos")
+}
+
+// ==================== 后勤管理（见业务规则确认记录#14/15/16） ====================
+// 后勤仓库/物料复用 P3 库存域已有的 Warehouse/InventoryItem（purpose=LOGISTICS 区分），
+// 不在此重复建模。本节只新增两块全新领域：车辆调度（集团层统一调度池+占用冲突检测）、
+// 水电费登记（门店级运营费用，不做分摊）。
+
+enum VehicleStatus {
+  AVAILABLE
+  MAINTENANCE
+  RETIRED
+}
+
+/// 车辆不归属单一门店，任意门店可申请使用（集团层统一调度池，见#15）。
+model Vehicle {
+  id          String        @id @default(cuid())
+  tenantId    String        @map("tenant_id")
+  plateNumber String        @map("plate_number")
+  model       String
+  status      VehicleStatus @default(AVAILABLE)
+  remark      String?       @db.Text
+  createdBy   String        @map("created_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  version     Int           @default(0)
+
+  bookings VehicleBooking[]
+
+  @@unique([tenantId, plateNumber])
+  @@map("vehicles")
+}
+
+enum VehicleBookingStatus {
+  BOOKED
+  CANCELLED
+}
+
+/// 使用申请：仅做占用冲突检测（同一车辆的 [startTime, endTime) 不可与其他 BOOKED 记录重叠），
+/// 不接入通用审批工作流——冲突检测本身就是唯一的准入门槛，呼应"集团层统一调度池"的定位。
+model VehicleBooking {
+  id           String               @id @default(cuid())
+  tenantId     String               @map("tenant_id")
+  vehicleId    String               @map("vehicle_id")
+  storeId      String               @map("store_id")
+  applicantId  String               @map("applicant_id")
+  purpose      String               @db.Text
+  startTime    DateTime             @map("start_time")
+  endTime      DateTime             @map("end_time")
+  status       VehicleBookingStatus @default(BOOKED)
+  cancelReason String?              @map("cancel_reason") @db.Text
+  createdBy    String               @map("created_by")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  version      Int                  @default(0)
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  store     Store   @relation(fields: [storeId], references: [id])
+  applicant Account @relation(fields: [applicantId], references: [id])
+
+  @@index([tenantId, vehicleId, status])
+  @@map("vehicle_bookings")
+}
+
+enum UtilityExpenseType {
+  ELECTRICITY
+  WATER
+  GAS
+  PROPERTY_MANAGEMENT
+  OTHER
+}
+
+/// 门店级运营费用登记，不做分摊到客户房费成本核算（见#16）。
+model UtilityExpense {
+  id          String             @id @default(cuid())
+  tenantId    String             @map("tenant_id")
+  storeId     String             @map("store_id")
+  period      String // "YYYY-MM"
+  expenseType UtilityExpenseType @map("expense_type")
+  amount      Int // 最小货币单位（分）
+  remark      String?            @db.Text
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  version     Int                @default(0)
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([tenantId, storeId, period, expenseType])
+  @@map("utility_expenses")
+}
+
+// ==================== AI / Agent 接入（P4，见《新系统开发文档》3.3节 + 业务规则确认记录#9/#10） ====================
+// 首批2个Agent场景：智能客服/线索首触、护理异常预警建议。均由 NestJS 侧预先组装业务上下文后
+// 调用 apps/ai-service 的模型网关做文本生成，不做自主多步工具调用（范围收窄见业务规则确认记录）。
+// AI 只生成建议，不直接写业务库；护理场景强制人工确认后才写入正式护理记录，不支持一键采纳。
+
+enum AiSuggestionScenario {
+  CUSTOMER_SERVICE
+  CARE_ABNORMALITY
+  BUSINESS_ANALYTICS
+}
+
+enum AiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+/// 每次 Agent 调用的留痕审计记录：输入、输出、所用模型、耗时、是否被人工采纳，满足合规留痕要求。
+model AiSuggestion {
+  id            String               @id @default(cuid())
+  tenantId      String               @map("tenant_id")
+  storeId       String               @map("store_id")
+  scenario      AiSuggestionScenario
+  businessType  String               @map("business_type") // 如 LEAD/CUSTOMER/CARE_ABNORMALITY
+  businessId    String               @map("business_id")
+  inputText     String               @map("input_text") @db.Text // 发送给模型的完整上下文（脱敏后）
+  outputText    String               @map("output_text") @db.Text
+  modelProvider String               @map("model_provider") // volcengine/minimax
+  modelName     String               @map("model_name")
+  usedFallback  Boolean              @default(false) @map("used_fallback")
+  latencyMs     Int                  @map("latency_ms")
+  escalate      Boolean              @default(false) // 智能客服场景：是否建议转人工
+  status        AiSuggestionStatus   @default(PENDING)
+  acceptedById  String?              @map("accepted_by_id")
+  acceptedAt    DateTime?            @map("accepted_at")
+  createdBy     String               @map("created_by")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+  version       Int                  @default(0)
+
+  store      Store    @relation(fields: [storeId], references: [id])
+  acceptedBy Account? @relation(fields: [acceptedById], references: [id])
+
+  @@index([tenantId, storeId, scenario])
+  @@index([tenantId, businessType, businessId])
+  @@map("ai_suggestions")
+}
+
+// ==================== RAG 知识库（P4第二切片，见业务规则确认记录"P4 RAG知识库接入中"） ====================
+// 只做"手动创建知识库文档"通用入口，不自动从ContractTemplate/CareFormTemplate等业务表同步。
+// 不引入独立向量数据库：KnowledgeChunk.embedding 存为 JSON 数组，检索时应用层(NestJS)对该
+// 租户全部chunk做暴力余弦相似度计算取top-K，量级小(V1几十到上百篇文档)下性能足够。
+// 两个Agent场景（智能客服、护理异常预警建议）都会在生成前检索并把命中片段加入prompt。
+
+/// 知识库文档：标题+正文，创建/更新时按固定长度分段并调用模型网关生成embedding写入KnowledgeChunk。
+model KnowledgeDocument {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  title     String
+  content   String       @db.Text
+  category  String? // 自由文本分类，如 合同模板说明/护理规范/常见问题
+  status    CommonStatus @default(ACTIVE)
+  createdBy String       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  version   Int          @default(0)
+
+  chunks KnowledgeChunk[]
+
+  @@index([tenantId, status])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  documentId String   @map("document_id")
+  chunkIndex Int      @map("chunk_index")
+  content    String   @db.Text
+  embedding  Json // float[]，由模型网关的 /embeddings/create 生成
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@map("knowledge_chunks")
+}
+
+// ==================== IoT 设备网关（P4遗留补齐，见业务规则确认记录"P4遗留IoT设备网关框架补齐"） ====================
+// V1不采购真实硬件，只搭建"设备网关"架构（设备台账 + Device Shadow期望态/上报态 + 事件流水 + 连接审计），
+// 用前端"模拟设备事件"面板代替真实MQTT网关触发事件上报，验证"上报→业务记录自动生成"链路。
+// 本轮只把两类设备事件接入真实业务表：呼叫/客房服务(CALL_SERVICE -> RoomCall)、
+// 能耗计量(UTILITY_METER -> UtilityExpense按"门店+月份+费用类型"覆盖登记，语义是替代人工登记而非叠加流水)；
+// 其余5类设备类别（体征监测/安防看护/门禁出入/身份结算/打印）本轮只做台账登记与事件留痕，不触发业务表写入。
+
+enum DeviceCategory {
+  VITAL_SIGN // 体征监测
+  SECURITY // 安防看护
+  ACCESS_CONTROL // 门禁出入
+  CALL_SERVICE // 呼叫/客房服务
+  IDENTITY_SETTLEMENT // 身份结算
+  PRINTING // 打印
+  UTILITY_METER // 能耗计量
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  DISABLED
+}
+
+enum DeviceConnectionLogType {
+  ONLINE
+  OFFLINE
+  COMMAND_ISSUED
+  COMMAND_CONFIRMED
+}
+
+/// 设备类型：协议/品类主数据，总部制定，同 room.type/care.field 口径不开放给 STORE_MANAGER。
+model DeviceType {
+  id                          String         @id @default(cuid())
+  tenantId                    String         @map("tenant_id")
+  category                    DeviceCategory
+  name                        String
+  protocol                    String // 自由文本，如 "MQTT"/"RTSP/MQTT"/"串口转HTTP"，对应开发文档接入协议列
+  requiresCommandConfirmation Boolean        @default(false) @map("requires_command_confirmation") // 门禁/监控等敏感设备下发指令需二次确认
+  status                      CommonStatus   @default(ACTIVE)
+  createdBy                   String         @map("created_by")
+  createdAt                   DateTime       @default(now()) @map("created_at")
+  updatedAt                   DateTime       @updatedAt @map("updated_at")
+  version                     Int            @default(0)
+
+  devices Device[]
+
+  @@unique([tenantId, name])
+  @@map("device_types")
+}
+
+/// 设备台账：门店级物理设备实例，店长可自行登记维护（同 room.room/warehouse 口径）。
+model Device {
+  id           String       @id @default(cuid())
+  tenantId     String       @map("tenant_id")
+  storeId      String       @map("store_id")
+  deviceTypeId String       @map("device_type_id")
+  code         String // 设备编号
+  name         String
+  roomId       String?      @map("room_id") // 呼叫器/门禁等绑定具体房间；能耗计量总表等可不绑定
+  status       DeviceStatus @default(OFFLINE)
+  lastSeenAt   DateTime?    @map("last_seen_at")
+  createdBy    String       @map("created_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  version      Int          @default(0)
+
+  store          Store                 @relation(fields: [storeId], references: [id])
+  deviceType     DeviceType            @relation(fields: [deviceTypeId], references: [id])
+  room           Room?                 @relation(fields: [roomId], references: [id])
+  shadow         DeviceShadow?
+  events         DeviceEvent[]
+  connectionLogs DeviceConnectionLog[]
+
+  @@unique([tenantId, storeId, code])
+  @@index([tenantId, storeId])
+  @@map("devices")
+}
+
+/// Device Shadow：设备期望态(desired，网关下发指令写入)与上报态(reported，设备确认后写入)分离存储，
+/// 网络不稳定时指令先存desired，设备恢复连接后再同步，核心业务不因设备离线中断（开发文档3.4节设计要点）。
+model DeviceShadow {
+  id              String    @id @default(cuid())
+  deviceId        String    @unique @map("device_id")
+  desiredState    Json?     @map("desired_state")
+  desiredVersion  Int       @default(0) @map("desired_version")
+  reportedState   Json?     @map("reported_state")
+  reportedVersion Int       @default(0) @map("reported_version")
+  lastCommandAt   DateTime? @map("last_command_at")
+  lastReportedAt  DateTime? @map("last_reported_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_shadows")
+}
+
+/// 设备事件流水：模拟/真实网关上报的原始事件；processedAt/businessRefType/businessRefId记录是否
+/// 及如何转换为正式业务记录，processingError记录转换失败原因（不静默丢弃，便于排查）。
+model DeviceEvent {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  storeId         String    @map("store_id")
+  deviceId        String    @map("device_id")
+  eventType       String    @map("event_type")
+  payload         Json
+  occurredAt      DateTime  @default(now()) @map("occurred_at")
+  processedAt     DateTime? @map("processed_at")
+  businessRefType String?   @map("business_ref_type")
+  businessRefId   String?   @map("business_ref_id")
+  processingError String?   @map("processing_error") @db.Text
+  createdBy       String    @map("created_by") // 本轮为模拟面板操作人；接入真实网关后可改为系统账号
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  device Device @relation(fields: [deviceId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, deviceId])
+  @@index([tenantId, storeId, occurredAt])
+  @@map("device_events")
+}
+
+/// 设备接入审计：上下线、指令下发/确认记录留痕（开发文档"设备接入审计"要求）。
+model DeviceConnectionLog {
+  id        String                  @id @default(cuid())
+  tenantId  String                  @map("tenant_id")
+  storeId   String                  @map("store_id")
+  deviceId  String                  @map("device_id")
+  logType   DeviceConnectionLogType @map("log_type")
+  detail    Json?
+  createdBy String?                 @map("created_by")
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  device Device @relation(fields: [deviceId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId, deviceId])
+  @@map("device_connection_logs")
+}
+
+// ==================== 员工培训与考核（P5切片，见业务规则确认记录"员工培训与考核模块启动前"） ====================
+// 完全是员工内部工具，不涉及客户端/小程序（对应"商城与知识库自建vs对接评估报告"里知识库-对内的结论）。
+// 试卷/题目为总部统一培训标准，仅SUPER_ADMIN维护；参加考试对全体员工开放；简答题批阅由店长一步给分完成，
+// 不接入通用工作流引擎。不做"我要学习"打卡审计，不限制重考次数。
+
+enum TrainingExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExamQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum ExamAttemptStatus {
+  PENDING_GRADING // 含简答题，等待人工批阅
+  COMPLETED // 全部客观题或简答题已批阅完毕
+}
+
+/// 试卷：总部统一培训标准，studyMaterial为自由文本学习资料（不新建独立文档系统）。
+model TrainingExam {
+  id            String             @id @default(cuid())
+  tenantId      String             @map("tenant_id")
+  title         String
+  studyMaterial String?            @map("study_material") @db.Text
+  passScore     Int?               @map("pass_score") // 及格分数线，可选
+  status        TrainingExamStatus @default(DRAFT)
+  createdBy     String             @map("created_by")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  version       Int                @default(0)
+
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@map("training_exams")
+}
+
+/// 题目：单选/多选/判断题程序自动判分，简答题固定人工批阅。
+model ExamQuestion {
+  id            String           @id @default(cuid())
+  tenantId      String           @map("tenant_id")
+  examId        String           @map("exam_id")
+  order         Int
+  type          ExamQuestionType
+  content       String           @db.Text
+  options       Json? // 选择题用：[{ key: 'A', text: '...' }, ...]；判断题/简答题为 null
+  correctAnswer Json?            @map("correct_answer") // 选择题存正确选项key数组；判断题存 true/false；简答题为 null（人工判分）
+  score         Int // 该题分值
+
+  exam    TrainingExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers ExamAnswer[]
+
+  @@index([tenantId, examId])
+  @@map("exam_questions")
+}
+
+/// 员工一次作答：answers/autoScore由提交时程序计算，manualScore/gradedBy由批阅时人工填写。
+model ExamAttempt {
+  id          String            @id @default(cuid())
+  tenantId    String            @map("tenant_id")
+  examId      String            @map("exam_id")
+  accountId   String            @map("account_id")
+  autoScore   Int               @default(0) @map("auto_score")
+  manualScore Int?              @map("manual_score")
+  totalScore  Int?              @map("total_score") // 全部判分完成后写入（autoScore+manualScore之和）
+  status      ExamAttemptStatus @default(PENDING_GRADING)
+  submittedAt DateTime          @default(now()) @map("submitted_at")
+  gradedById  String?           @map("graded_by_id")
+  gradedAt    DateTime?         @map("graded_at")
+  createdBy   String            @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  version     Int               @default(0)
+
+  exam     TrainingExam @relation(fields: [examId], references: [id])
+  account  Account      @relation("ExamAttemptAccount", fields: [accountId], references: [id])
+  gradedBy Account?     @relation("ExamAttemptGradedBy", fields: [gradedById], references: [id])
+  answers  ExamAnswer[]
+
+  @@index([tenantId, examId])
+  @@index([tenantId, accountId])
+  @@map("exam_attempts")
+}
+
+/// 单题作答：selectedKeys为选择题答案；textAnswer为简答题答案；isCorrect/score为该题判分结果。
+model ExamAnswer {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  attemptId    String   @map("attempt_id")
+  questionId   String   @map("question_id")
+  selectedKeys Json?    @map("selected_keys") // 选择题/判断题答案
+  textAnswer   String?  @map("text_answer") @db.Text // 简答题答案
+  isCorrect    Boolean? @map("is_correct") // 客观题自动判分结果；简答题人工批阅后填写
+  score        Int      @default(0) // 该题得分
+
+  attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id])
+
+  @@index([tenantId, attemptId])
+  @@map("exam_answers")
+}
+
+/// 回收站：删除客户/母婴档案时，把它和名下所有数据存成一份快照（保留30天），期内可原样还原；到期自动清除
+model RecycleBinItem {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  entityType String   @map("entity_type") // CUSTOMER / MOTHER_PROFILE
+  entityId   String   @map("entity_id")
+  title      String // 显示名，如客户姓名
+  summary    String?  @db.Text // 一并删除了什么，如“2 份合同、1 笔收款”
+  payload    String   @db.LongText // 快照（JSON 文本）：各表被删除的行 + 被置空的关联
+  fileDocIds Json?    @map("file_doc_ids") // 到期清除时要一并删掉磁盘文件的资料 id
+  reason     String? // 删除原因 / 来源（如 合并客户）
+  deletedBy  String   @map("deleted_by")
+  deletedAt  DateTime @default(now()) @map("deleted_at")
+  expiresAt  DateTime @map("expires_at")
+
+  @@index([tenantId, entityType, expiresAt])
+  @@map("recycle_bin_items")
+}
+
+/// 宝宝生长测量记录（身长/体重/头围）：定期测量，和《7岁以下儿童生长标准》WS/T 423-2022 的百分位对比、生成曲线图。
+/// 日常护理记录里的体重也会自动并入曲线（不用重复录）；身长、头围只来自这里。
+model BabyGrowthRecord {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  storeId         String   @map("store_id")
+  motherProfileId String   @map("mother_profile_id")
+  babyProfileId   String   @map("baby_profile_id")
+  measuredAt      DateTime @map("measured_at") @db.Date
+  weightG         Int?     @map("weight_g") // 体重（克）
+  lengthCm        Float?   @map("length_cm")
+  headCm          Float?   @map("head_cm")
+  measuredByName  String?  @map("measured_by_name")
+  note            String?
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  baby BabyProfile @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, babyProfileId, measuredAt])
+  @@map("baby_growth_records")
+}
+
+/// 发给客户看的“生长曲线”链接：凭不可猜的随机链接打开（只读，随记录更新），可随时作废。
+model BabyGrowthShare {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  babyProfileId String    @map("baby_profile_id")
+  tokenHash     String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt     DateTime  @map("expires_at")
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  revokedAt     DateTime? @map("revoked_at")
+  openCount     Int       @default(0) @map("open_count")
+  lastOpenedAt  DateTime? @map("last_opened_at")
+
+  baby BabyProfile @relation(fields: [babyProfileId], references: [id])
+
+  @@index([tenantId, babyProfileId])
+  @@map("baby_growth_shares")
+}
+
+// ==================== 满意度调查 ====================
+/// 客户满意度调查（纸质表《客户满意度调查表 一/二/三》，住满第 5/15/25 天各一张）。客服不定期收回纸质表后拍照上传，
+/// AI 识别出每个评分项的分值（0~12，打勾的格子）和手写意见，人工核对确认后才计入统计。
+model SatisfactionSurvey {
+  id              String                @id @default(cuid())
+  tenantId        String                @map("tenant_id")
+  storeId         String?               @map("store_id")
+  formNo          Int                   @map("form_no") // 所用模板的序号（1/2/3 是内置三张表）；统计、筛选以 templateId 为准
+  templateId      String?               @map("template_id") // 满意度模板（SatisfactionTemplate）
+  customerId      String?               @map("customer_id") // 对上的客户（姓名匹配或人工选择）
+  customerName    String?               @map("customer_name") // 纸上手写的姓名（客户没对上时也保留）
+  roomNo          String?               @map("room_no")
+  stewardName     String?               @map("steward_name") // 管家姓名
+  nurseName       String?               @map("nurse_name") // 责任护士
+  phone           String?
+  surveyDate      DateTime?             @map("survey_date") @db.Date
+  scores          Json? // { 评分项key: 0~12 }，没打勾的项不出现
+  suggestion      String?               @db.Text // 其它意见和建议 / 需要改进的地方
+  praise          String?               @db.Text // 值得表扬的人、事、物
+  status          String                @default("DRAFT") // DRAFT 待核对 / CONFIRMED 已确认（计入统计）
+  extractStatus   ContractExtractStatus @default(NONE) @map("extract_status")
+  extractError    String?               @map("extract_error") @db.Text
+  extractWarnings Json?                 @map("extract_warnings")
+  extractModel    String?               @map("extract_model")
+  extractedAt     DateTime?             @map("extracted_at")
+  confirmedBy     String?               @map("confirmed_by")
+  confirmedAt     DateTime?             @map("confirmed_at")
+  createdBy       String                @map("created_by")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  version         Int                   @default(0)
+
+  files SatisfactionSurveyFile[]
+
+  @@index([tenantId, formNo, status])
+  @@index([tenantId, templateId])
+  @@index([tenantId, customerId])
+  @@map("satisfaction_surveys")
+}
+
+model SatisfactionSurveyFile {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  surveyId     String   @map("survey_id")
+  fileName     String   @map("file_name")
+  storagePath  String   @map("storage_path")
+  originalPath String?  @map("original_path")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  survey SatisfactionSurvey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@map("satisfaction_survey_files")
+}
+
+/// 满意度调查模板：评分项分组、评分尺文字、两个手写栏的名称。day = 客户入住第几天做这张调查（空=不自动提醒）。
+/// 内置三张（第5/15/25天）首次使用时自动生成；也可手工新建，或上传 Word/Excel/PDF/图片由 AI 生成后再修改条款。
+/// groups: [{ key, title, items: [{ key, label }] }]；评分项 key 一旦生成就不变（历史评分按 key 存），改文字不影响历史数据。
+model SatisfactionTemplate {
+  id              String       @id @default(cuid())
+  tenantId        String       @map("tenant_id")
+  name            String
+  sortNo          Int          @default(1) @map("sort_no")
+  day             Int?
+  goodWord        String       @default("好") @map("good_word")
+  badWord         String       @default("不好") @map("bad_word")
+  suggestionLabel String       @map("suggestion_label")
+  praiseLabel     String       @map("praise_label")
+  groups          Json
+  status          CommonStatus @default(ACTIVE) // ACTIVE=正在使用；INACTIVE=停用/草稿
+  source          String       @default("MANUAL") // BUILTIN 内置 / MANUAL 手工 / UPLOAD 上传文件生成
+  createdBy       String       @map("created_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  version         Int          @default(0)
+
+  @@index([tenantId, status])
+  @@map("satisfaction_templates")
+}
+
+// ==================== 外部系统集成（呼叫定位系统等） ====================
+// 规则：管理系统是基础数据的唯一来源；外部系统用 API Key 只读拉取、写回呼叫事件，不碰本库。
+// 全局 ID 规则见 docs/集成规范-呼叫定位系统.md（全部主键为 cuid 字符串，全局唯一、不连号）。
+
+enum DutyStatus {
+  ON_DUTY
+  OFF_DUTY
+  RESTING
+}
+
+enum IntegrationDeviceKind {
+  TABLET
+  BEACON
+}
+
+/// 已接入的外部子系统（呼叫定位系统等）：登记地址、版本、开关；API Key 只存哈希，明文只在创建时显示一次
+model IntegrationSystem {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  code          String    @db.VarChar(64) // 系统代号，如 call-locating
+  name          String
+  baseUrl       String?   @map("base_url")
+  systemVersion String?   @map("system_version") @db.VarChar(32)
+  /// 限定只能访问某家门店；空 = 租户内所有门店
+  storeId       String?   @map("store_id")
+  apiKeyHash    String    @unique @map("api_key_hash") @db.VarChar(64)
+  apiKeyPrefix  String    @map("api_key_prefix") @db.VarChar(16)
+  enabled       Boolean   @default(true)
+  lastSeenAt    DateTime? @map("last_seen_at")
+  remark        String?   @db.Text
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  version       Int       @default(0)
+
+  @@unique([tenantId, code])
+  @@map("integration_systems")
+}
+
+/// 房间-设备绑定：一间房可有 1 台平板 + 多个蓝牙信标；device_code 是外部系统里的设备编号
+model RoomDeviceBinding {
+  id         String                @id @default(cuid())
+  tenantId   String                @map("tenant_id")
+  storeId    String                @map("store_id")
+  roomId     String                @map("room_id")
+  kind       IntegrationDeviceKind
+  deviceCode String                @map("device_code") @db.VarChar(64)
+  remark     String?
+  createdBy  String                @map("created_by")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@unique([tenantId, storeId, kind, deviceCode])
+  @@index([tenantId, roomId])
+  @@map("room_device_bindings")
+}
+
+/// 服务项字典：呼叫按钮/服务类型的统一代号（service_code）
+model ServiceCatalogItem {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  serviceCode String       @map("service_code") @db.VarChar(64)
+  name        String
+  category    String       @default("CALL") @db.VarChar(32)
+  sortNo      Int          @default(1) @map("sort_no")
+  status      CommonStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([tenantId, serviceCode])
+  @@map("service_catalog_items")
+}
+
+/// 外部呼叫记录：呼叫系统写回的每次呼叫，按 (来源系统, call_id) 幂等
+model ExternalCallRecord {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  storeId        String    @map("store_id")
+  source         String    @db.VarChar(64) // 来源系统代号
+  callId         String    @map("call_id") @db.VarChar(64)
+  roomId         String?   @map("room_id")
+  stayId         String?   @map("stay_id")
+  requestType    String    @map("request_type") @db.VarChar(64)
+  serviceCode    String?   @map("service_code") @db.VarChar(64)
+  status         String    @default("CREATED") @db.VarChar(32)
+  initiatedAt    DateTime  @map("initiated_at")
+  dispatchedAt   DateTime? @map("dispatched_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  completedAt    DateTime? @map("completed_at")
+  handlerStaffId String?   @map("handler_staff_id")
+  feedback       String?   @db.Text
+  payload        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, source, callId])
+  @@index([tenantId, storeId, initiatedAt])
+  @@index([tenantId, stayId])
+  @@index([tenantId, roomId])
+  @@map("external_call_records")
+}
+
+/// 管理系统事件（发件箱）：入住/离店/换房/排班变动时写入，外部系统按游标拉取（也可再转发 MQTT {store_id}/mgmt/{event_type}）
+model IntegrationEvent {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  storeId   String   @map("store_id")
+  eventType String   @map("event_type") @db.VarChar(64)
+  entityId  String?  @map("entity_id")
+  payload   Json
+  seq       BigInt   @unique @default(autoincrement())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, storeId, seq])
+  @@map("integration_events")
+}
+
+// ==================== 我的待办（个人工作台） ====================
+enum TodoQuadrant {
+  Q1 // 紧急且重要
+  Q2 // 重要但不紧急
+  Q3 // 紧急但不重要
+  Q4 // 不紧急且不重要
+}
+
+enum ReminderRepeat {
+  NONE // 只提醒一次（指定日期）
+  DAILY
+  WEEKDAYS // 周一至周五
+  WEEKLY
+  MONTHLY
+}
+
+/// 效率四象限里的个人任务
+model PersonalTask {
+  id        String       @id @default(cuid())
+  tenantId  String       @map("tenant_id")
+  accountId String       @map("account_id")
+  title     String       @db.VarChar(200)
+  note      String?      @db.VarChar(500)
+  quadrant  TodoQuadrant @default(Q2)
+  sortOrder Int          @default(0) @map("sort_order")
+  done      Boolean      @default(false)
+  doneAt    DateTime?    @map("done_at")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId, accountId, done])
+  @@map("personal_task")
+}
+
+/// 个人重要提醒（按日期/重复规则在当天自动出现）
+model PersonalReminder {
+  id          String                 @id @default(cuid())
+  tenantId    String                 @map("tenant_id")
+  accountId   String                 @map("account_id")
+  title       String                 @db.VarChar(200)
+  note        String?                @db.VarChar(500)
+  repeat      ReminderRepeat         @default(NONE)
+  /// 一次性提醒的日期（YYYY-MM-DD）；重复提醒表示“从这天开始”
+  startDate   String                 @map("start_date") @db.VarChar(10)
+  /// 提醒时刻 HH:mm，空=全天
+  timeOfDay   String?                @map("time_of_day") @db.VarChar(5)
+  /// 每周几(0-6，0=周日)，WEEKLY 用
+  weekday     Int?
+  /// 每月几号，MONTHLY 用
+  monthDay    Int?                   @map("month_day")
+  active      Boolean                @default(true)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  completions PersonalReminderDone[]
+
+  @@index([tenantId, accountId, active])
+  @@map("personal_reminder")
+}
+
+/// 某条提醒在某一天已完成
+model PersonalReminderDone {
+  id         String           @id @default(cuid())
+  reminderId String           @map("reminder_id")
+  date       String           @db.VarChar(10)
+  doneAt     DateTime         @default(now()) @map("done_at")
+  reminder   PersonalReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@unique([reminderId, date])
+  @@map("personal_reminder_done")
+}
+
+/// 正在进行中的持续性工作（带依次推进的节点）
+model OngoingWork {
+  id         String            @id @default(cuid())
+  tenantId   String            @map("tenant_id")
+  accountId  String            @map("account_id")
+  title      String            @db.VarChar(200)
+  note       String?           @db.VarChar(500)
+  finished   Boolean           @default(false)
+  finishedAt DateTime?         @map("finished_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  steps      OngoingWorkStep[]
+
+  @@index([tenantId, accountId, finished])
+  @@map("ongoing_work")
+}
+
+model OngoingWorkStep {
+  id        String      @id @default(cuid())
+  workId    String      @map("work_id")
+  title     String      @db.VarChar(200)
+  /// 完成时填的进展说明（可空）
+  result    String?     @db.VarChar(500)
+  sortOrder Int         @default(0) @map("sort_order")
+  done      Boolean     @default(false)
+  doneAt    DateTime?   @map("done_at")
+  createdAt DateTime    @default(now()) @map("created_at")
+  work      OngoingWork @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@index([workId])
+  @@map("ongoing_work_step")
+}
+
+/// 自定义快捷入口：每人把常用页面链接到“我的待办”
+model QuickLink {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  accountId String   @map("account_id")
+  path      String   @db.VarChar(200)
+  label     String   @db.VarChar(60)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([accountId, path])
+  @@map("quick_link")
+}

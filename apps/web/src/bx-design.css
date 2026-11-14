@@ -1,0 +1,157 @@
+/* 伴月轩设计语言（docs/设计语言.md）的颜色与字体变量：暖色、纸张感，不用冷灰/渐变/发光。 */
+:root {
+  --bx-ink: #161615;
+  --bx-paper: #f7f5ef;
+  --bx-paper-2: #eeebe3;
+  --bx-paper-3: #e6e3d9;
+  --bx-gray: #86817a; /* 暖灰：次要文字 */
+  --bx-clay: #c96f4f; /* 陶土橙：唯一强调色 */
+  --bx-olive: #7d8b63;
+  --bx-blue: #6e97bf;
+  --bx-lilac: #c8c6d8;
+  --bx-cactus: #b9cec6;
+  --bx-coral: #e8cbc8;
+  --bx-fig: #b86580;
+  --bx-oat: #e2d9cb;
+  --bx-card: #fffefb;
+  --bx-line-strong: #d6d2c8;
+  --bx-brand: #f7f5ef; /* 侧边栏品牌字 */
+  --bx-hero: #c96f4f; /* 登录页插画底 */
+  --bx-serif: 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC', STSong, Georgia, serif;
+  --bx-sans: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  --bx-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+}
+/* Sample：改版前的经典蓝绿配色 */
+:root[data-theme='sample'] {
+  --bx-ink: #1f2225;
+  --bx-paper: #ffffff;
+  --bx-paper-2: #f5f6f8;
+  --bx-paper-3: #e6e8eb;
+  --bx-gray: #888888;
+  --bx-clay: #f0a020;
+  --bx-olive: #18a058;
+  --bx-blue: #2080f0;
+  --bx-lilac: #e8f1f8;
+  --bx-cactus: #eaf1e6;
+  --bx-coral: #fdeee8;
+  --bx-fig: #d4537e;
+  --bx-oat: #fdf6dc;
+  --bx-card: #ffffff;
+  --bx-line-strong: #cfd4dc;
+  --bx-brand: #1f3a5f;
+  --bx-hero: #8fb4de;
+  --bx-serif: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --bx-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.bx-page {
+  background: var(--bx-paper);
+  color: var(--bx-ink);
+  font-family: var(--bx-sans);
+  border-radius: 14px;
+  padding: 20px;
+  min-height: calc(100vh - 120px);
+}
+.bx-serif {
+  font-family: var(--bx-serif);
+}
+@media (max-width: 767px) {
+  /* Sample：改版前的经典蓝绿配色 */
+:root[data-theme='sample'] {
+  --bx-ink: #1f2225;
+  --bx-paper: #ffffff;
+  --bx-paper-2: #f5f6f8;
+  --bx-paper-3: #e6e8eb;
+  --bx-gray: #888888;
+  --bx-clay: #f0a020;
+  --bx-olive: #18a058;
+  --bx-blue: #2080f0;
+  --bx-lilac: #e8f1f8;
+  --bx-cactus: #eaf1e6;
+  --bx-coral: #fdeee8;
+  --bx-fig: #d4537e;
+  --bx-oat: #fdf6dc;
+  --bx-card: #ffffff;
+  --bx-line-strong: #e0e0e6;
+  --bx-brand: #1f3a5f;
+  --bx-hero: #8fb4de;
+  --bx-serif: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --bx-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.bx-page {
+    padding: 12px;
+    border-radius: 10px;
+  }
+}
+a {
+  color: var(--bx-ink);
+  text-decoration-color: var(--bx-clay);
+  text-underline-offset: 3px;
+}
+
+/* 房间卡片（房态看板 / 护理看板共用）：白纸卡片 + 顶部一条实色“书脊”表示状态，和米白页面背景拉开层次 */
+.bx-rc.n-card {
+  background: var(--bx-card);
+  border: 1px solid var(--bx-line-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.15s;
+}
+.bx-rc.n-card:hover {
+  transform: translateY(-2px);
+}
+.bx-rc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: -8px -10px 8px;
+  padding: 7px 10px;
+  color: var(--bx-paper);
+}
+.bx-rc-head .bx-rc-no {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--bx-mono);
+  color: inherit;
+}
+.bx-rc-head .bx-rc-type {
+  font-size: 12px;
+  color: inherit;
+  opacity: 0.85;
+}
+.bx-rc-head .bx-rc-pill {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+  background: var(--bx-paper);
+  color: var(--bx-ink);
+  font-weight: 600;
+}
+.bx-rc--OCCUPIED .bx-rc-head { background: var(--bx-olive); }
+.bx-rc--RESERVED .bx-rc-head { background: var(--bx-oat); color: var(--bx-ink); }
+.bx-rc--PENDING_CLEANING .bx-rc-head { background: var(--bx-clay); }
+.bx-rc--MAINTENANCE .bx-rc-head { background: var(--bx-gray); }
+/* 空闲：没有书脊，虚线框、底色透明，自然退到后面 */
+.bx-rc--VACANT.n-card {
+  background: transparent;
+  border: 1px dashed var(--bx-line-strong);
+}
+.bx-rc--VACANT .bx-rc-head {
+  margin-bottom: -8px;
+  color: var(--bx-gray);
+}
+.bx-rc--VACANT .bx-rc-head .bx-rc-pill {
+  background: var(--bx-paper-3);
+  color: #5c5851;
+}
+
+/* Sample 配色下页面背景是白色：卡片主体按状态铺一层淡底色、色带加深，和背景拉开 */
+:root[data-theme='sample'] .bx-rc.n-card { box-shadow: 0 1px 3px rgba(31, 34, 37, 0.08); }
+:root[data-theme='sample'] .bx-rc--RESERVED.n-card { background: #fff8e6; border-color: #ecd9a4; }
+:root[data-theme='sample'] .bx-rc--RESERVED .bx-rc-head { background: #f6dc9a; }
+:root[data-theme='sample'] .bx-rc--OCCUPIED.n-card { background: #ecf8f1; border-color: #a9dcc0; }
+:root[data-theme='sample'] .bx-rc--PENDING_CLEANING.n-card { background: #fff1e6; border-color: #f3c79b; }
+:root[data-theme='sample'] .bx-rc--MAINTENANCE.n-card { background: #f1f2f4; border-color: #cfd4dc; }
+:root[data-theme='sample'] .bx-rc--VACANT.n-card { background: #fafbfc; box-shadow: none; }

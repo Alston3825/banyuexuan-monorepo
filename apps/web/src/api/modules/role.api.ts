@@ -1,0 +1,24 @@
+import { http } from '../client'
+import type { CreateRoleDto, Role, UpdateRoleDto } from '../types/role'
+
+export const roleApi = {
+  list: () => http.get<Role[]>('/platform/roles').then((r) => r.data),
+  get: (id: string) => http.get<Role>(`/platform/roles/${id}`).then((r) => r.data),
+  create: (body: CreateRoleDto) => http.post<Role>('/platform/roles', body).then((r) => r.data),
+  update: (id: string, body: UpdateRoleDto) => http.patch<Role>(`/platform/roles/${id}`, body).then((r) => r.data),
+  remove: (id: string) => http.delete(`/platform/roles/${id}`).then((r) => r.data),
+  /** 批量调整权限（一次请求，勾选大模块也不会被限流） */
+  changePermissions: (id: string, grant: string[], revoke: string[]) =>
+    http.put<{ granted: number; revoked: number }>(`/platform/roles/${id}/permissions`, { grant, revoke }, { silentNetwork: true } as any).then((r) => r.data),
+  /** 与默认权限清单对比：要新增/撤销哪些 */
+  defaultsPreview: (id: string) =>
+    http
+      .get<{ hasDefault: boolean; defaultCount: number; add: { id: string; code: string; name: string }[]; remove: { id: string; code: string; name: string }[] }>(`/platform/roles/${id}/default-permissions`)
+      .then((r) => r.data),
+  /** 恢复默认权限 */
+  restoreDefaults: (id: string) => http.post<{ granted: number; revoked: number; defaultCount: number }>(`/platform/roles/${id}/restore-defaults`).then((r) => r.data),
+  grantPermission: (id: string, permissionPointId: string) =>
+    http.post(`/platform/roles/${id}/permissions`, { permissionPointId }).then((r) => r.data),
+  revokePermission: (id: string, permissionPointId: string) =>
+    http.delete(`/platform/roles/${id}/permissions/${permissionPointId}`).then((r) => r.data),
+}

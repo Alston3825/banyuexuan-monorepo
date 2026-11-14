@@ -1,0 +1,42 @@
+# 本机测试环境用，跟 pm2.ecosystem.config.cjs 配套的自愈闭环里的一环——
+# restart 必须是 always 不能是 unless-stopped：Mac 关机/重启时 Docker 会把容器记成
+# "被正常停止"，unless-stopped 语义就是"人为停过的不要自动拉起"，导致每次重启电脑后
+# MySQL/Redis都起不来，得手动 docker compose up -d 才行（这个坑踩过两次）。
+# always 才会无视"上次是怎么停的"，daemon 一起来就把它俩重新拉起来。
+name: banyuexuan-dev
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: banyuexuan_dev
+      MYSQL_USER: banyuexuan
+      MYSQL_PASSWORD: banyuexuan
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
+  redis_data:

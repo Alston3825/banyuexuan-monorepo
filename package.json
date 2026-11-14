@@ -1,0 +1,17 @@
+{
+  "name": "banyuexuan-monorepo",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/web",
+    "apps/api",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@banyuexuan/web",
+    "dev:api": "npm run start:dev --workspace=@banyuexuan/api",
+    "build:web": "npm run build --workspace=@banyuexuan/web",
+    "build:api": "npm run build --workspace=@banyuexuan/api",
+    "test:api": "npm run test --workspace=@banyuexuan/api"
+  }
+}
