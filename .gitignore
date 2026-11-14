@@ -36,3 +36,27 @@ apps/web/dist/
 
 # 旧系统参考截图/视频素材：体积大（数百MB），仅本地参考用，不入库
 月子中心管理软件截图与操作视频/
+
+# Codex迁移副本：本机运行文件与秘密配置不提交
+.env*
+!.env*.example
+!.env*.template
+*.pem
+*.key
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+node_modules/
+.venv/
+__pycache__/
+**/build/
+.gradle/
+dist/
+tmp/
+host/models/
+host/data/
+host/config/
+host/mosquitto/auth/
+发出文件/
+.DS_Store
