@@ -4,7 +4,7 @@
 
 ## 权威目录与仓库
 
-本机原始开发目录：`/Users/alston/Documents/Codex/接手项目/伴月轩月子中心AI系统`。本次已完整复制到Codex目录；原目录保留作为历史副本。现有服务器地址不变。
+本机原始开发目录：`/Users/alston/Projects/Codex/接手项目/伴月轩月子中心AI系统`。本次没有搬迁代码或改变现有服务工作目录。
 
 独立私有仓库：https://github.com/Alston3825/banyuexuan-monorepo ，自动备份分支 `backup/live`。恢复时 clone 后显式切换该分支。已有生产仓库的 main 保持原发布流程，自动备份不会替你部署。
 
