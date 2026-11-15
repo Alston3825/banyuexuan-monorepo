@@ -37,7 +37,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('../layouts/AdminLayout.vue'),
-    redirect: '/crm/customers',
+    redirect: '/workspace/todos?tab=reminder',
     children: [
       { path: 'org/regions', name: 'regions', component: () => import('../views/org/RegionsView.vue'), meta: { title: '区域管理' } },
       { path: 'org/stores', name: 'stores', component: () => import('../views/org/StoresView.vue'), meta: { title: '门店管理' } },
@@ -156,7 +156,7 @@ router.beforeEach((to) => {
   if (to.meta.public) return true
   const auth = useAuthStore()
   if (to.path === '/login') {
-    if (auth.isAuthenticated) return firstAccessibleRoute(auth.hasAccess) ?? '/crm/customers'
+    if (auth.isAuthenticated) return '/workspace/todos?tab=reminder'
     return true
   }
   if (!auth.isAuthenticated) {

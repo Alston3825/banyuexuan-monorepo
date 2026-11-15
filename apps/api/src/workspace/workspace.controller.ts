@@ -18,8 +18,16 @@ export class WorkspaceController {
   }
 
   @Get('todos/badge')
-  badge() {
-    return this.workspaceService.badge();
+  async badge() {
+    const [business, reminders] = await Promise.all([
+      this.workspaceService.badge(),
+      this.wb.remindersForDay(),
+    ]);
+    const pending = reminders.filter((r) => !r.done);
+    return {
+      total: business.total + pending.length,
+      overdue: business.overdue + pending.filter((r) => r.overdue).length,
+    };
   }
 
   // ===== 个人工作台（只操作自己的数据，登录即可） =====
