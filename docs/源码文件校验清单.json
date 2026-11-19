@@ -124,7 +124,7 @@
   "apps/web/public/favicon.svg": "61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66",
   "apps/web/dev-dist/workbox-290dd570.js": "2481958d86deade5b50e6d480d336f1613332c0b70e6920e9654ba50a5bd94f9",
   "apps/web/dev-dist/registerSW.js": "8529a2aaf8ae6808fcd306e0a4bc5d850add8d55594f147076f8b29f75f08577",
-  "apps/web/dev-dist/sw.js": "359aa56f61ee0305fbc5de75d3ded0b9c31e58fd72837e6dfd4f2d0779a6d237",
+  "apps/web/dev-dist/sw.js": "17243695b37af2a85701107707ba05de9308dd1b9efa6cff7064b638602087c3",
   "apps/web/.vscode/extensions.json": "70d56b550e796e3ea92922763ae03037a1a94596fda9d737982c75f6a20e88dd",
   "apps/web/src/App.vue": "22182e8cd2c406ab2020d41563aabaddcb5c57b40569311c199a0ecb5dd11a85",
   "apps/web/src/main.ts": "a47be974424fe0685d7efe7d8670c52cfb2da5abf3909b06ec47b6c0fb530764",
