@@ -1,0 +1,22 @@
+{
+  "scanned_at": "2026-11-20T19:41:31.707067-08:00",
+  "timezone": "America/Los_Angeles",
+  "eligible_files_before_generated_documents": 1172,
+  "excluded_directories": [
+    ".claude",
+    ".git",
+    ".pytest_cache",
+    "apps/ai-service/.pytest_cache",
+    "apps/ai-service/.venv",
+    "apps/api/dist",
+    "apps/api/node_modules",
+    "apps/api/storage",
+    "apps/web/dev-dist",
+    "apps/web/dist",
+    "apps/web/node_modules",
+    "dist",
+    "node_modules"
+  ],
+  "excluded_sensitive_or_runtime_files_count": 4,
+  "note": "目录仅列排除边界，不列秘密文件名或值；完整上传文件哈希见docs/源码文件校验清单.json。扫描不代表上传成功。"
+}

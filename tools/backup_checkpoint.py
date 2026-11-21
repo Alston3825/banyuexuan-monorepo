@@ -31,6 +31,32 @@ def atomic_json(path, value):
 def prepare(now):
     folder = ROOT / '备份与交接'
     folder.mkdir(exist_ok=True)
+    excluded_dirs = []
+    excluded_files = 0
+    eligible = 0
+    for root, dirs, names in os.walk(ROOT):
+        kept = []
+        for name in dirs:
+            path = Path(root, name)
+            rel = path.relative_to(ROOT)
+            if engine.skip_directory(path, rel):
+                excluded_dirs.append(str(rel))
+            else:
+                kept.append(name)
+        dirs[:] = kept
+        for name in names:
+            path = Path(root, name)
+            if engine.excluded(path, path.relative_to(ROOT)):
+                excluded_files += 1
+            else:
+                eligible += 1
+    atomic_json(folder / '资料覆盖清单.json', {
+        'scanned_at': now.isoformat(), 'timezone': 'America/Los_Angeles',
+        'eligible_files_before_generated_documents': eligible,
+        'excluded_directories': sorted(excluded_dirs),
+        'excluded_sensitive_or_runtime_files_count': excluded_files,
+        'note': '目录仅列排除边界，不列秘密文件名或值；完整上传文件哈希见docs/源码文件校验清单.json。扫描不代表上传成功。'
+    })
     evidence = {}
     for name in ENTRIES:
         evidence[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()

@@ -68,7 +68,7 @@ def snapshot(pr):
    target=mirror/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
    if hashlib.sha256(target.read_bytes()).hexdigest()!=h:raise RuntimeError('扫描期间文件变化，待下次重试：'+name)
   docs=mirror/'docs';docs.mkdir(exist_ok=True)
-  note=f'# {pr["name"]} · 自动接手快照\n\n日期：{date}（Mac本地时间）。\n\n原目录：`{src}`\n\n原所属Git版本：`{origin or "无独立Git，采用内容哈希快照"}`\n\n源码/文档文件数：{len(files)}；总大小：{sum(x[2] for x in files.values())}字节。内容清单摘要：`{fingerprint}`。\n\n自上次快照新增或变化：{len(changed)}；移除：{len(removed)}。此为文件变化事实，不代表功能验收。\n\n先读 AI接手说明.md、当前开发任务.md、服务器对接状态.md。真实配置在原机器安全位置，生产数据走独立加密备份。\n\n最近变化路径：\n\n'+''.join('- `'+n+'`\n' for n in sorted(changed)[:100])
+  note=f'# {pr["name"]} · 自动接手快照\n\n日期：{date}（Mac本地时间）。\n\n原目录：`{src}`\n\n原所属Git版本：`{origin or "无独立Git，采用内容哈希快照"}`\n\n源码/文档文件数：{len(files)}；总大小：{sum(x[2] for x in files.values())}字节。内容清单摘要：`{fingerprint}`。\n\n自上次快照新增或变化：{len(changed)}；移除：{len(removed)}。此为文件变化事实，不代表功能验收。\n\n先读 备份与交接/交接说明.md、AGENTS.md、docs/当前开发任务.md。真实配置在原机器安全位置，生产数据走独立加密备份。\n\n最近变化路径：\n\n'+''.join('- `'+n+'`\n' for n in sorted(changed)[:100])
   (docs/'自动接手快照.md').write_text(note)
   (docs/'源码文件校验清单.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
   if not (mirror/'README.md').exists():(mirror/'README.md').write_text('# '+pr['name']+'\n\n从 [AI接手说明](docs/AI接手说明.md) 开始。\n')
