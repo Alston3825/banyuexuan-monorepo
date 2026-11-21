@@ -31,7 +31,9 @@ def skip_directory(root,relative):
  return root.name in SKIP or root.is_symlink() or relative.parts in RUNTIME_DIRS or (relative.parts[:2] == ('development', 'bycall') and relative.parts[2:] in RUNTIME_DIRS)
 
 def snapshot(pr):
- src=Path(pr['source']);mirror=BASE/'repos'/pr['id'];branch='backup/live' if pr['existing'] else 'main';mirror.mkdir(parents=True,exist_ok=True)
+ src=Path(pr['source']);mirror=BASE/'repos'/pr['id'];branch='backup/live' if pr['existing'] else 'main'
+ if src.resolve()==mirror.resolve() or src.resolve() in mirror.resolve().parents or mirror.resolve() in src.resolve().parents:raise RuntimeError('开发目录与备份镜像不能相同或互为父子目录，拒绝运行')
+ mirror.mkdir(parents=True,exist_ok=True)
  if not (mirror/'.git').exists():
   git(mirror,'init','-b',branch);git(mirror,'config','user.name','Alston project backup');git(mirror,'config','user.email','alston3825@users.noreply.github.com');git(mirror,'remote','add','origin','git@github.com:'+pr['repo']+'.git')
  if git(mirror,'remote','get-url','origin')!='git@github.com:'+pr['repo']+'.git':raise RuntimeError('远端不符合固定配置，停止')
