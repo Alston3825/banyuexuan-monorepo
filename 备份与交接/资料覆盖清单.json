@@ -1,7 +1,7 @@
 {
-  "scanned_at": "2026-11-21T00:03:52.366576-08:00",
+  "scanned_at": "2026-11-21T07:10:14.059703-08:00",
   "timezone": "America/Los_Angeles",
-  "eligible_files_before_generated_documents": 1173,
+  "eligible_files_before_generated_documents": 1174,
   "excluded_directories": [
     ".claude",
     ".git",
