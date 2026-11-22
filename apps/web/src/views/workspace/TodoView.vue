@@ -3,7 +3,8 @@
  * 我的待办：每天上午打开，一眼理清今天的工作。
  * 四个栏目左右排开——效率四象限 / 重要提醒 / 正在进行中 / 自定义快捷入口，点栏目名切换。
  */
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import QuadrantPanel from './QuadrantPanel.vue'
 import ReminderPanel from './ReminderPanel.vue'
 import OngoingPanel from './OngoingPanel.vue'
@@ -17,17 +18,22 @@ const TABS: { key: Tab; label: string; short: string }[] = [
   { key: 'ongoing', label: '正在进行中', short: '进行中' },
   { key: 'links', label: '自定义快捷入口', short: '快捷入口' },
 ]
-const tab = ref<Tab>('quadrant')
+const tab = ref<Tab>('reminder')
+const route = useRoute()
 const counts = ref<Record<Tab, number>>({ quadrant: 0, reminder: 0, ongoing: 0, links: 0 })
 const KEY = 'myTodoTab'
-onMounted(() => {
-  try {
-    const t = localStorage.getItem(KEY) as Tab | null
-    if (t && TABS.some((x) => x.key === t)) tab.value = t
-  } catch {
-    /* 记不住上次的栏目也没关系 */
+watch(() => route.query.tab, (requested) => {
+  if (typeof requested === 'string' && TABS.some((x) => x.key === requested)) {
+    tab.value = requested as Tab
+    return
   }
-})
+  try {
+    const saved = localStorage.getItem(KEY) as Tab | null
+    tab.value = saved && TABS.some((x) => x.key === saved) ? saved : 'reminder'
+  } catch {
+    tab.value = 'reminder'
+  }
+}, { immediate: true })
 function pick(t: Tab) {
   tab.value = t
   try {

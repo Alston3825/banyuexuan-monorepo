@@ -6,6 +6,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { ActorContext, SYSTEM_ACTOR } from '../../common/context/actor-context';
 import { WORKFLOW_ARCHIVE_QUEUE } from '../../queue/queue.constants';
+import { NotificationService } from '../../notification/notification.service';
+import { businessLabel } from './workflow-business';
 
 export interface StartInstanceParams {
   definitionCode: string;
@@ -22,6 +24,7 @@ export class WorkflowEngineService {
     private readonly auditLogService: AuditLogService,
     @InjectQueue(WORKFLOW_ARCHIVE_QUEUE)
     private readonly archiveQueue: Queue,
+    private readonly notifications: NotificationService,
   ) {}
 
   async startInstance(params: StartInstanceParams, actor: ActorContext): Promise<WorkflowInstance> {
@@ -147,7 +150,7 @@ export class WorkflowEngineService {
       data: { status: 'REJECTED', comment, actedAt: new Date() },
     });
     await this.logAction(instanceId, instance.currentNodeSeq, 'REJECT', actor.accountId, comment);
-    await this.finish(instanceId, 'REJECTED', actor);
+    await this.finish(instanceId, 'REJECTED', actor, comment);
     await this.auditRecord('REJECT', instanceId, actor, { nodeSeq: instance.currentNodeSeq });
     return this.getInstanceOrThrow(instanceId);
   }
@@ -188,6 +191,7 @@ export class WorkflowEngineService {
         }),
       ]);
       await this.logAction(instanceId, instance.currentNodeSeq, 'REASSIGN', actor.accountId, comment ?? '管理员重新指定审批人');
+      await this.notifyApprovers(instanceId, [toAccountId], '管理员把这张单据转给你审批');
       await this.auditRecord('REASSIGN', instanceId, actor, { toAccountId, byAdmin: true });
       return this.getInstanceOrThrow(instanceId);
     }
@@ -220,6 +224,7 @@ export class WorkflowEngineService {
     ]);
     await this.logAction(instanceId, instance.currentNodeSeq, 'REASSIGN', actor.accountId, comment);
     await this.auditRecord('REASSIGN', instanceId, actor, { toAccountId });
+    await this.notifyApprovers(instanceId, [toAccountId], '别人把这张单据转给你审批');
     return this.getInstanceOrThrow(instanceId);
   }
 
@@ -238,6 +243,7 @@ export class WorkflowEngineService {
       },
     });
     await this.logAction(instanceId, instance.currentNodeSeq, 'ADD_APPROVER', actor.accountId, comment);
+    await this.notifyApprovers(instanceId, [accountId], '你被加签为这张单据的审批人');
     await this.auditRecord('ADD_APPROVER', instanceId, actor, { accountId });
     return this.getInstanceOrThrow(instanceId);
   }
@@ -255,6 +261,13 @@ export class WorkflowEngineService {
     });
     await this.logAction(instanceId, instance.currentNodeSeq, 'CC', actor.accountId);
     await this.auditRecord('CC', instanceId, actor, { accountIds });
+    await this.notifications.notify(accountIds, {
+      tenantId: instance.tenantId,
+      category: 'CC',
+      title: `抄送给你：${businessLabel(instance.businessType)} ${instance.title}`,
+      body: '只需知晓，不用你审批',
+      link: `/workflow/instances/${instanceId}`,
+    });
     return this.getInstanceOrThrow(instanceId);
   }
 
@@ -266,6 +279,18 @@ export class WorkflowEngineService {
     const last = await this.prisma.workflowActionLog.findFirst({ where: { workflowInstanceId: instanceId, action: 'URGE' }, orderBy: { createdAt: 'desc' } });
     if (last && Date.now() - last.createdAt.getTime() < 3600_000) throw new ConflictException('刚催办过，请 1 小时后再催');
     await this.logAction(instanceId, instance.currentNodeSeq, 'URGE', actor.accountId, comment);
+    const pending = await this.prisma.workflowInstanceApprover.findMany({
+      where: { workflowInstanceId: instanceId, nodeSeq: instance.currentNodeSeq ?? -1, role: { in: ['APPROVER', 'ADDED_APPROVER'] }, status: 'PENDING' },
+      select: { accountId: true },
+    });
+    await this.notifications.notify(pending.map((p) => p.accountId), {
+      tenantId: instance.tenantId,
+      category: 'URGE',
+      level: 'danger',
+      title: `催办：${businessLabel(instance.businessType)} ${instance.title}`,
+      body: comment ? `发起人催你尽快处理：${comment}` : '发起人催你尽快处理这张单据',
+      link: `/workflow/instances/${instanceId}`,
+    });
     return instance;
   }
 
@@ -315,6 +340,22 @@ export class WorkflowEngineService {
         }),
       ),
     ]);
+    await this.notifyApprovers(instanceId, approverAccountIds, `当前节点：${node.name}`);
+  }
+
+  /** 站内消息：轮到这些人审批了 */
+  private async notifyApprovers(instanceId: string, accountIds: string[], note: string): Promise<void> {
+    const inst = await this.prisma.workflowInstance.findUnique({ where: { id: instanceId }, select: { tenantId: true, businessType: true, title: true, initiatorId: true } });
+    if (!inst) return;
+    const initiator = await this.prisma.account.findUnique({ where: { id: inst.initiatorId }, select: { realName: true } });
+    await this.notifications.notify(accountIds, {
+      tenantId: inst.tenantId,
+      category: 'APPROVAL',
+      level: 'warning',
+      title: `待你审批：${businessLabel(inst.businessType)} ${inst.title}`,
+      body: `${initiator?.realName ?? '有人'} 提交 · ${note}`,
+      link: `/workflow/instances/${instanceId}`,
+    });
   }
 
   /** 节点指定的员工：新数据读 approverAccountIds（可多人），旧数据只有一个 approverAccountId */
@@ -364,11 +405,23 @@ export class WorkflowEngineService {
     instanceId: string,
     status: 'APPROVED' | 'REJECTED' | 'WITHDRAWN',
     actor: ActorContext,
+    comment?: string,
   ): Promise<void> {
-    await this.prisma.workflowInstance.update({
+    const inst = await this.prisma.workflowInstance.update({
       where: { id: instanceId },
       data: { status, finishedAt: new Date() },
     });
+    if (status !== 'WITHDRAWN' && inst.initiatorId !== actor.accountId) {
+      const ok = status === 'APPROVED';
+      await this.notifications.notify([inst.initiatorId], {
+        tenantId: inst.tenantId,
+        category: 'APPROVAL_RESULT',
+        level: ok ? 'success' : 'danger',
+        title: `${ok ? '已通过' : '被驳回'}：${businessLabel(inst.businessType)} ${inst.title}`,
+        body: ok ? '你提交的申请已审批通过' : `你提交的申请没有通过${comment ? `，驳回意见：${comment}` : '，点开查看驳回意见'}`,
+        link: `/workflow/instances/${instanceId}`,
+      });
+    }
     if (status === 'APPROVED') {
       const delaySeconds = await this.getArchiveDelaySeconds(actor.tenantId);
       await this.archiveQueue.add('archive', { instanceId }, { delay: delaySeconds * 1000 });

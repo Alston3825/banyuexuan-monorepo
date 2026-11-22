@@ -13,6 +13,7 @@ import MySignatureDialog from '../components/care/MySignatureDialog.vue'
 import { mySignatureApi } from '../api/modules/care-sign.api'
 import { dialog, message } from '../utils/discrete-api'
 import { workspaceApi } from '../api/modules/workspace.api'
+import MessageBell from '../components/MessageBell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,6 +142,7 @@ async function handleUserMenuSelect(key: string) {
           <span class="page-title bx-serif">{{ route.meta.title }}</span>
         </n-space>
         <n-space align="center" :size="18" :wrap="false">
+          <MessageBell />
           <n-badge :value="todoTotal" :max="99" :type="todoOverdue > 0 ? 'error' : 'warning'" :show="todoTotal > 0">
             <n-button quaternary circle title="我的待办" @click="router.push('/workspace/todos')">
               <template #icon><n-icon size="20"><NotificationsOutline /></n-icon></template>

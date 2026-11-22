@@ -37,7 +37,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('../layouts/AdminLayout.vue'),
-    redirect: '/crm/customers',
+    redirect: '/workspace/todos?tab=reminder',
     children: [
       { path: 'org/regions', name: 'regions', component: () => import('../views/org/RegionsView.vue'), meta: { title: '区域管理' } },
       { path: 'org/stores', name: 'stores', component: () => import('../views/org/StoresView.vue'), meta: { title: '门店管理' } },
@@ -128,6 +128,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'workflow/demo-approvals', name: 'demo-approvals', component: () => import('../views/workflow/DemoApprovalsView.vue'), meta: { title: '示例审批单' } },
       { path: 'workflow/instances/:id', name: 'workflow-instance-detail', component: () => import('../views/workflow/WorkflowInstanceDetailView.vue'), meta: { title: '审批详情' } },
       { path: 'workspace/todos', name: 'workspace-todos', component: () => import('../views/workspace/TodoView.vue'), meta: { title: '我的待办' } },
+      { path: 'workspace/messages', name: 'workspace-messages', component: () => import('../views/workspace/MessagesView.vue'), meta: { title: '消息中心' } },
       { path: 'workflow/approvals', name: 'workflow-approvals', component: () => import('../views/workflow/ApprovalCenterView.vue'), meta: { title: '审批中心' } },
       { path: 'workflow/settings', name: 'workflow-settings', component: () => import('../views/workflow/WorkflowSettingsView.vue'), meta: { title: '审批流程设置' } },
       { path: 'workflow/definitions', redirect: '/workflow/settings' },
@@ -156,7 +157,7 @@ router.beforeEach((to) => {
   if (to.meta.public) return true
   const auth = useAuthStore()
   if (to.path === '/login') {
-    if (auth.isAuthenticated) return firstAccessibleRoute(auth.hasAccess) ?? '/crm/customers'
+    if (auth.isAuthenticated) return '/workspace/todos?tab=reminder'
     return true
   }
   if (!auth.isAuthenticated) {

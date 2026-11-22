@@ -1,3 +1,4 @@
+import { NotificationModule } from './notification/notification.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -45,6 +46,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     PrismaModule,
     CommonModule,
     QueueModule,
+    NotificationModule,
     AuthModule,
     PlatformModule,
     WorkflowModule,

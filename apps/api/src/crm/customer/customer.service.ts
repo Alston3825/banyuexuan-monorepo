@@ -1,3 +1,4 @@
+import { NotificationService } from '../../notification/notification.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Customer, Prisma, ReferrerType } from '@prisma/client';
 import { pinyin } from 'pinyin-pro';
@@ -28,7 +29,20 @@ export class CustomerService {
     private readonly ctx: RequestContextService,
     private readonly storage: CareStorageService,
     private readonly recycleBin: RecycleBinService,
+    private readonly notifications: NotificationService,
   ) {}
+
+  /** 抄送人站内消息：新建时发给全部抄送人，修改时只发给新加进来的（自己抄送给自己的不发） */
+  private async notifyCc(customer: Customer, accountIds: string[], isNew: boolean) {
+    const me = await this.prisma.account.findUnique({ where: { id: this.ctx.accountId ?? '' }, select: { realName: true } });
+    await this.notifications.notify(accountIds.filter((a) => a !== this.ctx.accountId), {
+      tenantId: customer.tenantId,
+      category: 'CC',
+      title: `抄送给你：客户 ${customer.name}`,
+      body: `${me?.realName ?? '同事'}${isNew ? '新添了客户' : '修改了客户资料'}并抄送给你，请知晓`,
+      link: `/crm/customers/${customer.id}`,
+    });
+  }
 
   findMany(query: QueryCustomerDto): Promise<Customer[]> {
     const where: Prisma.CustomerWhereInput = {
@@ -88,6 +102,7 @@ export class CustomerService {
       afterData: created,
       ...this.auditCtx(),
     });
+    if (ccAccountIds && ccAccountIds.length > 0) await this.notifyCc(created, ccAccountIds, true);
     return created;
   }
 
@@ -157,6 +172,11 @@ export class CustomerService {
       changedFields: Object.keys(dto),
       ...this.auditCtx(),
     });
+    if (ccAccountIds && ccAccountIds.length > 0) {
+      const old = Array.isArray(before.ccAccountIds) ? (before.ccAccountIds as unknown[]) : [];
+      const added = ccAccountIds.filter((a) => !old.includes(a));
+      if (added.length > 0) await this.notifyCc(updated, added, false);
+    }
     return updated;
   }
 

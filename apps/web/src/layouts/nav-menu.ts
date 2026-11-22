@@ -3,6 +3,7 @@ import { RouterLink } from 'vue-router'
 import { NIcon } from 'naive-ui'
 import type { MenuOption } from 'naive-ui'
 import {
+  MailOutline,
   Business,
   Storefront,
   Folder,
@@ -74,6 +75,8 @@ interface NavLeaf {
 
 /** perm 可以是单个权限点或"任意一个"的数组 */
 function hasAny(hasAccess: (perm: string) => boolean, perm: string | string[]): boolean {
+  // 空权限表示登录即可使用的个人工作台；业务审批仍单独校验权限。
+  if (perm === '') return true
   return Array.isArray(perm) ? perm.some((p) => hasAccess(p)) : hasAccess(perm)
 }
 
@@ -99,7 +102,8 @@ const navGroups: NavGroup[] = [
     label: '工作台',
     key: 'group-workspace',
     items: [
-      { label: '我的待办', to: '/workspace/todos', icon: NotificationsOutline, perm: 'workflow.instance' },
+      { label: '我的待办', to: '/workspace/todos', icon: NotificationsOutline, perm: '' },
+      { label: '消息中心', to: '/workspace/messages', icon: MailOutline, perm: '' },
       { label: '审批中心', to: '/workflow/approvals', icon: CheckmarkDoneOutline, perm: 'workflow.instance' },
     ],
   },

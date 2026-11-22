@@ -752,7 +752,7 @@ model Customer {
   hisNo                    String?        @map("his_no") // HIS 登记号（医院信息系统）
   passportNo               String?        @map("passport_no") // 国际证件号（护照等，没有身份证的外籍/港澳台客户）
   registeredAt             DateTime       @default(now()) @map("registered_at") // 添加时间：默认当前，可手改（补录历史客户时用），和 createdAt（记录入库时间）分开
-  ccAccountIds             Json?          @map("cc_account_ids") // 抄送人（员工账号 id 数组）；系统暂无站内通知，目前只记录和展示
+  ccAccountIds             Json?          @map("cc_account_ids") // 抄送人（员工账号 id 数组）；新建/新加抄送人时发站内消息（消息中心）
   channelTypeId            String?        @map("channel_type_id") // 渠道类型（可自定义，见 CustomerChannelType）；上面的 source 是它的"旧版 6 类"归并值，自定义类型一律记 OTHER
   channelId                String?        @map("channel_id") // 具体渠道，属于 channelTypeId 这个类型
   referrerType             ReferrerType?  @map("referrer_type")
@@ -4639,4 +4639,28 @@ model QuickLink {
 
   @@unique([accountId, path])
   @@map("quick_link")
+}
+
+/// 站内消息（消息中心）：一人一条。业务事件（审批、抄送）即时写入；定时扫描（评审到期、日常记录未填、个人提醒到点）
+/// 按 dedupKey 去重，同一件事同一天只发一次。只增不改内容，已读只改 readAt；保留 90 天后自动清理。
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String    @map("tenant_id")
+  accountId String    @map("account_id")
+  /// 类别：APPROVAL 待我审批 / APPROVAL_RESULT 我的申请有结果 / CC 抄送给我 / URGE 被催办 / CARE_PLAN 护理计划评审 / CARE_DAILY 日常记录未填 / REMINDER 个人提醒到点 / SYSTEM
+  category  String    @db.VarChar(32)
+  level     String    @default("info") @db.VarChar(16)
+  title     String    @db.VarChar(200)
+  body      String?   @db.VarChar(1000)
+  /// 点开跳转的页面路径（前端路由）
+  link      String?   @db.VarChar(300)
+  /// 去重键：同一个人同一个键只会有一条（定时扫描反复跑也不会重复发）
+  dedupKey  String?   @map("dedup_key") @db.VarChar(191)
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([accountId, dedupKey])
+  @@index([accountId, readAt, createdAt])
+  @@index([createdAt])
+  @@map("notifications")
 }

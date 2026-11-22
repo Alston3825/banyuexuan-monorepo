@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { AxiosError } from 'axios'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { NForm, NFormItem, NInput, NButton, type FormInst, type FormRules } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
 import { message } from '../utils/discrete-api'
 import BeianFooter from '../components/BeianFooter.vue'
 import BxTheme from '../components/BxTheme.vue'
 
-const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -46,8 +45,7 @@ async function handleSubmit() {
   loading.value = true
   try {
     await auth.login(model.value.username, model.value.password)
-    const redirect = (route.query.redirect as string) || '/crm/customers'
-    router.push(redirect)
+    await router.replace('/workspace/todos?tab=reminder')
   } catch (e) {
     // 密码只清密码框，用户名留着方便重输；有后端给的具体原因（如账号已停用）就直接显示
     const serverMsg = (e as AxiosError<{ message?: string | string[] }>).response?.data?.message
